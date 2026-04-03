@@ -53,10 +53,14 @@ app.add_middleware(
 from server.routers.turbines import router as turbines_router
 from server.routers.config import router as config_router
 from server.routers.export import router as export_router
+from server.routers.faults import router as faults_router
+from server.routers.i18n import router as i18n_router
 
 app.include_router(turbines_router)
 app.include_router(config_router)
 app.include_router(export_router)
+app.include_router(faults_router)
+app.include_router(i18n_router)
 
 
 @app.get("/api/health")

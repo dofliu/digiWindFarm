@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 class TurbineStatus(str, Enum):
@@ -17,23 +17,81 @@ class DataSourceMode(str, Enum):
 
 
 class TurbineReading(BaseModel):
+    """
+    Full SCADA reading aligned to Z72 Bachmann 39 display tags.
+    Backward-compatible: original fields preserved, new fields use Optional.
+    """
     turbineId: str
     name: str
     timestamp: datetime
     status: TurbineStatus
-    windSpeed: float          # m/s
-    powerOutput: float        # MW
-    rotorSpeed: float         # RPM
-    bladeAngle: float         # degrees (pitch)
-    temperature: float        # generator temp °C
-    vibration: float          # gearbox vibration mm/s
-    voltage: float            # V
-    current: float            # A
-    yawAngle: float           # degrees
-    gearboxTemp: float        # °C
-    frequency: Optional[float] = None       # Hz
-    hydraulicPressure: Optional[float] = None  # bar
+    turState: int = 6                # Bachmann TurState 1-9
+
+    # ── Original fields (backward-compatible) ──
+    windSpeed: float = 0.0           # m/s  (WMET_WSpeedNac)
+    powerOutput: float = 0.0         # MW   (WTUR_TotPwrAt / 1000)
+    rotorSpeed: float = 0.0          # RPM  (WROT_RotSpd)
+    bladeAngle: float = 0.0          # deg  (WROT_PtAngValBl1)
+    temperature: float = 0.0         # °C   (WGEN_GnStaTmp1)
+    vibration: float = 0.0           # mm/s (WNAC_VibMsNacXDir)
+    voltage: float = 0.0             # V    (WGEN_GnVtgMs)
+    current: float = 0.0             # A    (WGEN_GnCurMs)
+    yawAngle: float = 0.0            # deg  (derived from yaw system)
+    gearboxTemp: float = 0.0         # °C   (WNAC_NacTmp as proxy)
+    frequency: Optional[float] = None       # Hz  (WCNV_CnvGnFrq)
+    hydraulicPressure: Optional[float] = None  # bar (WYAW_YwBrkHyPrs)
     history: Optional[List[dict]] = None    # [{time, power}] for frontend chart
+
+    # ── WGEN — Generator (expanded) ──
+    genPower: Optional[float] = None         # kW  (WGEN_GnPwrMs)
+    genSpeed: Optional[float] = None         # RPM (WGEN_GnSpd)
+    genStatorTemp1: Optional[float] = None   # °C  (WGEN_GnStaTmp1)
+    genAirTemp1: Optional[float] = None      # °C  (WGEN_GnAirTmp1)
+    genBearingTemp1: Optional[float] = None  # °C  (WGEN_GnBrgTmp1)
+
+    # ── WROT — Rotor / Pitch (expanded) ──
+    bladeAngle1: Optional[float] = None      # deg (WROT_PtAngValBl1)
+    bladeAngle2: Optional[float] = None      # deg (WROT_PtAngValBl2)
+    bladeAngle3: Optional[float] = None      # deg (WROT_PtAngValBl3)
+    rotorTemp: Optional[float] = None        # °C  (WROT_RotTmp)
+    hubCabinetTemp: Optional[float] = None   # °C  (WROT_RotCabTmp)
+    rotorLocked: Optional[int] = None        # 0/1 (WROT_RotLckd)
+    brakeActive: Optional[int] = None        # 0/1 (WROT_SrvcBrkAct)
+
+    # ── WCNV — Converter ──
+    cnvCabinetTemp: Optional[float] = None   # °C  (WCNV_CnvCabinTmp)
+    cnvDcVoltage: Optional[float] = None     # V   (WCNV_CnvDClVtg)
+    cnvGridPower: Optional[float] = None     # kW  (WCNV_CnvGdPwrAt)
+    cnvGenFreq: Optional[float] = None       # Hz  (WCNV_CnvGnFrq)
+    cnvGenPower: Optional[float] = None      # kW  (WCNV_CnvGnPwr)
+    igctWaterCond: Optional[float] = None    #     (WCNV_IGCTWtrCond)
+    igctWaterPres1: Optional[float] = None   # bar (WCNV_IGCTWtrPres1)
+    igctWaterPres2: Optional[float] = None   # bar (WCNV_IGCTWtrPres2)
+    igctWaterTemp: Optional[float] = None    # °C  (WCNV_IGCTWtrTmp)
+
+    # ── WGDC — Transformer ──
+    transformerTemp: Optional[float] = None  # °C  (WGDC_TrfCoreTmp)
+
+    # ── WMET — Meteorological ──
+    windDirection: Optional[float] = None    # deg (WMET_WDirAbs)
+    outsideTemp: Optional[float] = None      # °C  (WMET_TmpOutside)
+
+    # ── WNAC — Nacelle ──
+    nacelleTemp: Optional[float] = None      # °C  (WNAC_NacTmp)
+    nacelleCabTemp: Optional[float] = None   # °C  (WNAC_NacCabTmp)
+    vibrationX: Optional[float] = None       # mm/s (WNAC_VibMsNacXDir)
+    vibrationY: Optional[float] = None       # mm/s (WNAC_VibMsNacYDir)
+
+    # ── WYAW — Yaw ──
+    yawError: Optional[float] = None         # deg  (WYAW_YwVn1AlgnAvg5s)
+    yawBrakePressure: Optional[float] = None # bar  (WYAW_YwBrkHyPrs)
+    cableWindup: Optional[float] = None      # turns (WYAW_CabWup)
+
+    # ── Fault info (from FaultEngine) ──
+    activeFaults: Optional[List[dict]] = None
+
+    # ── Raw SCADA dict (all 39 tags, for advanced views) ──
+    scadaTags: Optional[Dict[str, float]] = None
 
 
 class FarmStatus(BaseModel):
@@ -59,6 +117,18 @@ class SimulationConfig(BaseModel):
     baseWindSpeed: float = 10.0
     turbulenceIntensity: float = 0.1
     timeStep: float = 1.0
+
+
+class FaultInjectionRequest(BaseModel):
+    scenarioId: str
+    turbineId: str
+    severityRate: float = 0.001   # per second
+    initialSeverity: float = 0.0
+
+
+class FaultClearRequest(BaseModel):
+    turbineId: Optional[str] = None
+    scenarioId: Optional[str] = None
 
 
 class AppConfig(BaseModel):

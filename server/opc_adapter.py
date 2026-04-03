@@ -16,14 +16,37 @@ from server.models import DataSourceConfig
 
 
 # Tag mapping for different wind farm types
+# Z72 tags aligned to scada_registry.py (from original Bachmann Excel)
 TAG_MAPS = {
     "z72": {
         "server": "BACHMANN.OPCEnterpriseServer.2",
         "turbine_prefix": "Z72.H{:02d}",
         "turbine_range": range(1, 31),
         "tags": {
-            "wind_speed": "WMET.Z72PLC__UI_Loc_WMET_Analogue_WSpeedNacAvg10m",
-            "status": "WTUR.Z72PLC__UI_Loc_WTUR_State_TurSt",
+            "WMET_WSpeedNac": "WMET.Z72PLC__UI_Loc_WMET_Analogue_WSpeedNac",
+            "WMET_WDirAbs": "WMET.Z72PLC__UI_Loc_WMET_Analogue_WDirAbs",
+            "WMET_TmpOutside": "WMET.Z72PLC__UI_Loc_WMET_Analogue_TmpOutside",
+            "WTUR_TurSt": "WTUR.Z72PLC__UI_Loc_WTUR_State_TurSt",
+            "WTUR_TotPwrAt": "WTUR.Z72PLC__UI_Loc_WTUR_Analogue_TotPwrAt",
+            "WGEN_GnPwrMs": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnPwrMs",
+            "WGEN_GnSpd": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnSpd",
+            "WGEN_GnVtgMs": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnVtgMs",
+            "WGEN_GnCurMs": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnCurMs",
+            "WGEN_GnStaTmp1": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnStaTmp1",
+            "WGEN_GnAirTmp1": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnAirTmp1",
+            "WGEN_GnBrgTmp1": "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnBrgTmp1",
+            "WROT_RotSpd": "WROT.Z72PLC__UI_Loc_WROT_Analogue_RotSpd",
+            "WROT_PtAngValBl1": "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl1",
+            "WROT_PtAngValBl2": "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl2",
+            "WROT_PtAngValBl3": "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl3",
+            "WNAC_VibMsNacXDir": "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_VibMsNacXDir",
+            "WNAC_VibMsNacYDir": "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_VibMsNacYDir",
+            "WNAC_NacTmp": "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_NacTmp",
+            "WCNV_CnvGnFrq": "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGnFrq",
+            "WCNV_CnvGdPwrAt": "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGdPwrAt",
+            "WYAW_YwVn1AlgnAvg5s": "WYAW.Z72PLC__UI_Loc_WYAW_Analogue_YwVn1AlgnAvg5s",
+            "WYAW_YwBrkHyPrs": "WYAW.Z72PLC__UI_Loc_WYAW_Analogue_YwBrkHyPrs",
+            "WGDC_TrfCoreTmp": "WGDC.Z72PLC__UI_Loc_WGDC_Analogue_TrfCoreTmp",
         },
     },
     "ck1": {
@@ -31,12 +54,12 @@ TAG_MAPS = {
         "turbine_prefix": "Chankong1.WTG{:02d}",
         "turbine_range": range(1, 24),
         "tags": {
-            "wind_speed": "Ambient.WindSpeed",
-            "power": "Grid.Power",
-            "generator_rpm": "Generator.RPM",
-            "rotor_rpm": "RotorSystem.RotorRPM",
-            "gen_temp": "Generator.Phase1Temperature",
-            "status": "System.OperationStateInt",
+            "WMET_WSpeedNac": "Ambient.WindSpeed",
+            "WTUR_TotPwrAt": "Grid.Power",
+            "WGEN_GnSpd": "Generator.RPM",
+            "WROT_RotSpd": "RotorSystem.RotorRPM",
+            "WGEN_GnStaTmp1": "Generator.Phase1Temperature",
+            "WTUR_TurSt": "System.OperationStateInt",
         },
     },
     "ck2": {
@@ -44,12 +67,12 @@ TAG_MAPS = {
         "turbine_prefix": "Chankong2.WTG{:02d}",
         "turbine_range": range(24, 32),
         "tags": {
-            "wind_speed": "Ambient.WindSpeed",
-            "power": "Grid.Power",
-            "generator_rpm": "Generator.RPM",
-            "rotor_rpm": "RotorSystem.RotorRPM",
-            "gen_temp": "Generator.Phase1Temperature",
-            "status": "System.OperationStateInt",
+            "WMET_WSpeedNac": "Ambient.WindSpeed",
+            "WTUR_TotPwrAt": "Grid.Power",
+            "WGEN_GnSpd": "Generator.RPM",
+            "WROT_RotSpd": "RotorSystem.RotorRPM",
+            "WGEN_GnStaTmp1": "Generator.Phase1Temperature",
+            "WTUR_TurSt": "System.OperationStateInt",
         },
     },
 }
@@ -151,32 +174,42 @@ class OPCDAAdapter:
                 print(f"[OPCAdapter] Read error for {turbine_id}: {e}")
                 continue
 
+            # Build SCADA dict using tag IDs from scada_registry
+            scada = {}
+            for key, val in values.items():
+                scada[key] = val
+
             # Convert to simulator-compatible output format
+            power_kw = scada.get('WTUR_TotPwrAt', 0)
             reading = {
                 'timestamp': now.isoformat(),
                 'turbine_id': turbine_id,
-                'operational_state': self._map_opc_status(values.get('status', 0)),
-                'wind_speed': values.get('wind_speed', 0),
-                'wind_direction': 0,
+                'operational_state': self._map_opc_status(scada.get('WTUR_TurSt', 0)),
+                'wind_speed': scada.get('WMET_WSpeedNac', 0),
+                'wind_direction': scada.get('WMET_WDirAbs', 0),
+                'scada': scada,
                 'rotor': {
-                    'rotor_speed': values.get('rotor_rpm', 0),
+                    'rotor_speed': scada.get('WROT_RotSpd', 0),
                     'rotor_torque': 0,
                 },
-                'pitch_angle': 0,
+                'pitch_angle': scada.get('WROT_PtAngValBl1', 0),
                 'gearbox': {
-                    'temperature': 0,
-                    'vibration': 0,
+                    'temperature': scada.get('WNAC_NacTmp', 0),
+                    'vibration': scada.get('WNAC_VibMsNacXDir', 0),
                 },
                 'generator': {
-                    'power': values.get('power', 0) * 1000,  # kW → W
-                    'voltage': 690,
-                    'current': 0,
-                    'temperature': values.get('gen_temp', 0),
-                    'frequency': 50,
+                    'power': power_kw * 1000,  # kW → W
+                    'voltage': scada.get('WGEN_GnVtgMs', 690),
+                    'current': scada.get('WGEN_GnCurMs', 0),
+                    'temperature': scada.get('WGEN_GnStaTmp1', 0),
+                    'frequency': scada.get('WCNV_CnvGnFrq', 50),
                 },
-                'yaw': {'yaw_angle': 0, 'yaw_error': 0},
-                'hydraulic': {'pressure': 0},
-                'total_power': values.get('power', 0) * 1000,
+                'yaw': {
+                    'yaw_angle': scada.get('WYAW_YwVn1AlgnAvg5s', 0),
+                    'yaw_error': scada.get('WYAW_YwVn1AlgnAvg5s', 0),
+                },
+                'hydraulic': {'pressure': scada.get('WYAW_YwBrkHyPrs', 0)},
+                'total_power': power_kw * 1000,
             }
             readings.append(reading)
 

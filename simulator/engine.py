@@ -10,33 +10,42 @@ from collections import deque
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from wind_model import WindEnvironmentModel
-from turbine_model import WindTurbine
+from simulator.physics import TurbinePhysicsModel, FaultEngine
 
 
 class WindFarmSimulator:
-    """Wind farm simulator engine - produces realistic turbine data via callbacks."""
+    """Wind farm simulator engine — produces realistic SCADA data via callbacks.
+
+    Uses the independent physics model (simulator/physics/) for each turbine,
+    plus a shared FaultEngine for fault injection across the farm.
+    """
 
     def __init__(self, turbine_count: int = 14, base_wind_speed: float = 10.0,
                  turbulence_intensity: float = 0.1):
         self.wind_model = WindEnvironmentModel()
         self.wind_model.turbulence_intensity = turbulence_intensity
-        self.turbines: Dict[str, WindTurbine] = {}
+        self.turbines: Dict[str, TurbinePhysicsModel] = {}
         self.latest_data: Dict[str, Dict] = {}
         self.history: Dict[str, deque] = {}
         self.history_maxlen = 3600  # ~1 hour at 1Hz
+
+        self.fault_engine = FaultEngine()
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._callbacks: List[Callable] = []
         self._lock = threading.Lock()
 
+        # Ambient temperature model (simple daily cycle)
+        self._base_ambient_temp = 25.0
+
         # Initialize turbines
         for i in range(1, turbine_count + 1):
             tid = f"WT{i:03d}"
-            self.add_turbine(tid)
+            self.add_turbine(tid, seed=i)
 
-    def add_turbine(self, turbine_id: str):
-        self.turbines[turbine_id] = WindTurbine(turbine_id)
+    def add_turbine(self, turbine_id: str, seed: Optional[int] = None):
+        self.turbines[turbine_id] = TurbinePhysicsModel(seed=seed)
         self.latest_data[turbine_id] = {}
         self.history[turbine_id] = deque(maxlen=self.history_maxlen)
 
@@ -64,15 +73,31 @@ class WindFarmSimulator:
                 now = datetime.now()
                 wind_speed = self.wind_model.get_wind_speed(now)
                 wind_direction = self.wind_model.get_wind_direction(now)
+                ambient_temp = self._get_ambient_temp(now)
+
+                # Advance fault engine
+                fault_modifiers = self.fault_engine.step(dt=time_step)
 
                 readings = []
-                for tid, turbine in self.turbines.items():
-                    # Add per-turbine wind variation (wake effect approximation)
+                for tid, model in self.turbines.items():
+                    # Per-turbine wind variation (wake effect approximation)
                     idx = int(tid[2:])
-                    variation = (idx - 1) * 0.3  # slight offset per turbine
+                    variation = (idx - 1) * 0.3
                     local_wind = max(0, wind_speed + variation * (0.5 - hash(tid) % 100 / 100))
 
-                    output = turbine.simulate_step(local_wind, wind_direction, now, time_step)
+                    # Apply fault modifiers for this turbine
+                    model.fault_modifiers = fault_modifiers.get(tid, {})
+
+                    # Check if fault engine tripped this turbine
+                    for fault in self.fault_engine.active_faults:
+                        if fault.turbine_id == tid and fault.tripped:
+                            model.force_state(7)  # → Shutdown
+
+                    # Run physics step
+                    scada_output = model.step(local_wind, wind_direction, ambient_temp, time_step)
+
+                    # Build output dict (compatible with data_broker expectations)
+                    output = self._scada_to_output(tid, now, scada_output, local_wind, wind_direction)
 
                     with self._lock:
                         self.latest_data[tid] = output
@@ -90,6 +115,51 @@ class WindFarmSimulator:
             except Exception as e:
                 print(f"[Simulator] Error: {e}")
                 time.sleep(1)
+
+    def _get_ambient_temp(self, now: datetime) -> float:
+        """Simple daily temperature cycle."""
+        hour = now.hour + now.minute / 60.0
+        # Peak at 14:00, min at 05:00
+        import math
+        return self._base_ambient_temp + 5 * math.sin((hour - 5) * math.pi / 12)
+
+    @staticmethod
+    def _scada_to_output(tid: str, timestamp: datetime,
+                         scada: Dict[str, float],
+                         wind_speed: float, wind_direction: float) -> Dict:
+        """Convert flat SCADA dict to the nested output format expected by data_broker."""
+        return {
+            'timestamp': timestamp.isoformat(),
+            'turbine_id': tid,
+            'operational_state': _tur_state_to_str(int(scada.get("WTUR_TurSt", 1))),
+            'wind_speed': wind_speed,
+            'wind_direction': wind_direction,
+            'scada': scada,  # Full SCADA tags dict
+            'rotor': {
+                'rotor_speed': scada.get("WROT_RotSpd", 0),
+                'rotor_torque': 0,
+            },
+            'pitch_angle': scada.get("WROT_PtAngValBl1", 0),
+            'gearbox': {
+                'temperature': scada.get("WNAC_NacTmp", 40),
+                'vibration': scada.get("WNAC_VibMsNacXDir", 0),
+            },
+            'generator': {
+                'power': scada.get("WTUR_TotPwrAt", 0) * 1000,  # kW → W
+                'voltage': scada.get("WGEN_GnVtgMs", 0),
+                'current': scada.get("WGEN_GnCurMs", 0),
+                'temperature': scada.get("WGEN_GnStaTmp1", 45),
+                'frequency': scada.get("WCNV_CnvGnFrq", 0),
+            },
+            'yaw': {
+                'yaw_angle': scada.get("WYAW_YwVn1AlgnAvg5s", 0),
+                'yaw_error': scada.get("WYAW_YwVn1AlgnAvg5s", 0),
+            },
+            'hydraulic': {
+                'pressure': scada.get("WYAW_YwBrkHyPrs", 0),
+            },
+            'total_power': scada.get("WTUR_TotPwrAt", 0) * 1000,  # kW → W
+        }
 
     def get_current_data(self) -> Dict[str, Dict]:
         with self._lock:
@@ -111,3 +181,19 @@ class WindFarmSimulator:
     @property
     def turbine_ids(self) -> List[str]:
         return list(self.turbines.keys())
+
+
+def _tur_state_to_str(state: int) -> str:
+    """Map Bachmann TurState (1-9) to internal state string."""
+    mapping = {
+        1: "IDLE",       # Shutdown
+        2: "IDLE",       # Standby
+        3: "IDLE",       # Wait Restart
+        4: "STARTING",   # Pre-Production
+        5: "STARTING",   # Start Production
+        6: "RUNNING",    # Production
+        7: "STOPPING",   # Shutdown (in progress)
+        8: "STARTING",   # Restart
+        9: "STOPPING",   # Normal Stop
+    }
+    return mapping.get(state, "IDLE")
