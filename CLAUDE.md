@@ -119,7 +119,7 @@ digiWindTurbine/
 │   │   ├── TurbineDetail.tsx  # 6 SCADA subsystem panels + gauges + AI diagnosis
 │   │   ├── TrendChartPanel.tsx # ★ Multi-tag real-time trend chart (6 presets + custom)
 │   │   ├── FaultInjectionPanel.tsx # ★ Inject/monitor/clear faults
-│   │   ├── SettingsPage.tsx   # Data source + wind control (profiles + custom)
+│   │   ├── SettingsPage.tsx   # Data source + wind control + turbine spec + curtailment
 │   │   ├── MaintenanceHub.tsx # Work order management
 │   │   ├── DispatchModal.tsx, WorkOrderDetailModal.tsx
 │   │   ├── Gauge.tsx, MiniTrendChart.tsx, StatusIndicator.tsx, DataCard.tsx
@@ -155,6 +155,22 @@ digiWindTurbine/
 | POST | `/api/config/wind/clear` | Return to auto daily pattern |
 
 Wind profiles: `calm` (2m/s), `moderate` (8m/s), `rated` (12m/s), `strong` (18m/s), `storm` (26m/s), `gusty`, `ramp_up`, `ramp_down`, `auto`
+
+### Turbine Specification
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/config/turbine-spec` | Current turbine spec |
+| POST | `/api/config/turbine-spec` | Update spec or use preset: `{"preset":"vestas_v90_3mw"}` |
+| GET | `/api/config/turbine-spec/presets` | List available presets |
+
+Presets: `z72_5mw` (5MW), `vestas_v90_3mw` (3MW), `sg_8mw` (8MW), `goldwind_2.5mw` (2.5MW)
+
+### Operator Control
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/control/command` | `{"turbineId":"WT001","command":"stop\|start\|reset\|service_on\|service_off"}` |
+| POST | `/api/control/curtail` | `{"turbineId":"WT003","powerLimitKw":3000}` (null = remove) |
+| GET | `/api/control/{id}/status` | Current operator control status |
 
 ### Fault Injection
 | Method | Endpoint | Description |
@@ -284,3 +300,5 @@ Full map: `GET /api/modbus/registers` or `simulator/modbus_server.py`
 5. **Gemini AI service** needs `GEMINI_API_KEY` in `frontend/.env.local`
 6. **History data grows unbounded** — consider adding a cleanup job
 7. **Maintenance work orders** — frontend uses mock data, backend CRUD API not yet implemented
+
+See `TODO.md` for full development roadmap and future plans.
