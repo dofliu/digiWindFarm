@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $9, $5}')",
+      "Bash(status_all.bat)",
+      "Bash(cmd /c \"status_all.bat\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Wind Farm SCADA System",
+  "description": "A modern, real-time monitoring dashboard for a large-scale wind farm, providing at-a-glance overviews and detailed turbine diagnostics with AI-powered analysis.",
+  "requestFramePermissions": []
+}
