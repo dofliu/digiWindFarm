@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { type TurbineData, TurbineStatus } from '../types';
+import { type TurbineData, TurbineStatus, type FaultInfo } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/realtime';
@@ -9,6 +9,7 @@ interface ApiTurbineReading {
   name: string;
   timestamp: string;
   status: string;
+  turState: number;
   windSpeed: number;
   powerOutput: number;
   rotorSpeed: number;
@@ -22,6 +23,40 @@ interface ApiTurbineReading {
   frequency: number | null;
   hydraulicPressure: number | null;
   history: { time: number; power: number }[] | null;
+  // Extended SCADA fields
+  genPower?: number;
+  genSpeed?: number;
+  genStatorTemp1?: number;
+  genAirTemp1?: number;
+  genBearingTemp1?: number;
+  bladeAngle1?: number;
+  bladeAngle2?: number;
+  bladeAngle3?: number;
+  rotorTemp?: number;
+  hubCabinetTemp?: number;
+  rotorLocked?: number;
+  brakeActive?: number;
+  cnvCabinetTemp?: number;
+  cnvDcVoltage?: number;
+  cnvGridPower?: number;
+  cnvGenFreq?: number;
+  cnvGenPower?: number;
+  igctWaterCond?: number;
+  igctWaterPres1?: number;
+  igctWaterPres2?: number;
+  igctWaterTemp?: number;
+  transformerTemp?: number;
+  windDirection?: number;
+  outsideTemp?: number;
+  nacelleTemp?: number;
+  nacelleCabTemp?: number;
+  vibrationX?: number;
+  vibrationY?: number;
+  yawError?: number;
+  yawBrakePressure?: number;
+  cableWindup?: number;
+  activeFaults?: FaultInfo[];
+  scadaTags?: Record<string, number>;
 }
 
 function mapStatus(status: string): TurbineStatus {
@@ -39,6 +74,7 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     id: index + 1,
     name: api.name,
     status: mapStatus(api.status),
+    turState: api.turState,
     powerOutput: api.powerOutput,
     windSpeed: api.windSpeed,
     rotorSpeed: api.rotorSpeed,
@@ -48,6 +84,40 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     voltage: api.voltage,
     current: api.current,
     history: api.history || [],
+    // Extended fields
+    genPower: api.genPower,
+    genSpeed: api.genSpeed,
+    genStatorTemp1: api.genStatorTemp1,
+    genAirTemp1: api.genAirTemp1,
+    genBearingTemp1: api.genBearingTemp1,
+    bladeAngle1: api.bladeAngle1,
+    bladeAngle2: api.bladeAngle2,
+    bladeAngle3: api.bladeAngle3,
+    rotorTemp: api.rotorTemp,
+    hubCabinetTemp: api.hubCabinetTemp,
+    rotorLocked: api.rotorLocked,
+    brakeActive: api.brakeActive,
+    cnvCabinetTemp: api.cnvCabinetTemp,
+    cnvDcVoltage: api.cnvDcVoltage,
+    cnvGridPower: api.cnvGridPower,
+    cnvGenFreq: api.cnvGenFreq,
+    cnvGenPower: api.cnvGenPower,
+    igctWaterCond: api.igctWaterCond,
+    igctWaterPres1: api.igctWaterPres1,
+    igctWaterPres2: api.igctWaterPres2,
+    igctWaterTemp: api.igctWaterTemp,
+    transformerTemp: api.transformerTemp,
+    windDirection: api.windDirection,
+    outsideTemp: api.outsideTemp,
+    nacelleTemp: api.nacelleTemp,
+    nacelleCabTemp: api.nacelleCabTemp,
+    vibrationX: api.vibrationX,
+    vibrationY: api.vibrationY,
+    yawError: api.yawError,
+    yawBrakePressure: api.yawBrakePressure,
+    cableWindup: api.cableWindup,
+    activeFaults: api.activeFaults,
+    scadaTags: api.scadaTags,
   };
 }
 
@@ -76,7 +146,6 @@ export const useRealtimeData = () => {
 
       ws.onopen = () => {
         console.log('[WS] Connected to', WS_URL);
-        // Send a ping to keep connection alive
         ws.send('ping');
       };
 
