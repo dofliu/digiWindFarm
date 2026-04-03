@@ -91,6 +91,75 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
         }
     };
 
+    // Turbine spec state
+    const [turbineSpec, setTurbineSpec] = useState<any>(null);
+    const [specPresets, setSpecPresets] = useState<Record<string, any>>({});
+    const [specMsg, setSpecMsg] = useState('');
+    const [editSpec, setEditSpec] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        fetch(`${API_BASE}/api/config/turbine-spec`).then(r => r.json()).then(spec => {
+            setTurbineSpec(spec);
+            setEditSpec({
+                rated_power_kw: String(spec.rated_power_kw || 5000),
+                rotor_diameter: String(spec.rotor_diameter || 126),
+                cut_in_speed: String(spec.cut_in_speed || 3),
+                rated_speed: String(spec.rated_speed || 12),
+                cut_out_speed: String(spec.cut_out_speed || 25),
+                gear_ratio: String(spec.gear_ratio || 100),
+                max_rotor_rpm: String(spec.max_rotor_rpm || 15),
+                nominal_voltage: String(spec.nominal_voltage || 690),
+                curtailment_kw: spec.curtailment_kw != null ? String(spec.curtailment_kw) : '',
+            });
+        }).catch(() => {});
+        fetch(`${API_BASE}/api/config/turbine-spec/presets`).then(r => r.json()).then(setSpecPresets).catch(() => {});
+    }, []);
+
+    const handleSetPreset = async (preset: string) => {
+        const res = await fetch(`${API_BASE}/api/config/turbine-spec`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset }),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setTurbineSpec(data.spec);
+            setEditSpec({
+                rated_power_kw: String(data.spec.rated_power_kw),
+                rotor_diameter: String(data.spec.rotor_diameter),
+                cut_in_speed: String(data.spec.cut_in_speed),
+                rated_speed: String(data.spec.rated_speed),
+                cut_out_speed: String(data.spec.cut_out_speed),
+                gear_ratio: String(data.spec.gear_ratio),
+                max_rotor_rpm: String(data.spec.max_rotor_rpm),
+                nominal_voltage: String(data.spec.nominal_voltage),
+                curtailment_kw: data.spec.curtailment_kw != null ? String(data.spec.curtailment_kw) : '',
+            });
+            setSpecMsg(lang === 'zh' ? `已套用: ${preset}` : `Applied: ${preset}`);
+            setTimeout(() => setSpecMsg(''), 3000);
+        }
+    };
+
+    const handleApplySpec = async () => {
+        const payload: Record<string, any> = {};
+        for (const [k, v] of Object.entries(editSpec)) {
+            if (v === '') {
+                payload[k] = null;
+            } else {
+                payload[k] = parseFloat(v);
+            }
+        }
+        const res = await fetch(`${API_BASE}/api/config/turbine-spec`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setTurbineSpec(data.spec);
+            setSpecMsg(lang === 'zh' ? '已更新風機規格' : 'Turbine spec updated');
+            setTimeout(() => setSpecMsg(''), 3000);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onSave(formData);
@@ -253,6 +322,79 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
                                         />
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Turbine Specification */}
+                        {(formData.dataSource === DataSourceType.SIMULATION) && (
+                            <div className="bg-gray-900/50 p-4 rounded-md border-l-4 border-purple-500">
+                                <h3 className="text-lg font-semibold text-white mb-3">
+                                    {lang === 'zh' ? '風機規格設定' : 'Turbine Specification'}
+                                </h3>
+
+                                {/* Presets */}
+                                <div className="mb-4">
+                                    <label className="block text-sm text-gray-300 mb-2">{lang === 'zh' ? '預設機型' : 'Presets'}</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Object.entries(specPresets).map(([name, spec]) => (
+                                            <button key={name} onClick={() => handleSetPreset(name)}
+                                                className="text-xs px-3 py-1.5 rounded-md border bg-gray-700 border-gray-600 text-gray-300 hover:border-purple-400 transition-colors">
+                                                {name} ({(spec as any).rated_power_kw}kW)
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Editable fields */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+                                    {[
+                                        { key: 'rated_power_kw', label_zh: '額定功率 (kW)', label_en: 'Rated Power (kW)' },
+                                        { key: 'rotor_diameter', label_zh: '葉輪直徑 (m)', label_en: 'Rotor Diameter (m)' },
+                                        { key: 'cut_in_speed', label_zh: '切入風速 (m/s)', label_en: 'Cut-in Speed (m/s)' },
+                                        { key: 'rated_speed', label_zh: '額定風速 (m/s)', label_en: 'Rated Speed (m/s)' },
+                                        { key: 'cut_out_speed', label_zh: '切出風速 (m/s)', label_en: 'Cut-out Speed (m/s)' },
+                                        { key: 'gear_ratio', label_zh: '齒輪比', label_en: 'Gear Ratio' },
+                                        { key: 'max_rotor_rpm', label_zh: '最大轉速 (RPM)', label_en: 'Max Rotor RPM' },
+                                        { key: 'nominal_voltage', label_zh: '額定電壓 (V)', label_en: 'Nominal Voltage (V)' },
+                                    ].map(f => (
+                                        <div key={f.key}>
+                                            <label className="text-xs text-gray-500">{lang === 'zh' ? f.label_zh : f.label_en}</label>
+                                            <input type="number" step="any" value={editSpec[f.key] || ''}
+                                                onChange={e => setEditSpec(p => ({...p, [f.key]: e.target.value}))}
+                                                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white" />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Curtailment */}
+                                <div className="mb-3 p-3 bg-gray-800/80 rounded border border-yellow-500/30">
+                                    <label className="text-sm font-semibold text-yellow-300">
+                                        {lang === 'zh' ? '功率限載 (kW)' : 'Power Curtailment (kW)'}
+                                    </label>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <input type="number" step="100" min="0" value={editSpec.curtailment_kw || ''}
+                                            onChange={e => setEditSpec(p => ({...p, curtailment_kw: e.target.value}))}
+                                            placeholder={lang === 'zh' ? '留空=不限載' : 'Empty=no curtailment'}
+                                            className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white" />
+                                        <span className="text-xs text-gray-500">
+                                            {lang === 'zh'
+                                                ? `額定: ${editSpec.rated_power_kw || '5000'} kW`
+                                                : `Rated: ${editSpec.rated_power_kw || '5000'} kW`}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {lang === 'zh'
+                                            ? '限載後 pitch 角度會自動增加以限制輸出功率'
+                                            : 'Curtailment increases pitch angle to limit output power'}
+                                    </p>
+                                </div>
+
+                                <button onClick={handleApplySpec}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold px-4 py-1.5 rounded transition-colors">
+                                    {lang === 'zh' ? '套用風機規格' : 'Apply Turbine Spec'}
+                                </button>
+
+                                {specMsg && <span className="ml-3 text-sm text-cyan-300">{specMsg}</span>}
                             </div>
                         )}
 

@@ -82,3 +82,62 @@ async def clear_wind():
         raise HTTPException(400, "Simulator not running")
     b.simulator.wind_model.clear_override()
     return {"status": "ok", "mode": "auto"}
+
+
+# ─── Turbine Specification ─────────────────────────────────────────────
+
+@router.get("/turbine-spec")
+async def get_turbine_spec():
+    """Get current turbine specification."""
+    b = get_broker()
+    if not b.simulator or not b.simulator.turbines:
+        raise HTTPException(400, "Simulator not running")
+    # Return spec from first turbine (all share same spec)
+    first_tid = list(b.simulator.turbines.keys())[0]
+    model = b.simulator.turbines[first_tid]
+    return model.spec.to_dict()
+
+
+@router.post("/turbine-spec")
+async def set_turbine_spec(spec_dict: dict):
+    """Update turbine specifications for all turbines.
+
+    Accepts partial updates — only provided fields are changed.
+    Example: {"rated_power_kw": 3000, "cut_in_speed": 4.0, "curtailment_kw": 2000}
+
+    Or use a preset: {"preset": "vestas_v90_3mw"}
+    Available presets: z72_5mw, vestas_v90_3mw, sg_8mw, goldwind_2.5mw
+    """
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+
+    from simulator.physics import TurbineSpec, TURBINE_PRESETS
+
+    # Check for preset
+    preset_name = spec_dict.pop("preset", None)
+    if preset_name:
+        if preset_name not in TURBINE_PRESETS:
+            raise HTTPException(404, f"Unknown preset: {preset_name}. Available: {list(TURBINE_PRESETS.keys())}")
+        new_spec = TURBINE_PRESETS[preset_name]
+    else:
+        # Get current spec and merge updates
+        first_model = list(b.simulator.turbines.values())[0]
+        current = first_model.spec.to_dict()
+        current.update({k: v for k, v in spec_dict.items() if v is not None})
+        new_spec = TurbineSpec.from_dict(current)
+
+    # Apply to all turbines
+    for model in b.simulator.turbines.values():
+        model.update_spec(new_spec)
+
+    return {"status": "ok", "spec": new_spec.to_dict()}
+
+
+@router.get("/turbine-spec/presets")
+async def list_turbine_presets():
+    """List available turbine specification presets."""
+    from simulator.physics import TURBINE_PRESETS
+    return {
+        name: spec.to_dict() for name, spec in TURBINE_PRESETS.items()
+    }
