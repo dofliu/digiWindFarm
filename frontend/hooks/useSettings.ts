@@ -25,20 +25,26 @@ export const useSettings = () => {
 
     const saveSettings = (newSettings: AppSettings) => {
         try {
+            const prevSettings = settings;
             setSettings(newSettings);
             window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
 
-            // Sync data source with backend
+            // Only sync simulation config if params actually changed
             if (newSettings.dataSource === DataSourceType.SIMULATION) {
-                fetch(`${API_BASE}/api/config/simulation`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        turbineCount: newSettings.simulation.turbineCount,
-                        baseWindSpeed: newSettings.simulation.baseWindSpeed,
-                        turbulenceIntensity: newSettings.simulation.turbulenceIntensity,
-                    }),
-                }).catch(err => console.warn('Failed to sync simulation config:', err.message));
+                const simChanged =
+                    prevSettings.simulation.turbineCount !== newSettings.simulation.turbineCount ||
+                    prevSettings.simulation.turbulenceIntensity !== newSettings.simulation.turbulenceIntensity;
+                if (simChanged) {
+                    fetch(`${API_BASE}/api/config/simulation`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            turbineCount: newSettings.simulation.turbineCount,
+                            baseWindSpeed: newSettings.simulation.baseWindSpeed,
+                            turbulenceIntensity: newSettings.simulation.turbulenceIntensity,
+                        }),
+                    }).catch(err => console.warn('Failed to sync simulation config:', err.message));
+                }
             } else if (newSettings.dataSource === DataSourceType.OPC_DA) {
                 fetch(`${API_BASE}/api/config/datasource`, {
                     method: 'POST',
