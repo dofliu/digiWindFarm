@@ -23,6 +23,15 @@ async def lifespan(app: FastAPI):
     broker.start(config, sim_config)
     print("[Server] Wind farm simulator started with 14 turbines")
 
+    # Auto-start Modbus TCP server
+    if broker.simulator:
+        from simulator.modbus_server import ModbusSimServer
+        broker.simulator.modbus_server = ModbusSimServer(
+            port=5020, turbine_count=len(broker.simulator.turbines)
+        )
+        broker.simulator.modbus_server.start()
+        print("[Server] Modbus TCP server started on port 5020")
+
     # Start WebSocket broadcast task
     task = asyncio.create_task(_ws_broadcast_loop())
 
@@ -30,6 +39,8 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     task.cancel()
+    if broker.simulator and broker.simulator.modbus_server:
+        broker.simulator.modbus_server.stop()
     broker.stop()
     print("[Server] Shutdown complete")
 

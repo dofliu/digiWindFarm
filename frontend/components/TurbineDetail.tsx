@@ -3,6 +3,7 @@ import { type TurbineData, TurbineStatus, type WorkOrder, WorkOrderStatus, type 
 import StatusIndicator from './StatusIndicator';
 import Gauge from './Gauge';
 import MiniTrendChart from './MiniTrendChart';
+import TrendChartPanel from './TrendChartPanel';
 import DataCard from './DataCard';
 import { analyzeTurbineFault } from '../services/geminiService';
 import { BackIcon, BrainIcon, BoltIcon, WindIcon, TempIcon, VibrationIcon, AngleIcon, SpeedIcon, WrenchScrewdriverIcon } from './icons';
@@ -228,6 +229,11 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
           <DataRow label={lang === 'zh' ? '風向' : 'Wind Dir'} value={`${fmt(turbine.windDirection, 0)}°`} />
           <DataRow label={lang === 'zh' ? '室外溫度' : 'Outside Temp'} value={`${fmt(turbine.outsideTemp)}°C`} />
         </SubsystemPanel>
+      </div>
+
+      {/* Trend Chart */}
+      <div className="mb-6">
+        <TrendChartPanel turbineId={`WT${String(turbine.id).padStart(3, '0')}`} lang={lang} />
       </div>
 
       {/* AI Fault Diagnosis */}
