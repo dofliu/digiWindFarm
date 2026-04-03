@@ -1,0 +1,255 @@
+"""
+SCADA Tag Registry — single source of truth for all data point definitions.
+
+Maps internal tag IDs to:
+  - OPC DA tag name (Bachmann Z72 format)
+  - Modbus register address
+  - Data type and unit
+  - i18n labels (en / zh-TW)
+  - Valid range for simulation
+
+Based on: docs/1040610-Z72_PLC_OPC_TAG_1040510.xlsx
+Sheet: "簡化-每部風力機頁面顯示" + "Modbus標籤對應(from Bachmann)"
+"""
+
+from dataclasses import dataclass, field
+from typing import Optional, Dict, List
+
+
+@dataclass(frozen=True)
+class ScadaTag:
+    """Definition of a single SCADA data point."""
+    id: str                    # Internal key, e.g. "WGEN_GnPwrMs"
+    opc_tag: str               # Bachmann OPC tag suffix
+    subsystem: str             # WCNV, WGDC, WGEN, WMET, WNAC, WROT, WTUR, WYAW, WSRV, MBUS
+    data_type: str             # REAL32, SINT16, UINT16, BOOL
+    unit: str                  # kW, RPM, °C, m/s, deg, bar, mm/s, V, A, Hz, ...
+    label_en: str              # English label
+    label_zh: str              # 繁體中文標籤
+    sim_min: float = 0.0       # Simulation valid range min
+    sim_max: float = 100.0     # Simulation valid range max
+    modbus_reg: Optional[str] = None  # e.g. "HldReg[228]"
+    is_display: bool = True    # Show on per-turbine dashboard
+
+
+# ─── Registry ──────────────────────────────────────────────────────────────
+
+_TAGS: List[ScadaTag] = [
+    # ══════════════════════════════════════════════════════════════════════
+    # WTUR — Wind Turbine (whole machine)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WTUR_TurSt", "WTUR.Z72PLC__UI_Loc_WTUR_State_TurSt",
+             "WTUR", "SINT16", "", "Turbine State", "風力機運轉狀態",
+             1, 9, "HldReg[224]"),
+    ScadaTag("WTUR_TotPwrAt", "WTUR.Z72PLC__UI_Loc_WTUR_Analogue_TotPwrAt",
+             "WTUR", "REAL32", "kW", "Total Active Power", "風力機發電量(功率)",
+             0, 5500, "HldReg[267]"),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WGEN — Generator
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WGEN_GnPwrMs", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnPwrMs",
+             "WGEN", "REAL32", "kW", "Generator Power", "發電機發電量(功率)",
+             0, 5500),
+    ScadaTag("WGEN_GnSpd", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnSpd",
+             "WGEN", "REAL32", "RPM", "Generator Speed", "發電機轉速",
+             0, 2000, "HldReg[274]"),
+    ScadaTag("WGEN_GnVtgMs", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnVtgMs",
+             "WGEN", "REAL32", "V", "Generator Voltage", "發電機電壓",
+             0, 800, "HldReg[261]"),
+    ScadaTag("WGEN_GnCurMs", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnCurMs",
+             "WGEN", "REAL32", "A", "Generator Current", "發電機電流",
+             0, 5000, "HldReg[275]"),
+    ScadaTag("WGEN_GnStaTmp1", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnStaTmp1",
+             "WGEN", "REAL32", "°C", "Generator Stator Temp 1", "發電機定子溫度1",
+             20, 160, "HldReg[501]"),
+    ScadaTag("WGEN_GnAirTmp1", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnAirTmp1",
+             "WGEN", "REAL32", "°C", "Generator Air Gap Temp", "發電機氣隙溫度",
+             20, 120, "HldReg[507]"),
+    ScadaTag("WGEN_GnBrgTmp1", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnBrgTmp1",
+             "WGEN", "REAL32", "°C", "Generator Bearing Temp", "發電機軸承溫度",
+             20, 120, "HldReg[509]"),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WROT — Rotor / Pitch
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WROT_RotSpd", "WROT.Z72PLC__UI_Loc_WROT_Analogue_RotSpd",
+             "WROT", "REAL32", "RPM", "Rotor Speed", "葉輪轉速",
+             0, 20, "HldReg[228]"),
+    ScadaTag("WROT_PtAngValBl1", "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl1",
+             "WROT", "REAL32", "deg", "Blade 1 Pitch Angle", "葉片1角度",
+             -5, 95, "HldReg[230]"),
+    ScadaTag("WROT_PtAngValBl2", "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl2",
+             "WROT", "REAL32", "deg", "Blade 2 Pitch Angle", "葉片2角度",
+             -5, 95, "HldReg[231]"),
+    ScadaTag("WROT_PtAngValBl3", "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl3",
+             "WROT", "REAL32", "deg", "Blade 3 Pitch Angle", "葉片3角度",
+             -5, 95, "HldReg[232]"),
+    ScadaTag("WROT_RotTmp", "WROT.Z72PLC__UI_Loc_WROT_Analogue_RotTmp",
+             "WROT", "REAL32", "°C", "Rotor Temperature", "葉輪轉子溫度",
+             -10, 80, "HldReg[511]"),
+    ScadaTag("WROT_RotCabTmp", "WROT.Z72PLC__UI_Loc_WROT_Analogue_RotCabTmp",
+             "WROT", "REAL32", "°C", "Hub Cabinet Temp", "輪毂控制櫃溫度",
+             -10, 60, "HldReg[512]"),
+    ScadaTag("WROT_LckngPnPos", "WROT.Z72PLC__UI_Loc_WROT_Analogue_LckngPnPos",
+             "WROT", "REAL32", "", "Locking Pin Position", "鎖緊銷位置",
+             0, 1),
+    ScadaTag("WROT_RotLckd", "WROT.Z72PLC__UI_Loc_WROT_State_RotLckd",
+             "WROT", "SINT16", "", "Rotor Locked", "葉輪鎖固狀態",
+             0, 1),
+    ScadaTag("WROT_SrvcBrkAct", "WROT.Z72PLC__UI_Loc_WROT_State_SrvcBrkAct",
+             "WROT", "SINT16", "", "Service Brake Active", "剎車啟動",
+             0, 1),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WCNV — Converter
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WCNV_CnvCabinTmp", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvCabinTmp",
+             "WCNV", "REAL32", "°C", "Converter Cabinet Temp", "變頻器控制櫃溫度",
+             10, 65, "HldReg[277]"),
+    ScadaTag("WCNV_CnvDClVtg", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvDClVtg",
+             "WCNV", "REAL32", "V", "Converter DC Link Voltage", "變頻器直流電壓",
+             0, 1200),
+    ScadaTag("WCNV_CnvGdPwrAt", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGdPwrAt",
+             "WCNV", "REAL32", "kW", "Converter Grid Active Power", "變頻器電網實功率",
+             -500, 5500, "HldReg[267]"),
+    ScadaTag("WCNV_CnvGnFrq", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGnFrq",
+             "WCNV", "REAL32", "Hz", "Converter Generator Freq", "變頻器發電機頻率",
+             0, 60, "HldReg[274]"),
+    ScadaTag("WCNV_CnvGnPwr", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGnPwr",
+             "WCNV", "REAL32", "kW", "Converter Generator Power", "變頻器發電機功率",
+             0, 5500, "HldReg[273]"),
+    ScadaTag("WCNV_IGCTWtrCond", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_IGCTWtrCond",
+             "WCNV", "REAL32", "", "IGCT Water Condition", "變頻器IGCT水壓狀態",
+             0, 5),
+    ScadaTag("WCNV_IGCTWtrPres1", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_IGCTWtrPres1",
+             "WCNV", "REAL32", "bar", "IGCT Water Pressure 1", "變頻器IGCT水壓1",
+             0, 10, "HldReg[279]"),
+    ScadaTag("WCNV_IGCTWtrPres2", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_IGCTWtrPres2",
+             "WCNV", "REAL32", "bar", "IGCT Water Pressure 2", "變頻器IGCT水壓2",
+             0, 10, "HldReg[280]"),
+    ScadaTag("WCNV_IGCTWtrTmp", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_IGCTWtrTmp",
+             "WCNV", "REAL32", "°C", "IGCT Water Temp", "變頻器IGCT水溫",
+             10, 60, "HldReg[277]"),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WGDC — Grid / Transformer
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WGDC_TrfCoreTmp", "WGDC.Z72PLC__UI_Loc_WGDC_Analogue_TrfCoreTmp",
+             "WGDC", "REAL32", "°C", "Transformer Core Temp", "變壓器溫度",
+             10, 120),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WMET — Meteorological
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WMET_WSpeedNac", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WSpeedNac",
+             "WMET", "REAL32", "m/s", "Nacelle Wind Speed", "機艙風速",
+             0, 40, "HldReg[248]"),
+    ScadaTag("WMET_WDirAbs", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WDirAbs",
+             "WMET", "REAL32", "deg", "Wind Direction (absolute)", "風向(絕對)",
+             0, 360),
+    ScadaTag("WMET_TmpOutside", "WMET.Z72PLC__UI_Loc_WMET_Analogue_TmpOutside",
+             "WMET", "REAL32", "°C", "Outside Temperature", "室外溫度",
+             -10, 45),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WNAC — Nacelle
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WNAC_NacTmp", "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_NacTmp",
+             "WNAC", "REAL32", "°C", "Nacelle Temperature", "機艙溫度",
+             -10, 60, "HldReg[513]"),
+    ScadaTag("WNAC_NacCabTmp", "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_NacCabTmp",
+             "WNAC", "REAL32", "°C", "Nacelle Cabinet Temp", "機艙控制櫃溫度",
+             -10, 55, "HldReg[514]"),
+    ScadaTag("WNAC_VibMsNacXDir", "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_VibMsNacXDir",
+             "WNAC", "REAL32", "mm/s", "Nacelle Vibration X", "機艙X方向振動",
+             0, 20, "HldReg[244]"),
+    ScadaTag("WNAC_VibMsNacYDir", "WNAC.Z72PLC__UI_Loc_WNAC_Analogue_VibMsNacYDir",
+             "WNAC", "REAL32", "mm/s", "Nacelle Vibration Y", "機艙Y方向振動",
+             0, 20, "HldReg[245]"),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WYAW — Yaw System
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WYAW_YwVn1AlgnAvg5s", "WYAW.Z72PLC__UI_Loc_WYAW_Analogue_YwVn1AlgnAvg5s",
+             "WYAW", "REAL32", "deg", "Yaw Alignment Vn1 (5s avg)", "轉向Vn1誤差(5秒平均)",
+             -180, 180, "HldReg[243]"),
+    ScadaTag("WYAW_YwBrkHyPrs", "WYAW.Z72PLC__UI_Loc_WYAW_Analogue_YwBrkHyPrs",
+             "WYAW", "REAL32", "bar", "Yaw Brake Hydraulic Pressure", "轉向剎車液壓壓力",
+             0, 250, "HldReg[247]"),
+    ScadaTag("WYAW_CabWup", "WYAW.Z72PLC__UI_Loc_WYAW_Analogue_CabWup",
+             "WYAW", "REAL32", "turns", "Cable Windup", "纜線防絞(圈數)",
+             -5, 5, "HldReg[246]"),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WSRV / MBUS — Service & Control
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WSRV_SrvOn", "WSRV.Z72PLC__UI_Srv_State_SrvOn",
+             "WSRV", "SINT16", "", "Service Mode On", "系統服務模式",
+             0, 1),
+    ScadaTag("MBUS_Contact2", "MBUS.Z72PLC__UI_Mbus_Contact[2]",
+             "MBUS", "UINT16", "", "Local/Remote Control", "風機本地/遠端控制",
+             0, 1, "Contact[2]"),
+]
+
+
+class ScadaRegistry:
+    """Registry providing lookup by tag ID, subsystem, OPC name, or Modbus address."""
+
+    def __init__(self, tags: List[ScadaTag]):
+        self._tags = {t.id: t for t in tags}
+        self._by_subsystem: Dict[str, List[ScadaTag]] = {}
+        self._by_opc: Dict[str, ScadaTag] = {}
+        self._by_modbus: Dict[str, ScadaTag] = {}
+        for t in tags:
+            self._by_subsystem.setdefault(t.subsystem, []).append(t)
+            self._by_opc[t.opc_tag] = t
+            if t.modbus_reg:
+                self._by_modbus[t.modbus_reg] = t
+
+    def __getitem__(self, tag_id: str) -> ScadaTag:
+        return self._tags[tag_id]
+
+    def __contains__(self, tag_id: str) -> bool:
+        return tag_id in self._tags
+
+    def get(self, tag_id: str) -> Optional[ScadaTag]:
+        return self._tags.get(tag_id)
+
+    @property
+    def all_tags(self) -> List[ScadaTag]:
+        return list(self._tags.values())
+
+    @property
+    def tag_ids(self) -> List[str]:
+        return list(self._tags.keys())
+
+    @property
+    def display_tags(self) -> List[ScadaTag]:
+        return [t for t in self._tags.values() if t.is_display]
+
+    def by_subsystem(self, subsystem: str) -> List[ScadaTag]:
+        return self._by_subsystem.get(subsystem, [])
+
+    def by_opc_tag(self, opc_tag: str) -> Optional[ScadaTag]:
+        return self._by_opc.get(opc_tag)
+
+    def by_modbus(self, register: str) -> Optional[ScadaTag]:
+        return self._by_modbus.get(register)
+
+    def labels(self, lang: str = "en") -> Dict[str, str]:
+        """Return {tag_id: label} for the given language."""
+        if lang == "zh" or lang == "zh-TW":
+            return {t.id: t.label_zh for t in self._tags.values()}
+        return {t.id: t.label_en for t in self._tags.values()}
+
+    def to_i18n_dict(self) -> Dict[str, Dict[str, str]]:
+        """Return full i18n dict: {tag_id: {en: ..., zh: ...}}."""
+        return {
+            t.id: {"en": t.label_en, "zh": t.label_zh}
+            for t in self._tags.values()
+        }
+
+
+# Singleton instance
+SCADA_REGISTRY = ScadaRegistry(_TAGS)

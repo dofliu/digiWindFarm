@@ -25,8 +25,10 @@ def _map_state(state: str) -> TurbineStatus:
     return mapping.get(state, TurbineStatus.OFFLINE)
 
 
-def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = None) -> TurbineReading:
-    """Convert simulator output dict to TurbineReading model."""
+def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = None,
+                            fault_info: Optional[List[Dict]] = None) -> TurbineReading:
+    """Convert simulator output dict to TurbineReading model (39 SCADA tags)."""
+    scada = output.get('scada', {})
     rotor = output.get('rotor', {})
     gen = output.get('generator', {})
     gb = output.get('gearbox', {})
@@ -66,24 +68,88 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
                 ht_ms = int(ht.timestamp() * 1000) if isinstance(ht, datetime) else 0
             history.append({"time": ht_ms, "power": round(hp / 1_000_000, 2)})
 
+    # Determine turbine status — check if any fault has tripped
+    op_state = output.get('operational_state', 'IDLE')
+    status = _map_state(op_state)
+    if fault_info:
+        for f in fault_info:
+            if f.get('tripped'):
+                status = TurbineStatus.FAULT
+
+    tur_state = int(scada.get("WTUR_TurSt", 6)) if scada else 6
+
     return TurbineReading(
         turbineId=tid,
         name=name,
         timestamp=ts,
-        status=_map_state(output.get('operational_state', 'IDLE')),
+        status=status,
+        turState=tur_state,
+
+        # ── Original fields (backward-compatible) ──
         windSpeed=round(output.get('wind_speed', 0), 2),
         powerOutput=round(power_mw, 2),
-        rotorSpeed=round(rotor.get('rotor_speed', 0), 2),
-        bladeAngle=round(output.get('pitch_angle', 0), 2),
-        temperature=round(gen.get('temperature', 45), 2),
-        vibration=round(gb.get('vibration', 0), 2),
-        voltage=round(gen.get('voltage', 690), 2),
-        current=round(gen.get('current', 0), 2),
-        yawAngle=round(yaw.get('yaw_angle', 0), 2),
-        gearboxTemp=round(gb.get('temperature', 40), 2),
-        frequency=gen.get('frequency'),
-        hydraulicPressure=hyd.get('pressure'),
+        rotorSpeed=round(scada.get("WROT_RotSpd", rotor.get('rotor_speed', 0)), 3),
+        bladeAngle=round(scada.get("WROT_PtAngValBl1", output.get('pitch_angle', 0)), 2),
+        temperature=round(scada.get("WGEN_GnStaTmp1", gen.get('temperature', 45)), 2),
+        vibration=round(scada.get("WNAC_VibMsNacXDir", gb.get('vibration', 0)), 3),
+        voltage=round(scada.get("WGEN_GnVtgMs", gen.get('voltage', 690)), 2),
+        current=round(scada.get("WGEN_GnCurMs", gen.get('current', 0)), 2),
+        yawAngle=round(scada.get("WYAW_YwVn1AlgnAvg5s", yaw.get('yaw_angle', 0)), 2),
+        gearboxTemp=round(scada.get("WNAC_NacTmp", gb.get('temperature', 40)), 2),
+        frequency=scada.get("WCNV_CnvGnFrq", gen.get('frequency')),
+        hydraulicPressure=scada.get("WYAW_YwBrkHyPrs", hyd.get('pressure')),
         history=history,
+
+        # ── WGEN expanded ──
+        genPower=scada.get("WGEN_GnPwrMs"),
+        genSpeed=scada.get("WGEN_GnSpd"),
+        genStatorTemp1=scada.get("WGEN_GnStaTmp1"),
+        genAirTemp1=scada.get("WGEN_GnAirTmp1"),
+        genBearingTemp1=scada.get("WGEN_GnBrgTmp1"),
+
+        # ── WROT expanded ──
+        bladeAngle1=scada.get("WROT_PtAngValBl1"),
+        bladeAngle2=scada.get("WROT_PtAngValBl2"),
+        bladeAngle3=scada.get("WROT_PtAngValBl3"),
+        rotorTemp=scada.get("WROT_RotTmp"),
+        hubCabinetTemp=scada.get("WROT_RotCabTmp"),
+        rotorLocked=int(scada.get("WROT_RotLckd", 0)) if scada.get("WROT_RotLckd") is not None else None,
+        brakeActive=int(scada.get("WROT_SrvcBrkAct", 0)) if scada.get("WROT_SrvcBrkAct") is not None else None,
+
+        # ── WCNV ──
+        cnvCabinetTemp=scada.get("WCNV_CnvCabinTmp"),
+        cnvDcVoltage=scada.get("WCNV_CnvDClVtg"),
+        cnvGridPower=scada.get("WCNV_CnvGdPwrAt"),
+        cnvGenFreq=scada.get("WCNV_CnvGnFrq"),
+        cnvGenPower=scada.get("WCNV_CnvGnPwr"),
+        igctWaterCond=scada.get("WCNV_IGCTWtrCond"),
+        igctWaterPres1=scada.get("WCNV_IGCTWtrPres1"),
+        igctWaterPres2=scada.get("WCNV_IGCTWtrPres2"),
+        igctWaterTemp=scada.get("WCNV_IGCTWtrTmp"),
+
+        # ── WGDC ──
+        transformerTemp=scada.get("WGDC_TrfCoreTmp"),
+
+        # ── WMET ──
+        windDirection=scada.get("WMET_WDirAbs"),
+        outsideTemp=scada.get("WMET_TmpOutside"),
+
+        # ── WNAC ──
+        nacelleTemp=scada.get("WNAC_NacTmp"),
+        nacelleCabTemp=scada.get("WNAC_NacCabTmp"),
+        vibrationX=scada.get("WNAC_VibMsNacXDir"),
+        vibrationY=scada.get("WNAC_VibMsNacYDir"),
+
+        # ── WYAW ──
+        yawError=scada.get("WYAW_YwVn1AlgnAvg5s"),
+        yawBrakePressure=scada.get("WYAW_YwBrkHyPrs"),
+        cableWindup=scada.get("WYAW_CabWup"),
+
+        # ── Fault info ──
+        activeFaults=fault_info,
+
+        # ── Raw SCADA dict ──
+        scadaTags=scada if scada else None,
     )
 
 
@@ -154,10 +220,12 @@ class DataBroker:
     def get_all_turbines(self) -> List[TurbineReading]:
         if self.mode == DataSourceMode.SIMULATION and self.simulator:
             current = self.simulator.get_current_data()
+            fault_status = self.simulator.fault_engine.get_fault_status()
             result = []
             for tid, output in current.items():
                 hist = self.simulator.get_history(tid, limit=30)
-                result.append(_sim_output_to_reading(output, hist))
+                tid_faults = [f for f in fault_status if f['turbine_id'] == tid]
+                result.append(_sim_output_to_reading(output, hist, tid_faults or None))
             return sorted(result, key=lambda r: r.turbineId)
         return []
 
@@ -166,7 +234,9 @@ class DataBroker:
             output = self.simulator.get_turbine_data(turbine_id)
             if output:
                 hist = self.simulator.get_history(turbine_id, limit=30)
-                return _sim_output_to_reading(output, hist)
+                fault_status = self.simulator.fault_engine.get_fault_status()
+                tid_faults = [f for f in fault_status if f['turbine_id'] == turbine_id]
+                return _sim_output_to_reading(output, hist, tid_faults or None)
         return None
 
     def get_history(self, turbine_id: str, start: Optional[str] = None,
