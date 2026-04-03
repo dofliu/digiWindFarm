@@ -106,15 +106,20 @@ const App: React.FC = () => {
     }
   };
 
+  // Keep selected turbine in sync with live data
+  const liveTurbine = selectedTurbine
+    ? turbines.find(t => t.id === selectedTurbine.id) || selectedTurbine
+    : null;
+
   const renderContent = () => {
     switch (view) {
         case 'dashboard':
-            return selectedTurbine ? (
+            return liveTurbine ? (
               <TurbineDetail
-                turbine={selectedTurbine}
+                turbine={liveTurbine}
                 onBack={handleBackToOverview}
                 onDispatch={handleOpenDispatchModal}
-                activeWorkOrder={activeWorkOrders.find(wo => wo.turbineId === selectedTurbine.id)}
+                activeWorkOrder={activeWorkOrders.find(wo => wo.turbineId === liveTurbine.id)}
                 lang={lang}
               />
             ) : (
