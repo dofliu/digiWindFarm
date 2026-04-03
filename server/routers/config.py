@@ -30,14 +30,29 @@ async def set_datasource(config: DataSourceConfig):
 
 @router.post("/simulation")
 async def set_simulation(config: SimulationConfig):
-    """Update simulation parameters and restart simulator."""
+    """Update simulation parameters. Only restarts if turbine count changed."""
     b = get_broker()
+
+    # Only restart if turbine count actually changed
+    current_count = len(b.turbine_ids) if b.simulator else 0
+    if b.simulator and b.simulator.is_running and config.turbineCount == current_count:
+        # Just update wind model parameters without restarting
+        b.simulator.wind_model.turbulence_intensity = config.turbulenceIntensity
+        return {
+            "status": "ok",
+            "turbineCount": config.turbineCount,
+            "baseWindSpeed": config.baseWindSpeed,
+            "restarted": False,
+        }
+
+    # Turbine count changed — full restart required
     ds_config = DataSourceConfig(mode=DataSourceMode.SIMULATION)
     b.switch_mode(ds_config, config)
     return {
         "status": "ok",
         "turbineCount": config.turbineCount,
         "baseWindSpeed": config.baseWindSpeed,
+        "restarted": True,
     }
 
 
