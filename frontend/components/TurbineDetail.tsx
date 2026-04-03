@@ -76,6 +76,114 @@ const FaultBadge: React.FC<{ fault: FaultInfo; lang: string }> = ({ fault, lang 
   );
 };
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+
+const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ turbineId, lang }) => {
+  const [controlStatus, setControlStatus] = useState<any>(null);
+  const [curtailValue, setCurtailValue] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const refresh = () => {
+    fetch(`${API_BASE}/api/control/${turbineId}/status`).then(r => r.json()).then(setControlStatus).catch(() => {});
+  };
+
+  useEffect(() => {
+    refresh();
+    const iv = setInterval(refresh, 3000);
+    return () => clearInterval(iv);
+  }, [turbineId]);
+
+  const sendCmd = async (command: string) => {
+    await fetch(`${API_BASE}/api/control/command`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turbineId, command }),
+    });
+    setMsg(`${command} OK`);
+    refresh();
+    setTimeout(() => setMsg(''), 2000);
+  };
+
+  const setCurtail = async () => {
+    const val = curtailValue === '' ? null : parseFloat(curtailValue);
+    await fetch(`${API_BASE}/api/control/curtail`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ turbineId, powerLimitKw: val }),
+    });
+    setMsg(val ? `${lang === 'zh' ? '限載' : 'Curtail'}: ${val} kW` : (lang === 'zh' ? '已解除限載' : 'Curtailment removed'));
+    refresh();
+    setTimeout(() => setMsg(''), 2000);
+  };
+
+  const isServiceMode = controlStatus?.service_mode;
+  const isStopped = controlStatus?.operator_stop;
+  const curtailKw = controlStatus?.curtailment_kw;
+
+  return (
+    <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
+        <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+          {lang === 'zh' ? '操作控制' : 'Operator Control'}
+        </h4>
+        <div className="flex items-center space-x-2 mt-2 sm:mt-0 text-xs">
+          {isServiceMode && <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 border border-orange-500/50">
+            {lang === 'zh' ? '定檢模式' : 'Service Mode'}
+          </span>}
+          {isStopped && <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/50">
+            {lang === 'zh' ? '手動停機' : 'Manual Stop'}
+          </span>}
+          {curtailKw != null && <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/50">
+            {lang === 'zh' ? `限載 ${curtailKw} kW` : `Curtail ${curtailKw} kW`}
+          </span>}
+          {msg && <span className="text-cyan-300">{msg}</span>}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 items-end">
+        {/* Command buttons */}
+        <button onClick={() => sendCmd('stop')}
+          className="px-3 py-1.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-700 text-white transition-colors">
+          {lang === 'zh' ? '停機' : 'Stop'}
+        </button>
+        <button onClick={() => sendCmd('start')}
+          className="px-3 py-1.5 text-xs font-semibold rounded bg-green-600 hover:bg-green-700 text-white transition-colors">
+          {lang === 'zh' ? '啟動' : 'Start'}
+        </button>
+        <button onClick={() => sendCmd('reset')}
+          className="px-3 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+          {lang === 'zh' ? '復位' : 'Reset'}
+        </button>
+        <button onClick={() => sendCmd(isServiceMode ? 'service_off' : 'service_on')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+            isServiceMode ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
+          {lang === 'zh' ? (isServiceMode ? '結束定檢' : '進入定檢') : (isServiceMode ? 'Exit Service' : 'Service Mode')}
+        </button>
+
+        <div className="border-l border-gray-600 h-6 mx-1" />
+
+        {/* Curtailment */}
+        <div className="flex items-center gap-1">
+          <input type="number" step="100" min="0" value={curtailValue}
+            onChange={e => setCurtailValue(e.target.value)}
+            placeholder={lang === 'zh' ? '限載 kW' : 'kW limit'}
+            className="w-24 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white" />
+          <button onClick={setCurtail}
+            className="px-2 py-1 text-xs rounded bg-yellow-600 hover:bg-yellow-700 text-white transition-colors">
+            {lang === 'zh' ? '設定' : 'Set'}
+          </button>
+          {curtailKw != null && (
+            <button onClick={() => { setCurtailValue(''); fetch(`${API_BASE}/api/control/curtail`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ turbineId, powerLimitKw: null }),
+            }).then(refresh); setMsg(lang === 'zh' ? '已解除' : 'Cleared'); setTimeout(() => setMsg(''), 2000); }}
+              className="px-2 py-1 text-xs rounded bg-gray-600 hover:bg-gray-500 text-gray-200 transition-colors">
+              {lang === 'zh' ? '解除' : 'Clear'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispatch, activeWorkOrder, lang = 'zh' }) => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<string | null>(null);
@@ -149,6 +257,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
           ))}
         </div>
       )}
+
+      {/* Operator Control Panel */}
+      <OperatorControlPanel turbineId={`WT${String(turbine.id).padStart(3, '0')}`} lang={lang} />
 
       {/* Gauges row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">

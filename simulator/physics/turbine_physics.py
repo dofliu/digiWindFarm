@@ -153,6 +153,13 @@ class TurbinePhysicsModel:
         self._yaw_brake_pressure = 150.0
         self._sim_time = 0.0
 
+        # ── Operator control (set via API, maps to Modbus Coil/Contact) ──
+        self.operator_stop = False           # Manual stop command (Coil[2])
+        self.operator_start_pending = False  # Start command (Coil[1])
+        self.service_mode = False            # Maintenance / inspection mode (WSRV_SrvOn)
+        self.local_control = False           # Local/Remote (MBUS Contact[2])
+        self.curtailment_kw: Optional[float] = None  # Per-turbine power limit (None=use spec)
+
         # ── Fault modifiers (set by FaultEngine) ──
         self.fault_modifiers: Dict[str, float] = {}
 
@@ -194,9 +201,11 @@ class TurbinePhysicsModel:
         # Clamp to rated power
         gen_power_kw = min(gen_power_kw, s.rated_power_kw)
 
-        # Apply curtailment (限載)
+        # Apply curtailment (限載) — per-turbine overrides spec-level
         effective_limit = s.rated_power_kw
-        if s.curtailment_kw is not None:
+        if self.curtailment_kw is not None:
+            effective_limit = min(effective_limit, self.curtailment_kw)
+        elif s.curtailment_kw is not None:
             effective_limit = min(effective_limit, s.curtailment_kw)
         gen_power_kw = min(gen_power_kw, effective_limit)
 
@@ -291,8 +300,8 @@ class TurbinePhysicsModel:
             "WYAW_YwVn1AlgnAvg5s": round(yaw_error, 2),
             "WYAW_YwBrkHyPrs": round(max(0, yaw_brake_prs), 2),
             "WYAW_CabWup": round(self.cable_windup, 2),
-            "WSRV_SrvOn": 0.0,
-            "MBUS_Contact2": 0.0,
+            "WSRV_SrvOn": 1.0 if self.service_mode else 0.0,
+            "MBUS_Contact2": 1.0 if self.local_control else 0.0,
         }
 
         for tag_id, modifier in self.fault_modifiers.items():
@@ -307,6 +316,27 @@ class TurbinePhysicsModel:
         s = self.spec
         st = self.tur_state
 
+        # ── Operator commands override (highest priority) ──
+        if self.operator_stop or self.service_mode:
+            if st == 6:  # Production → Normal Stop
+                self.tur_state = 9
+            elif st in (4, 5):  # Starting → Normal Stop
+                self.tur_state = 9
+            elif st == 9 and self.rotor_speed < 0.5:
+                self.tur_state = 1  # Stop complete
+            # Consume start command if stopped
+            if self.operator_start_pending:
+                self.operator_start_pending = False
+            return
+
+        # ── Operator start command ──
+        if self.operator_start_pending and st in (1, 2, 9):
+            self.operator_start_pending = False
+            if s.cut_in_speed <= wind_speed <= s.cut_out_speed:
+                self.tur_state = 4  # → Pre-Production
+            return
+
+        # ── Normal state transitions ──
         if st == 1:
             if s.cut_in_speed <= wind_speed <= s.cut_out_speed:
                 self.tur_state = 2
@@ -387,9 +417,10 @@ class TurbinePhysicsModel:
         else:
             target = min(30.0, (wind_speed - s.rated_speed) * 2.3)
 
-        # Extra pitch if curtailed
-        if is_producing and s.curtailment_kw is not None and s.curtailment_kw < s.rated_power_kw:
-            curtail_ratio = s.curtailment_kw / s.rated_power_kw
+        # Extra pitch if curtailed (per-turbine or spec-level)
+        active_curtail = self.curtailment_kw if self.curtailment_kw is not None else s.curtailment_kw
+        if is_producing and active_curtail is not None and active_curtail < s.rated_power_kw:
+            curtail_ratio = active_curtail / s.rated_power_kw
             target = max(target, (1 - curtail_ratio) * 15.0)
 
         diff = target - self.pitch_angle
@@ -425,9 +456,53 @@ class TurbinePhysicsModel:
         if 1 <= state <= 9:
             self.tur_state = state
 
+    def cmd_stop(self):
+        """Operator manual stop."""
+        self.operator_stop = True
+        self.operator_start_pending = False
+
+    def cmd_start(self):
+        """Operator manual start (clears stop/service mode)."""
+        self.operator_stop = False
+        self.service_mode = False
+        self.operator_start_pending = True
+
+    def cmd_reset(self):
+        """Operator reset (clear faults, return to standby)."""
+        self.operator_stop = False
+        self.service_mode = False
+        self.operator_start_pending = False
+        self.fault_modifiers.clear()
+        if self.tur_state in (7, 9):
+            self.tur_state = 1  # Will auto-transition to standby
+
+    def cmd_service(self, on: bool):
+        """Enter/exit maintenance service mode."""
+        self.service_mode = on
+        if on:
+            self.operator_stop = False
+
+    def cmd_curtail(self, power_kw: Optional[float]):
+        """Set per-turbine power curtailment. None = remove curtailment."""
+        self.curtailment_kw = power_kw
+
+    def get_control_status(self) -> dict:
+        """Return current operator control status."""
+        return {
+            "operator_stop": self.operator_stop,
+            "service_mode": self.service_mode,
+            "local_control": self.local_control,
+            "curtailment_kw": self.curtailment_kw,
+            "tur_state": self.tur_state,
+        }
+
     def reset(self):
         self.tur_state = 1
         self.rotor_speed = 0.0
         self.pitch_angle = 90.0
         self._pitch_bl = [90.0, 90.0, 90.0]
+        self.operator_stop = False
+        self.service_mode = False
+        self.operator_start_pending = False
+        self.curtailment_kw = None
         self.fault_modifiers.clear()
