@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "install",
+      "type": "shell",
+      "command": "pip install -r requirements.txt"
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "pytest -q"
+    },
+    {
+      "label": "run",
+      "type": "shell",
+      "command": "uvicorn app.main:app --reload"
+    }
+  ]
+}

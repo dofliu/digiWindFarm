@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: wind-influxdb
+    expose:
+      - "8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=windpower2026
+      - DOCKER_INFLUXDB_INIT_ORG=windpower
+      - DOCKER_INFLUXDB_INIT_BUCKET=wind_10min
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=wind-backup-token-2026
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: wind-nginx
+    ports:
+      - "8086:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - influxdb
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: wind-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=windpower2026
+    depends_on:
+      - influxdb
+    restart: unless-stopped
+
+volumes:
+  influxdb-data:
+  influxdb-config:
+  grafana-data:

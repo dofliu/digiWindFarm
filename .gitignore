@@ -12,4 +12,4 @@ env/
 .env
 
 # Custom ignored directories
-z72SCADA_New/
+z72SCADA_New/wind-backup/Z72_Data
