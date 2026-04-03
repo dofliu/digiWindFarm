@@ -18,12 +18,14 @@ import threading
 import logging
 from typing import Dict, Optional, List
 
-from pymodbus.server import StartTcpServer, ModbusTcpServer
-from pymodbus.datastore import (
-    ModbusDeviceContext,
-    ModbusServerContext,
-    ModbusSequentialDataBlock,
-)
+from pymodbus.server import StartTcpServer
+from pymodbus.datastore import ModbusServerContext, ModbusSequentialDataBlock
+
+# Compatible with pymodbus 3.5+ (ModbusSlaveContext) and 3.12+ (ModbusDeviceContext)
+try:
+    from pymodbus.datastore import ModbusDeviceContext as _SlaveContext
+except ImportError:
+    from pymodbus.datastore import ModbusSlaveContext as _SlaveContext
 
 logger = logging.getLogger(__name__)
 
@@ -148,13 +150,17 @@ class ModbusSimServer:
         slaves: Dict[int, ModbusDeviceContext] = {}
         for i in range(1, turbine_count + 1):
             hr = ModbusSequentialDataBlock(0, [0] * (_MAX_REG + 1))
-            slaves[i] = ModbusDeviceContext(
+            slaves[i] = _SlaveContext(
                 di=ModbusSequentialDataBlock(0, [0] * 10),
                 co=ModbusSequentialDataBlock(0, [0] * 10),
                 hr=hr,
                 ir=ModbusSequentialDataBlock(0, [0] * 10),
             )
-        self._server_context = ModbusServerContext(devices=slaves, single=False)
+        # Compatible: pymodbus <3.7 uses 'slaves=', >=3.7 uses 'devices='
+        try:
+            self._server_context = ModbusServerContext(devices=slaves, single=False)
+        except TypeError:
+            self._server_context = ModbusServerContext(slaves=slaves, single=False)
 
     def start(self):
         """Start the Modbus TCP server in a background thread."""
