@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from wind_model import WindEnvironmentModel
 from simulator.physics import TurbinePhysicsModel, FaultEngine
+from simulator.modbus_server import ModbusSimServer
 
 
 class WindFarmSimulator:
@@ -18,6 +19,7 @@ class WindFarmSimulator:
 
     Uses the independent physics model (simulator/physics/) for each turbine,
     plus a shared FaultEngine for fault injection across the farm.
+    Optionally exposes data via Modbus TCP server.
     """
 
     def __init__(self, turbine_count: int = 14, base_wind_speed: float = 10.0,
@@ -30,6 +32,7 @@ class WindFarmSimulator:
         self.history_maxlen = 3600  # ~1 hour at 1Hz
 
         self.fault_engine = FaultEngine()
+        self.modbus_server: Optional[ModbusSimServer] = None
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -101,6 +104,10 @@ class WindFarmSimulator:
                         self.history[tid].append(output)
 
                     readings.append(output)
+
+                    # Update Modbus registers
+                    if self.modbus_server and self.modbus_server.is_running:
+                        self.modbus_server.update_turbine(tid, scada_output)
 
                 for cb in self._callbacks:
                     try:
