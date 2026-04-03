@@ -1,5 +1,5 @@
-from fastapi import APIRouter
-from server.models import DataSourceConfig, SimulationConfig, DataSourceMode
+from fastapi import APIRouter, HTTPException
+from server.models import DataSourceConfig, SimulationConfig, DataSourceMode, WindOverrideRequest
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -39,3 +39,46 @@ async def set_simulation(config: SimulationConfig):
         "turbineCount": config.turbineCount,
         "baseWindSpeed": config.baseWindSpeed,
     }
+
+
+@router.get("/wind")
+async def get_wind_status():
+    """Get current wind model status (auto/manual, override values)."""
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    return b.simulator.wind_model.get_status()
+
+
+@router.post("/wind")
+async def set_wind(req: WindOverrideRequest):
+    """Set wind conditions manually, or activate a profile.
+
+    Profiles: calm, moderate, rated, strong, storm, gusty, ramp_up, ramp_down, auto
+    Or set individual values: windSpeed, windDirection, ambientTemp, turbulence
+    """
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+
+    wm = b.simulator.wind_model
+    if req.profile:
+        wm.set_profile(req.profile)
+    else:
+        wm.set_override(
+            wind_speed=req.windSpeed,
+            wind_direction=req.windDirection,
+            ambient_temp=req.ambientTemp,
+            turbulence=req.turbulence,
+        )
+    return wm.get_status()
+
+
+@router.post("/wind/clear")
+async def clear_wind():
+    """Return to automatic daily pattern wind model."""
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    b.simulator.wind_model.clear_override()
+    return {"status": "ok", "mode": "auto"}

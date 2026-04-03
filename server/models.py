@@ -119,6 +119,15 @@ class SimulationConfig(BaseModel):
     timeStep: float = 1.0
 
 
+class WindOverrideRequest(BaseModel):
+    """Set manual wind conditions. null values keep auto mode."""
+    windSpeed: Optional[float] = None       # m/s (None = auto)
+    windDirection: Optional[float] = None   # deg (None = auto)
+    ambientTemp: Optional[float] = None     # °C (None = auto)
+    turbulence: Optional[float] = None      # 0.0-0.5 (None = keep current)
+    profile: Optional[str] = None           # 'calm','moderate','rated','strong','storm','gusty','ramp_up','ramp_down','auto'
+
+
 class FaultInjectionRequest(BaseModel):
     scenarioId: str
     turbineId: str
