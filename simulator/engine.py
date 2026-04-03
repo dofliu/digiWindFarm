@@ -36,9 +36,6 @@ class WindFarmSimulator:
         self._callbacks: List[Callable] = []
         self._lock = threading.Lock()
 
-        # Ambient temperature model (simple daily cycle)
-        self._base_ambient_temp = 25.0
-
         # Initialize turbines
         for i in range(1, turbine_count + 1):
             tid = f"WT{i:03d}"
@@ -73,7 +70,7 @@ class WindFarmSimulator:
                 now = datetime.now()
                 wind_speed = self.wind_model.get_wind_speed(now)
                 wind_direction = self.wind_model.get_wind_direction(now)
-                ambient_temp = self._get_ambient_temp(now)
+                ambient_temp = self.wind_model.get_ambient_temp(now)
 
                 # Advance fault engine
                 fault_modifiers = self.fault_engine.step(dt=time_step)
@@ -115,13 +112,6 @@ class WindFarmSimulator:
             except Exception as e:
                 print(f"[Simulator] Error: {e}")
                 time.sleep(1)
-
-    def _get_ambient_temp(self, now: datetime) -> float:
-        """Simple daily temperature cycle."""
-        hour = now.hour + now.minute / 60.0
-        # Peak at 14:00, min at 05:00
-        import math
-        return self._base_ambient_temp + 5 * math.sin((hour - 5) * math.pi / 12)
 
     @staticmethod
     def _scada_to_output(tid: str, timestamp: datetime,

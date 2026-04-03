@@ -128,7 +128,7 @@ const App: React.FC = () => {
         case 'faults':
             return <FaultInjectionPanel lang={lang} />;
         case 'settings':
-            return <SettingsPage settings={settings} onSave={saveSettings} />;
+            return <SettingsPage settings={settings} onSave={saveSettings} lang={lang} />;
         default:
             return null;
     }
