@@ -1,11 +1,14 @@
 """
 Independent physics-based wind turbine model.
 
-Produces all 39+ SCADA data points with physically-coupled relationships.
-No dependency on FastAPI, frontend, or storage — only numpy.
+Composes independent sub-models (each can be replaced separately):
+  - PowerCurveModel:  Region 2/3 power output
+  - RotorSpeedModel:  RPM tracking with inertia
+  - ThermalSystem:    10-point temperature model
+  - VibrationModel:   RPM + turbulence + load driven
+  - YawModel:         Dead band + delay + cable management
 
-Turbine specifications (cut-in, cut-out, rated power, power curve, etc.)
-are configurable via TurbineSpec dataclass. Power curtailment is supported.
+No dependency on FastAPI, frontend, or storage — only numpy.
 """
 
 import math
@@ -13,69 +16,46 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel
+from simulator.physics.thermal_model import ThermalSystem, ThermalSystemConfig
+from simulator.physics.vibration_model import VibrationModel
+from simulator.physics.yaw_model import YawModel
+
 
 @dataclass
 class TurbineSpec:
     """Configurable wind turbine specifications."""
 
-    # ── Basic parameters ──
-    rated_power_kw: float = 5000.0       # kW
-    rotor_diameter: float = 126.0        # m
-    hub_height: float = 90.0             # m
-    cut_in_speed: float = 3.0            # m/s
-    rated_speed: float = 12.0            # m/s
-    cut_out_speed: float = 25.0          # m/s
+    rated_power_kw: float = 5000.0
+    rotor_diameter: float = 126.0
+    hub_height: float = 90.0
+    cut_in_speed: float = 3.0
+    rated_speed: float = 12.0
+    cut_out_speed: float = 25.0
 
-    # ── Drivetrain ──
     gear_ratio: float = 100.0
     generator_efficiency: float = 0.95
     generator_poles: int = 4
-    nominal_voltage: float = 690.0       # V
-    air_density: float = 1.225           # kg/m³
+    nominal_voltage: float = 690.0
+    air_density: float = 1.225
 
-    # ── Rotor ──
-    max_rotor_rpm: float = 15.0          # RPM
-    optimal_tsr: float = 7.5             # Tip Speed Ratio
-    cp_max: float = 0.48                 # Max power coefficient
+    max_rotor_rpm: float = 15.0
+    optimal_tsr: float = 7.5
+    cp_max: float = 0.48
 
-    # ── Power curtailment (限載) ──
-    curtailment_kw: Optional[float] = None   # None = no curtailment
-
-    # ── Custom power curve (optional) ──
-    # List of (wind_speed_m_s, power_kw) points. If provided, overrides Cp-based calculation.
-    # Example: [(3,0), (5,200), (8,1500), (12,5000), (15,5000), (25,5000)]
+    curtailment_kw: Optional[float] = None
     power_curve: Optional[List[Tuple[float, float]]] = None
 
     def to_dict(self) -> dict:
-        d = {
-            "rated_power_kw": self.rated_power_kw,
-            "rotor_diameter": self.rotor_diameter,
-            "hub_height": self.hub_height,
-            "cut_in_speed": self.cut_in_speed,
-            "rated_speed": self.rated_speed,
-            "cut_out_speed": self.cut_out_speed,
-            "gear_ratio": self.gear_ratio,
-            "generator_efficiency": self.generator_efficiency,
-            "generator_poles": self.generator_poles,
-            "nominal_voltage": self.nominal_voltage,
-            "air_density": self.air_density,
-            "max_rotor_rpm": self.max_rotor_rpm,
-            "optimal_tsr": self.optimal_tsr,
-            "cp_max": self.cp_max,
-            "curtailment_kw": self.curtailment_kw,
-            "power_curve": self.power_curve,
-        }
-        return d
+        return {k: getattr(self, k) for k in self.__dataclass_fields__}
 
     @classmethod
     def from_dict(cls, d: dict) -> "TurbineSpec":
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
-# ── Preset turbine specs ──────────────────────────────────────────────
-
 TURBINE_PRESETS: Dict[str, TurbineSpec] = {
-    "z72_5mw": TurbineSpec(),  # Default Z72 Bachmann 5MW
+    "z72_5mw": TurbineSpec(),
     "vestas_v90_3mw": TurbineSpec(
         rated_power_kw=3000, rotor_diameter=90, hub_height=80,
         cut_in_speed=4.0, rated_speed=13.0, cut_out_speed=25.0,
@@ -96,83 +76,73 @@ TURBINE_PRESETS: Dict[str, TurbineSpec] = {
 }
 
 
-class ThermalModel:
-    """First-order thermal model: dT/dt = (Q_in - (T - T_amb) / R_th) / C_th"""
-
-    def __init__(self, thermal_resistance: float, thermal_capacity: float,
-                 initial_temp: float = 25.0):
-        self.R_th = thermal_resistance
-        self.C_th = thermal_capacity
-        self.temperature = initial_temp
-
-    def step(self, heat_input_kw: float, ambient_temp: float, dt: float) -> float:
-        dT = (heat_input_kw - (self.temperature - ambient_temp) / self.R_th) / self.C_th * dt
-        self.temperature += dT
-        return self.temperature
-
-
 class TurbinePhysicsModel:
     """
-    Complete wind turbine physics model aligned to Z72 Bachmann SCADA tags.
+    Complete wind turbine physics model — composes independent sub-models.
 
-    Output is a flat dict keyed by SCADA tag IDs (matching scada_registry.py).
-    All internal state is encapsulated — caller only provides environmental inputs.
+    Each sub-model can be replaced by assigning a new instance:
+        model.thermal = MyCustomThermalSystem()
+        model.vibration = MyCustomVibrationModel()
     """
 
     def __init__(self, spec: Optional[TurbineSpec] = None, seed: Optional[int] = None):
         self.spec = spec or TurbineSpec()
         self._rng = np.random.RandomState(seed)
+        _seed = seed or 0
 
-        # Precompute power curve lookup if provided
-        self._power_curve_interp = None
-        if self.spec.power_curve:
-            ws = [p[0] for p in self.spec.power_curve]
-            pw = [p[1] for p in self.spec.power_curve]
-            self._power_curve_interp = (np.array(ws), np.array(pw))
+        # ── Composable sub-models (each independently replaceable) ──
+        self.power_curve = PowerCurveModel(
+            power_curve=self.spec.power_curve,
+            rated_power_kw=self.spec.rated_power_kw,
+            cut_in=self.spec.cut_in_speed,
+            rated_speed=self.spec.rated_speed,
+            cut_out=self.spec.cut_out_speed,
+        )
+        self.rotor_model = RotorSpeedModel(
+            rotor_diameter=self.spec.rotor_diameter,
+            optimal_tsr=self.spec.optimal_tsr,
+            max_rpm=self.spec.max_rotor_rpm,
+            rated_speed=self.spec.rated_speed,
+            gear_ratio=self.spec.gear_ratio,
+        )
+        self.thermal = ThermalSystem()
+        self.vibration = VibrationModel(seed=_seed)
+        self.yaw = YawModel()
 
-        # ── State variables ──
+        # ── State ──
         self.tur_state = 1
         self.rotor_speed = 0.0
         self.pitch_angle = 90.0
         self._pitch_bl = [90.0, 90.0, 90.0]
-        self.yaw_angle = 270.0
-        self.cable_windup = 0.0
-
-        # ── Thermal models ──
-        self._gen_stator_temp = ThermalModel(0.015, 200.0, 35.0)
-        self._gen_air_temp = ThermalModel(0.020, 150.0, 30.0)
-        self._gen_bearing_temp = ThermalModel(0.012, 250.0, 30.0)
-        self._cnv_cabin_temp = ThermalModel(0.010, 300.0, 28.0)
-        self._cnv_igct_water_temp = ThermalModel(0.008, 400.0, 25.0)
-        self._transformer_temp = ThermalModel(0.005, 500.0, 30.0)
-        self._nacelle_temp = ThermalModel(0.030, 800.0, 25.0)
-        self._nacelle_cab_temp = ThermalModel(0.025, 200.0, 28.0)
-        self._rotor_temp = ThermalModel(0.035, 300.0, 25.0)
-        self._hub_cab_temp = ThermalModel(0.030, 150.0, 28.0)
-
-        self._yaw_brake_pressure = 150.0
         self._sim_time = 0.0
 
-        # ── Operator control (set via API, maps to Modbus Coil/Contact) ──
-        self.operator_stop = False           # Manual stop command (Coil[2])
-        self.operator_start_pending = False  # Start command (Coil[1])
-        self.service_mode = False            # Maintenance / inspection mode (WSRV_SrvOn)
-        self.local_control = False           # Local/Remote (MBUS Contact[2])
-        self.curtailment_kw: Optional[float] = None  # Per-turbine power limit (None=use spec)
+        # ── Operator control ──
+        self.operator_stop = False
+        self.operator_start_pending = False
+        self.service_mode = False
+        self.local_control = False
+        self.curtailment_kw: Optional[float] = None
 
-        # ── Fault modifiers (set by FaultEngine) ──
+        # ── Fault modifiers ──
         self.fault_modifiers: Dict[str, float] = {}
 
     def update_spec(self, spec: TurbineSpec):
-        """Update turbine specifications at runtime."""
+        """Update turbine specifications and rebuild sub-models."""
         self.spec = spec
-        # Rebuild power curve interpolation
-        if spec.power_curve:
-            ws = [p[0] for p in spec.power_curve]
-            pw = [p[1] for p in spec.power_curve]
-            self._power_curve_interp = (np.array(ws), np.array(pw))
-        else:
-            self._power_curve_interp = None
+        self.power_curve = PowerCurveModel(
+            power_curve=spec.power_curve,
+            rated_power_kw=spec.rated_power_kw,
+            cut_in=spec.cut_in_speed,
+            rated_speed=spec.rated_speed,
+            cut_out=spec.cut_out_speed,
+        )
+        self.rotor_model = RotorSpeedModel(
+            rotor_diameter=spec.rotor_diameter,
+            optimal_tsr=spec.optimal_tsr,
+            max_rpm=spec.max_rotor_rpm,
+            rated_speed=spec.rated_speed,
+            gear_ratio=spec.gear_ratio,
+        )
 
     def step(self, wind_speed: float, wind_direction: float,
              ambient_temp: float = 25.0, dt: float = 1.0) -> Dict[str, float]:
@@ -182,26 +152,21 @@ class TurbinePhysicsModel:
         # ── 1. State machine ──
         self._update_state(wind_speed)
         is_producing = self.tur_state == 6
+        is_starting = self.tur_state in (4, 5)
 
-        # ── 2. Rotor aerodynamics ──
-        rotor_power_kw, rotor_torque = self._calc_rotor(wind_speed, dt, is_producing)
+        # ── 2. Rotor speed (with realistic inertia) ──
+        self.rotor_speed = self.rotor_model.step(
+            self.rotor_speed, wind_speed, s.cut_in_speed,
+            is_producing, is_starting, dt
+        )
 
-        # ── 3. Pitch control ──
-        self._calc_pitch(wind_speed, is_producing, dt)
+        # ── 3. Power (from realistic power curve) ──
+        if is_producing:
+            gen_power_kw = self.power_curve.get_power(wind_speed)
+        else:
+            gen_power_kw = 0.0
 
-        # ── 4. Generator ──
-        gen_speed = self.rotor_speed * s.gear_ratio if is_producing else 0.0
-        gen_power_kw = rotor_power_kw * s.generator_efficiency if is_producing else 0.0
-
-        # Apply power curve if defined
-        if is_producing and self._power_curve_interp is not None:
-            ws_arr, pw_arr = self._power_curve_interp
-            gen_power_kw = float(np.interp(wind_speed, ws_arr, pw_arr))
-
-        # Clamp to rated power
-        gen_power_kw = min(gen_power_kw, s.rated_power_kw)
-
-        # Apply curtailment (限載) — per-turbine overrides spec-level
+        # Apply curtailment
         effective_limit = s.rated_power_kw
         if self.curtailment_kw is not None:
             effective_limit = min(effective_limit, self.curtailment_kw)
@@ -209,6 +174,11 @@ class TurbinePhysicsModel:
             effective_limit = min(effective_limit, s.curtailment_kw)
         gen_power_kw = min(gen_power_kw, effective_limit)
 
+        # ── 4. Pitch control ──
+        self._calc_pitch(wind_speed, gen_power_kw, is_producing, dt)
+
+        # ── 5. Electrical ──
+        gen_speed = self.rotor_speed * s.gear_ratio if is_producing else 0.0
         gen_freq = (gen_speed * s.generator_poles / 2) / 60.0 if is_producing else 0.0
         gen_voltage = s.nominal_voltage if is_producing else 0.0
         gen_current = (gen_power_kw * 1000 / (gen_voltage * math.sqrt(3) * 0.95)
@@ -218,47 +188,29 @@ class TurbinePhysicsModel:
         cnv_gd_pwr = gen_power_kw * 0.98
         cnv_dc_vtg = 1100.0 if is_producing else 0.0
 
-        # ── 5. Yaw ──
-        self._calc_yaw(wind_direction, is_producing, dt)
-        yaw_error = self._angle_diff(wind_direction, self.yaw_angle)
+        # ── 6. Yaw (with dead band, delay, cable management) ──
+        yaw_out = self.yaw.step(wind_direction, is_producing, dt)
 
-        # ── 6. Thermal models ──
-        heat_gen = gen_power_kw * (1 - s.generator_efficiency) if is_producing else 0.0
-        heat_cnv = gen_power_kw * 0.02 if is_producing else 0.0
-        heat_trf = cnv_gd_pwr * 0.01 if is_producing else 0.0
-        heat_nac = heat_gen * 0.3 + heat_cnv * 0.5
+        # ── 7. Thermal (calibrated steady-state temperatures) ──
+        temps = self.thermal.step(
+            gen_power_kw, cnv_gd_pwr, self.rotor_speed,
+            ambient_temp, s.generator_efficiency, dt
+        )
 
-        gen_sta_t = self._gen_stator_temp.step(heat_gen * 0.6, ambient_temp, dt)
-        gen_air_t = self._gen_air_temp.step(heat_gen * 0.3, ambient_temp, dt)
-        gen_brg_t = self._gen_bearing_temp.step(heat_gen * 0.1 + self.rotor_speed * 0.01, ambient_temp, dt)
-        cnv_cab_t = self._cnv_cabin_temp.step(heat_cnv, ambient_temp, dt)
-        cnv_wtr_t = self._cnv_igct_water_temp.step(heat_cnv * 0.7, ambient_temp, dt)
-        trf_t = self._transformer_temp.step(heat_trf, ambient_temp, dt)
-        nac_t = self._nacelle_temp.step(heat_nac, ambient_temp, dt)
-        nac_cab_t = self._nacelle_cab_temp.step(heat_cnv * 0.2, nac_t, dt)
-        rot_t = self._rotor_temp.step(0, ambient_temp, dt)
-        hub_cab_t = self._hub_cab_temp.step(0, rot_t, dt)
+        # ── 8. Vibration (RPM + turbulence + load) ──
+        vib_x, vib_y = self.vibration.step(
+            self.rotor_speed, wind_speed, gen_power_kw,
+            turbulence=0.1, dt=dt
+        )
 
-        # ── 7. Vibration ──
-        base_vib = 0.3 + self.rotor_speed * 0.05 if is_producing else 0.1
-        vib_x = base_vib + self._rng.normal(0, 0.15)
-        vib_y = base_vib * 0.8 + self._rng.normal(0, 0.12)
-
-        # ── 8. Hydraulic / cooling ──
-        igct_pres1 = 3.5 + self._rng.normal(0, 0.1) if is_producing else 0.0
-        igct_pres2 = 3.3 + self._rng.normal(0, 0.1) if is_producing else 0.0
+        # ── 9. Hydraulic / cooling ──
+        igct_pres1 = 3.5 + self._rng.normal(0, 0.08) if is_producing else 0.0
+        igct_pres2 = 3.3 + self._rng.normal(0, 0.08) if is_producing else 0.0
         igct_cond = 1.0 if is_producing else 0.0
 
-        if abs(yaw_error) > 5 and is_producing:
-            self._yaw_brake_pressure = max(80, self._yaw_brake_pressure - 2 * dt)
-        else:
-            self._yaw_brake_pressure = min(180, self._yaw_brake_pressure + 5 * dt)
-        yaw_brake_prs = self._yaw_brake_pressure + self._rng.normal(0, 1)
-
-        # ── 9. Status flags ──
+        # ── 10. Status flags ──
         rotor_locked = 1 if self.tur_state in (1, 2, 9) else 0
         brake_active = 1 if self.tur_state in (1, 7, 9) else 0
-        locking_pin = 1.0 if rotor_locked else 0.0
 
         # ── Build output ──
         output: Dict[str, float] = {
@@ -268,19 +220,19 @@ class TurbinePhysicsModel:
             "WGEN_GnSpd": round(gen_speed, 2),
             "WGEN_GnVtgMs": round(gen_voltage, 2),
             "WGEN_GnCurMs": round(gen_current, 2),
-            "WGEN_GnStaTmp1": round(gen_sta_t, 2),
-            "WGEN_GnAirTmp1": round(gen_air_t, 2),
-            "WGEN_GnBrgTmp1": round(gen_brg_t, 2),
+            "WGEN_GnStaTmp1": temps["gen_stator"],
+            "WGEN_GnAirTmp1": temps["gen_air"],
+            "WGEN_GnBrgTmp1": temps["gen_bearing"],
             "WROT_RotSpd": round(self.rotor_speed, 3),
             "WROT_PtAngValBl1": round(self._pitch_bl[0], 2),
             "WROT_PtAngValBl2": round(self._pitch_bl[1], 2),
             "WROT_PtAngValBl3": round(self._pitch_bl[2], 2),
-            "WROT_RotTmp": round(rot_t, 2),
-            "WROT_RotCabTmp": round(hub_cab_t, 2),
-            "WROT_LckngPnPos": locking_pin,
+            "WROT_RotTmp": temps["rotor"],
+            "WROT_RotCabTmp": temps["hub_cabinet"],
+            "WROT_LckngPnPos": 1.0 if rotor_locked else 0.0,
             "WROT_RotLckd": float(rotor_locked),
             "WROT_SrvcBrkAct": float(brake_active),
-            "WCNV_CnvCabinTmp": round(cnv_cab_t, 2),
+            "WCNV_CnvCabinTmp": temps["cnv_cabinet"],
             "WCNV_CnvDClVtg": round(cnv_dc_vtg, 2),
             "WCNV_CnvGdPwrAt": round(cnv_gd_pwr, 2),
             "WCNV_CnvGnFrq": round(gen_freq, 3),
@@ -288,22 +240,23 @@ class TurbinePhysicsModel:
             "WCNV_IGCTWtrCond": igct_cond,
             "WCNV_IGCTWtrPres1": round(igct_pres1, 2),
             "WCNV_IGCTWtrPres2": round(igct_pres2, 2),
-            "WCNV_IGCTWtrTmp": round(cnv_wtr_t, 2),
-            "WGDC_TrfCoreTmp": round(trf_t, 2),
+            "WCNV_IGCTWtrTmp": temps["cnv_water"],
+            "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
-            "WNAC_NacTmp": round(nac_t, 2),
-            "WNAC_NacCabTmp": round(nac_cab_t, 2),
-            "WNAC_VibMsNacXDir": round(max(0, vib_x), 3),
-            "WNAC_VibMsNacYDir": round(max(0, vib_y), 3),
-            "WYAW_YwVn1AlgnAvg5s": round(yaw_error, 2),
-            "WYAW_YwBrkHyPrs": round(max(0, yaw_brake_prs), 2),
-            "WYAW_CabWup": round(self.cable_windup, 2),
+            "WNAC_NacTmp": temps["nacelle"],
+            "WNAC_NacCabTmp": temps["nac_cabinet"],
+            "WNAC_VibMsNacXDir": round(vib_x, 3),
+            "WNAC_VibMsNacYDir": round(vib_y, 3),
+            "WYAW_YwVn1AlgnAvg5s": round(yaw_out["yaw_error"], 2),
+            "WYAW_YwBrkHyPrs": round(max(0, yaw_out["brake_pressure"]), 2),
+            "WYAW_CabWup": round(yaw_out["cable_windup"], 2),
             "WSRV_SrvOn": 1.0 if self.service_mode else 0.0,
             "MBUS_Contact2": 1.0 if self.local_control else 0.0,
         }
 
+        # Apply fault modifiers
         for tag_id, modifier in self.fault_modifiers.items():
             if tag_id in output:
                 output[tag_id] += modifier
@@ -316,27 +269,23 @@ class TurbinePhysicsModel:
         s = self.spec
         st = self.tur_state
 
-        # ── Operator commands override (highest priority) ──
         if self.operator_stop or self.service_mode:
-            if st == 6:  # Production → Normal Stop
+            if st == 6:
                 self.tur_state = 9
-            elif st in (4, 5):  # Starting → Normal Stop
+            elif st in (4, 5):
                 self.tur_state = 9
             elif st == 9 and self.rotor_speed < 0.5:
-                self.tur_state = 1  # Stop complete
-            # Consume start command if stopped
+                self.tur_state = 1
             if self.operator_start_pending:
                 self.operator_start_pending = False
             return
 
-        # ── Operator start command ──
         if self.operator_start_pending and st in (1, 2, 9):
             self.operator_start_pending = False
             if s.cut_in_speed <= wind_speed <= s.cut_out_speed:
-                self.tur_state = 4  # → Pre-Production
+                self.tur_state = 4
             return
 
-        # ── Normal state transitions ──
         if st == 1:
             if s.cut_in_speed <= wind_speed <= s.cut_out_speed:
                 self.tur_state = 2
@@ -365,59 +314,24 @@ class TurbinePhysicsModel:
             if self.rotor_speed < 0.5:
                 self.tur_state = 1
 
-    # ─── Rotor ─────────────────────────────────────────────────────────
-
-    def _calc_rotor(self, wind_speed: float, dt: float, is_producing: bool) -> tuple:
-        s = self.spec
-        swept_area = math.pi * (s.rotor_diameter / 2) ** 2
-
-        if is_producing and wind_speed > 0:
-            tsr = ((self.rotor_speed * math.pi * s.rotor_diameter / 60) / wind_speed
-                   if wind_speed > 0 else 0)
-            cp = self._calc_cp(tsr)
-            wind_power = 0.5 * s.air_density * swept_area * wind_speed ** 3
-            rotor_power = wind_power * cp / 1000.0
-
-            target_rpm = self._optimal_rpm(wind_speed)
-            self.rotor_speed += (target_rpm - self.rotor_speed) * 0.1 * dt
-
-            rotor_torque = (rotor_power * 1000 / (self.rotor_speed * 2 * math.pi / 60)
-                            if self.rotor_speed > 0 else 0)
-        else:
-            self.rotor_speed = max(0, self.rotor_speed - 0.3 * dt)
-            rotor_power = 0.0
-            rotor_torque = 0.0
-            if self.tur_state in (4, 5) and wind_speed >= s.cut_in_speed:
-                target_rpm = self._optimal_rpm(wind_speed)
-                self.rotor_speed += target_rpm * 0.05 * dt
-
-        return rotor_power, rotor_torque
-
-    def _calc_cp(self, tsr: float) -> float:
-        s = self.spec
-        if tsr <= 0 or tsr > 15:
-            return 0.0
-        return s.cp_max * math.exp(-0.5 * ((tsr - s.optimal_tsr) / 2.5) ** 2)
-
-    def _optimal_rpm(self, wind_speed: float) -> float:
-        s = self.spec
-        rpm = (s.optimal_tsr * wind_speed * 60) / (math.pi * s.rotor_diameter)
-        return min(rpm, s.max_rotor_rpm)
-
     # ─── Pitch ─────────────────────────────────────────────────────────
 
-    def _calc_pitch(self, wind_speed: float, is_producing: bool, dt: float):
+    def _calc_pitch(self, wind_speed: float, power_kw: float,
+                    is_producing: bool, dt: float):
         s = self.spec
-        max_rate = 8.0
+        max_rate = 8.0  # °/s
 
         if not is_producing:
-            target = 90.0
+            target = 90.0  # feathered
         elif wind_speed < s.rated_speed:
-            target = 0.0
+            target = 0.0  # Region 2: fine pitch
         else:
-            target = min(30.0, (wind_speed - s.rated_speed) * 2.3)
+            # Region 3: pitch to limit power to rated
+            # More pitch = less power captured
+            excess_wind = wind_speed - s.rated_speed
+            target = min(30.0, excess_wind * 2.0 + excess_wind ** 2 * 0.1)
 
-        # Extra pitch if curtailed (per-turbine or spec-level)
+        # Curtailment pitch
         active_curtail = self.curtailment_kw if self.curtailment_kw is not None else s.curtailment_kw
         if is_producing and active_curtail is not None and active_curtail < s.rated_power_kw:
             curtail_ratio = active_curtail / s.rated_power_kw
@@ -430,26 +344,6 @@ class TurbinePhysicsModel:
         for i in range(3):
             self._pitch_bl[i] = self.pitch_angle + self._rng.normal(0, 0.15)
 
-    # ─── Yaw ───────────────────────────────────────────────────────────
-
-    def _calc_yaw(self, wind_direction: float, is_producing: bool, dt: float):
-        if not is_producing:
-            return
-        error = self._angle_diff(wind_direction, self.yaw_angle)
-        if abs(error) > 5.0:
-            yaw_rate = 0.3
-            self.yaw_angle += math.copysign(yaw_rate, error) * dt
-            self.yaw_angle %= 360
-            self.cable_windup += math.copysign(yaw_rate * dt / 360, error)
-            self.cable_windup = max(-4.0, min(4.0, self.cable_windup))
-
-    @staticmethod
-    def _angle_diff(target: float, current: float) -> float:
-        diff = (target - current) % 360
-        if diff > 180:
-            diff -= 360
-        return diff
-
     # ─── External control ──────────────────────────────────────────────
 
     def force_state(self, state: int):
@@ -457,37 +351,31 @@ class TurbinePhysicsModel:
             self.tur_state = state
 
     def cmd_stop(self):
-        """Operator manual stop."""
         self.operator_stop = True
         self.operator_start_pending = False
 
     def cmd_start(self):
-        """Operator manual start (clears stop/service mode)."""
         self.operator_stop = False
         self.service_mode = False
         self.operator_start_pending = True
 
     def cmd_reset(self):
-        """Operator reset (clear faults, return to standby)."""
         self.operator_stop = False
         self.service_mode = False
         self.operator_start_pending = False
         self.fault_modifiers.clear()
         if self.tur_state in (7, 9):
-            self.tur_state = 1  # Will auto-transition to standby
+            self.tur_state = 1
 
     def cmd_service(self, on: bool):
-        """Enter/exit maintenance service mode."""
         self.service_mode = on
         if on:
             self.operator_stop = False
 
     def cmd_curtail(self, power_kw: Optional[float]):
-        """Set per-turbine power curtailment. None = remove curtailment."""
         self.curtailment_kw = power_kw
 
     def get_control_status(self) -> dict:
-        """Return current operator control status."""
         return {
             "operator_stop": self.operator_stop,
             "service_mode": self.service_mode,

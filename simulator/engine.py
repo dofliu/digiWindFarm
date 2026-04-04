@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from wind_model import WindEnvironmentModel
 from simulator.physics import TurbinePhysicsModel, FaultEngine
+from simulator.physics.wind_field import TurbulenceGenerator, PerTurbineWind
 from simulator.modbus_server import ModbusSimServer
 
 
@@ -33,6 +34,10 @@ class WindFarmSimulator:
 
         self.fault_engine = FaultEngine()
         self.modbus_server: Optional[ModbusSimServer] = None
+
+        # Per-turbine wind variation and turbulence
+        self._turbulence_gen = TurbulenceGenerator(seed=42)
+        self._per_turbine_wind = PerTurbineWind(turbine_count, seed=99)
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -71,19 +76,24 @@ class WindFarmSimulator:
         while self._running:
             try:
                 now = datetime.now()
-                wind_speed = self.wind_model.get_wind_speed(now)
+                base_wind = self.wind_model.get_wind_speed(now)
                 wind_direction = self.wind_model.get_wind_direction(now)
                 ambient_temp = self.wind_model.get_ambient_temp(now)
+
+                # Add autocorrelated turbulence
+                turb_component = self._turbulence_gen.step(
+                    base_wind, self.wind_model.turbulence_intensity, time_step
+                )
+                farm_wind = max(0, base_wind + turb_component)
 
                 # Advance fault engine
                 fault_modifiers = self.fault_engine.step(dt=time_step)
 
                 readings = []
                 for tid, model in self.turbines.items():
-                    # Per-turbine wind variation (wake effect approximation)
-                    idx = int(tid[2:])
-                    variation = (idx - 1) * 0.3
-                    local_wind = max(0, wind_speed + variation * (0.5 - hash(tid) % 100 / 100))
+                    # Per-turbine wind variation (wake effect + spatial decorrelation)
+                    idx = int(tid[2:]) - 1
+                    local_wind = self._per_turbine_wind.get_local_wind(farm_wind, idx)
 
                     # Apply fault modifiers for this turbine
                     model.fault_modifiers = fault_modifiers.get(tid, {})
