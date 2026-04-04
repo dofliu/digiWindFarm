@@ -37,11 +37,16 @@ Integrated wind farm monitoring platform combining:
 │  Physics Engine          OPC DA (Real Wind Farm)      │
 │  simulator/physics/      opc_adapter.py               │
 │  ├─ turbine_physics.py   (Bachmann Z72 / Vestas)      │
+│  ├─ power_curve.py       ★ Region 2/3 power curve     │
+│  ├─ thermal_model.py     ★ 10-point calibrated temps   │
+│  ├─ vibration_model.py   ★ 5-source vibration model    │
+│  ├─ yaw_model.py         ★ dead band + delay + unwind  │
+│  ├─ wind_field.py        ★ AR(1) turbulence + wake     │
 │  ├─ fault_engine.py                                    │
 │  └─ scada_registry.py (40 tags, i18n)                  │
 │                                                        │
 │  Wind Model (wind_model.py)                            │
-│  ├─ Auto: daily pattern + turbulence                   │
+│  ├─ Auto: daily pattern + Kaimal-like turbulence       │
 │  ├─ Profiles: calm/moderate/rated/strong/storm/gusty   │
 │  └─ Custom: manual wind speed/direction/temp override  │
 └──────────────┬────────────────────────────────────────┘
@@ -53,6 +58,7 @@ Integrated wind farm monitoring platform combining:
 ┌──────────────▼────────────────────────────────────────┐
 │  FastAPI Backend (port 8000)                           │
 │  REST: /api/turbines, /config, /faults, /i18n, /modbus│
+│  REST: /api/control (stop/start/curtail/service)       │
 │  WebSocket: /ws/realtime (2s push)                     │
 │  SQLite: wind_farm_data.db (scada_json column)         │
 ├────────────────────────────────────────────────────────┤
@@ -62,8 +68,10 @@ Integrated wind farm monitoring platform combining:
                │
 ┌──────────────▼────────────────────────────────────────┐
 │  React 19 Frontend (port 3000)                         │
+│  3 dashboard modes (cards/summary/table)               │
 │  6 SCADA subsystem panels / Trend charts / i18n        │
-│  Fault injection console / Wind condition control      │
+│  Fault injection / Wind control / Turbine spec         │
+│  Operator control (stop/start/curtail/service mode)    │
 │  FarmOverview / TurbineDetail / MaintenanceHub         │
 └───────────────────────────────────────────────────────┘
 ```
@@ -73,7 +81,7 @@ Integrated wind farm monitoring platform combining:
 ## Directory Structure
 
 ```
-digiWindTurbine/
+digiWindFarm/
 ├── run.py                     # Entry point: starts FastAPI + simulator + Modbus
 ├── requirements.txt           # Python deps: fastapi, uvicorn, numpy, pydantic, pymodbus
 │
@@ -81,9 +89,14 @@ digiWindTurbine/
 │   ├── engine.py              # WindFarmSimulator (orchestrates physics + faults + Modbus)
 │   ├── modbus_server.py       # Modbus TCP server (pymodbus, Bachmann register map)
 │   └── physics/               # ★ Independent physics module (no FastAPI dependency)
-│       ├── __init__.py
+│       ├── __init__.py        # Exports all sub-models
 │       ├── scada_registry.py  # 40 SCADA tag definitions + i18n (en/zh-TW) + OPC/Modbus mapping
-│       ├── turbine_physics.py # Full turbine physics model (coupling chain, thermal models)
+│       ├── turbine_physics.py # Main model: composes all sub-models below
+│       ├── power_curve.py     # ★ PowerCurveModel + RotorSpeedModel (Region 2/3)
+│       ├── thermal_model.py   # ★ ThermalSystem (10 calibrated thermal elements)
+│       ├── vibration_model.py # ★ VibrationModel (5-source: 1P, 3P, aero, load, noise)
+│       ├── yaw_model.py       # ★ YawModel (dead band, delay, cable unwind)
+│       ├── wind_field.py      # ★ TurbulenceGenerator (AR1/Kaimal) + PerTurbineWind (wake)
 │       └── fault_engine.py    # 7 fault scenarios with gradual degradation curves
 │
 ├── wind_model.py              # Wind environment (daily pattern + manual override + profiles)
@@ -99,26 +112,27 @@ digiWindTurbine/
 │   ├── opc_adapter.py         # OPC DA adapter (TAG_MAPS aligned to scada_registry)
 │   └── routers/
 │       ├── turbines.py        # /api/turbines, /{id}/history, /{id}/trend, /farm-status
-│       ├── config.py          # /api/config, /simulation, /datasource, /wind
+│       ├── config.py          # /api/config, /simulation, /datasource, /wind, /turbine-spec
+│       ├── control.py         # /api/control/command, /curtail, /{id}/status
 │       ├── faults.py          # /api/faults/scenarios, /inject, /active, /clear
 │       ├── i18n.py            # /api/i18n/tags, /tags/all, /tags/registry
 │       ├── modbus.py          # /api/modbus/start, /stop, /status, /registers
-│       └── export.py          # /api/export/snapshot, /history?format=csv
+│       └── export.py          # /api/export/snapshot, /history?format=csv (40-col flattened)
 │
 ├── frontend/                  # React 19 + Vite + Tailwind
-│   ├── App.tsx                # Main app (nav, language toggle, fault badge)
+│   ├── App.tsx                # Main app (nav, language toggle, fault badge, live data)
 │   ├── types.ts               # TurbineData (51 fields), FaultInfo, ScadaTagI18n
 │   ├── hooks/
 │   │   ├── useRealtimeData.ts # WebSocket + REST, maps all 40 SCADA fields
 │   │   ├── useI18n.ts         # Language toggle (en/zh-TW), SCADA tag labels
 │   │   ├── useMockTurbineData.ts
 │   │   ├── useMockMaintenanceData.ts
-│   │   └── useSettings.ts
+│   │   └── useSettings.ts    # Smart sync (doesn't restart simulator unnecessarily)
 │   ├── components/
-│   │   ├── FarmOverview.tsx   # Turbine cards with TurState, fault badges
-│   │   ├── TurbineDetail.tsx  # 6 SCADA subsystem panels + gauges + AI diagnosis
-│   │   ├── TrendChartPanel.tsx # ★ Multi-tag real-time trend chart (6 presets + custom)
-│   │   ├── FaultInjectionPanel.tsx # ★ Inject/monitor/clear faults
+│   │   ├── FarmOverview.tsx   # ★ 3 view modes: cards / summary+stats / table (10 cols)
+│   │   ├── TurbineDetail.tsx  # 6 SCADA panels + gauges + operator control + AI diagnosis
+│   │   ├── TrendChartPanel.tsx # Multi-tag real-time trend chart (6 presets + custom)
+│   │   ├── FaultInjectionPanel.tsx # Inject/monitor/clear faults
 │   │   ├── SettingsPage.tsx   # Data source + wind control + turbine spec + curtailment
 │   │   ├── MaintenanceHub.tsx # Work order management
 │   │   ├── DispatchModal.tsx, WorkOrderDetailModal.tsx
@@ -131,6 +145,74 @@ digiWindTurbine/
 │   └── 1040610-Z72_PLC_OPC_TAG_1040510.xlsx  # Original Bachmann Z72 tag definitions
 │
 └── wind_farm_data.db          # Auto-created SQLite (gitignore)
+```
+
+---
+
+## Physics Sub-Model Architecture
+
+Each sub-model is an **independent class** that can be replaced separately:
+
+```python
+# Example: replace vibration model with a custom one
+model = TurbinePhysicsModel()
+model.vibration = MyAdvancedVibrationModel()
+model.thermal = CFDBasedThermalSystem()
+```
+
+### PowerCurveModel (`power_curve.py`)
+- Lookup-table based, default 5MW curve with 30+ points
+- Region 2 (partial load): power ∝ V³, tracks optimal TSR
+- Region 3 (rated): constant power, pitch regulates
+- Supports custom power curves via `power_curve` parameter
+
+### RotorSpeedModel (`power_curve.py`)
+- Region 2: RPM proportional to wind speed (optimal TSR tracking)
+- Region 3: constant rated RPM (13.6 RPM for 5MW)
+- First-order inertia (τ = 8 seconds, realistic for 126m rotor)
+- Startup/braking dynamics
+
+### ThermalSystem (`thermal_model.py`)
+10 calibrated thermal elements with realistic steady-state temperatures:
+
+| Component | R_th | τ (sec) | Steady-state at rated | Real range |
+|-----------|------|---------|----------------------|------------|
+| Gen Stator | 0.24 | 600 | ~60°C | 70-110°C |
+| Gen Air Gap | 0.32 | 450 | ~49°C | 60-85°C |
+| Gen Bearing | 0.70 | 900 | ~53°C | 50-75°C |
+| Cnv Cabinet | 0.20 | 500 | ~45°C | 35-50°C |
+| IGCT Water | 0.17 | 300 | ~37°C | 30-42°C |
+| Transformer | 0.70 | 1200 | ~59°C | 50-80°C |
+| Nacelle | 0.08 | 1800 | ~37°C | 30-45°C |
+
+### VibrationModel (`vibration_model.py`)
+5-source model: rotational (1P), blade-pass (3P), aerodynamic (turbulence),
+drivetrain load, broadband noise. Low-pass filtered for realistic time behavior.
+- Normal: 0.5-2.0 mm/s, Warning: >4.0, Alarm: >7.0
+
+### YawModel (`yaw_model.py`)
+- Dead band: ±8° (no action within)
+- Activation delay: 60 seconds sustained error before yaw starts
+- Post-action hold: 30 seconds after alignment
+- Cable unwind: auto-unwind at ±2.5 turns
+- Brake pressure: 140-180 bar (stationary), 80-120 during yaw
+
+### Wind Field (`wind_field.py`)
+- TurbulenceGenerator: AR(1) process, Kaimal-like spectrum (τ = L/V, L=340m)
+- PerTurbineWind: spatial decorrelation + wake effect (2-6% deficit)
+
+### Power Curve Validation (5MW Z72, steady state)
+```
+Wind    Power     RPM   Pitch  GenTemp  BrgTemp
+  3       0kW    0.00   90.0°   31°C    29°C
+  5     284kW    5.68    0.1°   30°C    30°C
+  7    1068kW    7.96    0.0°   31°C    32°C
+  9    2548kW   10.23    0.0°   36°C    35°C
+ 12    4851kW   13.64    0.2°   52°C    47°C   ← rated
+ 16    4900kW   13.64    9.6°   58°C    51°C   ← Region 3
+ 20    4900kW   13.64   22.5°   60°C    54°C
+ 25    4900kW   13.64   30.0°   60°C    55°C
+ 26       0kW    0.00   90.2°    --      --    ← cut-out
 ```
 
 ---
@@ -206,7 +288,7 @@ Presets: `z72_5mw` (5MW), `vestas_v90_3mw` (3MW), `sg_8mw` (8MW), `goldwind_2.5m
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/export/snapshot` | Current state as JSON |
-| GET | `/api/export/history?turbine_id=WT001&format=csv` | History as CSV |
+| GET | `/api/export/history?turbine_id=WT001&format=csv` | History as CSV (40 cols flattened) |
 
 ### WebSocket
 | Endpoint | Description |
@@ -231,27 +313,6 @@ Based on `docs/1040610-Z72_PLC_OPC_TAG_1040510.xlsx` sheet "簡化-每部風力�
 | **WYAW** (Yaw) | YwVn1AlgnAvg5s, YwBrkHyPrs, CabWup | Alignment, hydraulic, cable |
 
 Full definitions: `simulator/physics/scada_registry.py`
-
----
-
-## Physics Model Coupling Chain
-
-```
-Wind Speed → Rotor RPM → Generator RPM/Freq → Power/Current/Voltage
-             ↓                  ↓
-          Blade Angles      Converter Power
-             ↓                  ↓
-        Pitch Motor Cur     IGCT Temperature
-                                ↓
-                           Transformer Temp
-
-Wind Speed → Nacelle Vibration (X,Y)
-Wind Dir → Yaw Error → Yaw Action → Hydraulic Pressure / Cable Windup
-Ambient Temp → Nacelle Temp → Cabinet Temps
-Power × Time → Thermal rise (generator stator, bearings, air gap)
-```
-
-Independent module at `simulator/physics/` — no dependency on FastAPI/frontend/storage.
 
 ---
 
