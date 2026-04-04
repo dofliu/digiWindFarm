@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { type TurbineData, TurbineStatus, type AppSettings, DataSourceType } from '../types';
 import StatusIndicator from './StatusIndicator';
 import { WindTurbineIcon } from './icons';
+import FarmTrendChart from './FarmTrendChart';
 
 interface FarmOverviewProps {
   turbines: TurbineData[];
@@ -109,27 +110,33 @@ const SummaryView: React.FC<{ turbines: TurbineData[]; onSelect: (t: TurbineData
         </div>
       </div>
 
-      {/* Compact turbine grid */}
-      <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2">
-        {turbines.map(t => (
-          <div key={t.id} onClick={() => onSelect(t)}
-            className={`rounded-md p-2 border cursor-pointer transition-all hover:scale-105 ${
-              t.status === TurbineStatus.FAULT ? 'border-red-500/50 bg-red-500/10' :
-              t.status === TurbineStatus.OPERATING ? 'border-green-500/30 bg-gray-800/50' :
-              'border-gray-600/30 bg-gray-800/30'
-            }`}>
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs font-bold text-white">{t.name}</span>
-              <span className={`w-2 h-2 rounded-full ${
-                t.status === TurbineStatus.OPERATING ? 'bg-green-400' :
-                t.status === TurbineStatus.FAULT ? 'bg-red-400 animate-pulse' :
-                'bg-yellow-400'
-              }`} />
+      {/* Right column: trend chart + compact grid */}
+      <div className="flex-1 space-y-4">
+        {/* Farm-wide trend chart */}
+        <FarmTrendChart turbines={turbines} lang={lang} />
+
+        {/* Compact turbine grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2">
+          {turbines.map(t => (
+            <div key={t.id} onClick={() => onSelect(t)}
+              className={`rounded-md p-2 border cursor-pointer transition-all hover:scale-105 ${
+                t.status === TurbineStatus.FAULT ? 'border-red-500/50 bg-red-500/10' :
+                t.status === TurbineStatus.OPERATING ? 'border-green-500/30 bg-gray-800/50' :
+                'border-gray-600/30 bg-gray-800/30'
+              }`}>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-white">{t.name}</span>
+                <span className={`w-2 h-2 rounded-full ${
+                  t.status === TurbineStatus.OPERATING ? 'bg-green-400' :
+                  t.status === TurbineStatus.FAULT ? 'bg-red-400 animate-pulse' :
+                  'bg-yellow-400'
+                }`} />
+              </div>
+              <div className="text-lg font-orbitron font-bold text-white">{t.powerOutput.toFixed(1)}<span className="text-xs text-gray-400 ml-0.5">MW</span></div>
+              <div className="text-xs text-gray-500">{t.windSpeed.toFixed(1)} m/s</div>
             </div>
-            <div className="text-lg font-orbitron font-bold text-white">{t.powerOutput.toFixed(1)}<span className="text-xs text-gray-400 ml-0.5">MW</span></div>
-            <div className="text-xs text-gray-500">{t.windSpeed.toFixed(1)} m/s</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
