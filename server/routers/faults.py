@@ -49,6 +49,20 @@ async def inject_fault(req: FaultInjectionRequest):
     if not ok:
         raise HTTPException(404, f"Unknown scenario: {req.scenarioId}")
 
+    b.record_event(
+        event_type="fault",
+        source="faults",
+        title=f"Fault injected: {req.scenarioId}",
+        turbine_id=req.turbineId,
+        detail=f"Injected {req.scenarioId} on {req.turbineId}",
+        payload={
+            "scenarioId": req.scenarioId,
+            "turbineId": req.turbineId,
+            "severityRate": req.severityRate,
+            "initialSeverity": req.initialSeverity,
+        },
+    )
+
     return {"status": "injected", "scenarioId": req.scenarioId, "turbineId": req.turbineId}
 
 
@@ -75,5 +89,14 @@ async def clear_faults(req: FaultClearRequest):
     # Reset tripped turbines back to normal
     if req.turbineId and req.turbineId in b.simulator.turbines:
         b.simulator.turbines[req.turbineId].reset()
+
+    b.record_event(
+        event_type="fault",
+        source="faults",
+        title="Faults cleared",
+        turbine_id=req.turbineId,
+        detail=f"Cleared faults for {req.turbineId or 'all turbines'}",
+        payload={"turbineId": req.turbineId, "scenarioId": req.scenarioId},
+    )
 
     return {"status": "cleared"}

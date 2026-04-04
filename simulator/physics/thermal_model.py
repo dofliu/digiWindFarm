@@ -1,57 +1,35 @@
 """
 Thermal models for wind turbine components.
 
-Each component uses a first-order RC thermal model calibrated to
-produce realistic steady-state temperatures at rated power.
-
-Reference values (5MW turbine at rated load, 25°C ambient):
-  Generator stator:  80-110°C
-  Generator air gap: 60-85°C
-  Generator bearing:  50-75°C
-  Nacelle:           35-45°C
-  Nacelle cabinet:   35-48°C
-  Converter cabinet: 35-50°C
-  IGCT water:        30-42°C
-  Transformer core:  50-80°C
-  Hub/rotor:         ambient + 5-10°C
-  Hub cabinet:       ambient + 8-15°C
-
-Can be replaced independently for different turbine types.
+This version adds:
+  - residual heat memory after startup / shutdown
+  - different cooling behavior for running vs stopped states
+  - heat soak between nearby components
+  - wind-assisted cooling for exposed components
 """
 
+import math
 from dataclasses import dataclass
 from typing import Dict
 
 
 class ThermalElement:
     """
-    First-order thermal model: τ × dT/dt = Q_in × R_th - (T - T_amb)
-
-    Parameters calibrated so that:
-      T_steady = T_amb + Q_in × R_th
-
-    Where τ = R_th × C_th (time constant in seconds).
+    First-order thermal model for one component.
     """
 
-    def __init__(self, thermal_resistance: float, time_constant: float,
-                 initial_temp: float = 25.0):
-        """
-        Args:
-            thermal_resistance: R_th (°C per kW of heat input)
-            time_constant: τ = R×C (seconds to reach 63% of steady state)
-            initial_temp: Starting temperature (°C)
-        """
+    def __init__(self, thermal_resistance: float, time_constant: float, initial_temp: float = 25.0):
         self.R_th = thermal_resistance
-        self.tau = time_constant  # seconds
-        self.C_th = time_constant / thermal_resistance  # kJ/°C (derived)
+        self.tau = time_constant
+        self.C_th = time_constant / thermal_resistance
         self.temperature = initial_temp
 
-    def step(self, heat_input_kw: float, ambient_temp: float, dt: float) -> float:
-        """Advance one timestep. Returns new temperature."""
-        T_target = ambient_temp + heat_input_kw * self.R_th
-        import math
-        alpha = 1.0 - math.exp(-dt / self.tau)
-        self.temperature += (T_target - self.temperature) * alpha
+    def step(self, heat_input_kw: float, ambient_temp: float, dt: float, cooling_factor: float = 1.0) -> float:
+        """Advance one timestep. Higher cooling_factor means faster response to ambient."""
+        target = ambient_temp + heat_input_kw * self.R_th
+        effective_tau = max(1.0, self.tau / max(0.25, cooling_factor))
+        alpha = 1.0 - math.exp(-dt / effective_tau)
+        self.temperature += (target - self.temperature) * alpha
         return self.temperature
 
     def reset(self, temp: float):
@@ -62,50 +40,25 @@ class ThermalElement:
 class ThermalSystemConfig:
     """Calibrated thermal parameters for a 5MW turbine."""
 
-    # (R_th °C/kW, time_constant seconds, initial °C)
-    # R_th is chosen so that at rated heat load, T_steady = T_amb + Q × R_th
-
-    # Generator stator: ~250kW heat loss at 5MW, target +60°C above ambient → R=0.24
-    gen_stator:  tuple = (0.24, 600, 35.0)
-    # Generator air gap: ~125kW, target +40°C → R=0.32
-    gen_air:     tuple = (0.32, 450, 30.0)
-    # Generator bearing: ~50kW (heat + friction), target +35°C → R=0.70
+    gen_stator: tuple = (0.24, 600, 35.0)
+    gen_air: tuple = (0.32, 450, 30.0)
     gen_bearing: tuple = (0.70, 900, 30.0)
 
-    # Converter cabinet: ~100kW, target +20°C → R=0.20
     cnv_cabinet: tuple = (0.20, 500, 28.0)
-    # IGCT water cooling: ~70kW, target +12°C → R=0.17
-    cnv_water:   tuple = (0.17, 300, 25.0)
+    cnv_water: tuple = (0.17, 300, 25.0)
 
-    # Transformer: ~50kW, target +35°C → R=0.70
     transformer: tuple = (0.70, 1200, 30.0)
 
-    # Nacelle: diffuse heat, target +12°C → R=0.08
-    nacelle:     tuple = (0.08, 1800, 25.0)
-    # Nacelle cabinet: smaller volume, target +15°C from nacelle temp → R=0.75
+    nacelle: tuple = (0.08, 1800, 25.0)
     nac_cabinet: tuple = (0.75, 300, 28.0)
 
-    # Hub/rotor: mostly ambient-driven
-    rotor:       tuple = (0.10, 600, 25.0)
+    rotor: tuple = (0.10, 600, 25.0)
     hub_cabinet: tuple = (0.30, 300, 28.0)
 
 
 class ThermalSystem:
     """
-    Complete turbine thermal system — manages all thermal elements.
-
-    Heat flow model at rated (5MW):
-      Generator loss: 5000 × (1-0.95) = 250 kW
-        → stator:  60% = 150 kW → ΔT = 150×0.24 = 36°C → T ≈ 61°C
-        → air gap: 30% = 75 kW  → ΔT = 75×0.32  = 24°C → T ≈ 49°C
-        → bearing: 10% = 25 kW + friction 15kW = 40kW → ΔT = 40×0.70 = 28°C → T ≈ 53°C
-
-      Converter loss: 5000 × 0.02 = 100 kW
-        → cabinet: 100 kW → ΔT = 100×0.20 = 20°C → T ≈ 45°C
-        → water:   70 kW  → ΔT = 70×0.17  = 12°C → T ≈ 37°C
-
-      Transformer: 4900 × 0.01 = 49 kW → ΔT = 49×0.70 = 34°C → T ≈ 59°C
-      Nacelle: ~150 kW diffuse → ΔT = 150×0.08 = 12°C → T ≈ 37°C
+    Complete turbine thermal system with startup / shutdown thermal inertia.
     """
 
     def __init__(self, config: ThermalSystemConfig = None):
@@ -122,42 +75,132 @@ class ThermalSystem:
         self.rotor = ThermalElement(*cfg.rotor)
         self.hub_cabinet = ThermalElement(*cfg.hub_cabinet)
 
-    def step(self, gen_power_kw: float, grid_power_kw: float,
-             rotor_speed: float, ambient_temp: float,
-             gen_efficiency: float, dt: float) -> Dict[str, float]:
-        """
-        Advance all thermal models by one timestep.
+        # Residual heat states. These decay slower than electrical load.
+        self._mem_gen = 0.0
+        self._mem_cnv = 0.0
+        self._mem_trf = 0.0
+        self._mem_bearing = 0.0
 
-        Returns dict with all temperature values.
-        """
-        is_running = gen_power_kw > 10  # threshold
+    def step(
+        self,
+        gen_power_kw: float,
+        grid_power_kw: float,
+        rotor_speed: float,
+        ambient_temp: float,
+        gen_efficiency: float,
+        dt: float,
+        wind_speed: float = 0.0,
+        tur_state: int = 1,
+        sync_progress: float = 0.0,
+        extra_heat: Dict[str, float] | None = None,
+        cooling_bias: Dict[str, float] | None = None,
+    ) -> Dict[str, float]:
+        """Advance all thermal models by one timestep."""
+        extra_heat = extra_heat or {}
+        cooling_bias = cooling_bias or {}
+        is_running = tur_state == 6
+        is_starting = tur_state in (4, 5, 8)
+        is_stopping = tur_state in (7, 9)
+        running_factor = 1.0 if is_running else max(
+            0.0,
+            min(1.0, sync_progress if is_starting else 0.15 if is_stopping else 0.0),
+        )
 
-        # ── Heat sources ──
-        heat_gen = gen_power_kw * (1.0 - gen_efficiency) if is_running else 0.0
-        heat_cnv = gen_power_kw * 0.02 if is_running else 0.0
-        heat_trf = grid_power_kw * 0.01 if is_running else 0.0
-        heat_bearing_friction = rotor_speed * 1.5 if is_running else 0.0  # kW, RPM-dependent
+        heat_gen_raw = gen_power_kw * (1.0 - gen_efficiency) * max(0.2, running_factor)
+        heat_cnv_raw = gen_power_kw * 0.02 * max(0.15, running_factor)
+        heat_trf_raw = grid_power_kw * 0.01 * max(0.15, running_factor)
+        heat_bearing_raw = rotor_speed * 1.5 * max(0.25, min(1.0, rotor_speed / 4.0))
 
-        # Diffuse heat into nacelle from all sources
-        heat_nac = heat_gen * 0.15 + heat_cnv * 0.3 + heat_bearing_friction * 0.2
+        self._mem_gen = self._update_memory(self._mem_gen, heat_gen_raw, dt, rise_tau=45.0, fall_tau=900.0)
+        self._mem_cnv = self._update_memory(self._mem_cnv, heat_cnv_raw, dt, rise_tau=35.0, fall_tau=480.0)
+        self._mem_trf = self._update_memory(self._mem_trf, heat_trf_raw, dt, rise_tau=90.0, fall_tau=1800.0)
+        self._mem_bearing = self._update_memory(self._mem_bearing, heat_bearing_raw, dt, rise_tau=25.0, fall_tau=700.0)
 
-        # ── Step each element ──
-        gen_sta_t = self.gen_stator.step(heat_gen * 0.60, ambient_temp, dt)
-        gen_air_t = self.gen_air.step(heat_gen * 0.30, ambient_temp, dt)
+        heat_gen = max(heat_gen_raw, self._mem_gen * (0.35 if not is_running else 1.0)) + extra_heat.get("generator", 0.0)
+        heat_cnv = max(heat_cnv_raw, self._mem_cnv * (0.30 if not is_running else 1.0)) + extra_heat.get("converter", 0.0)
+        heat_trf = max(heat_trf_raw, self._mem_trf * (0.45 if not is_running else 1.0)) + extra_heat.get("transformer", 0.0)
+        heat_bearing = max(heat_bearing_raw, self._mem_bearing * (0.35 if rotor_speed < 1.0 else 1.0)) + extra_heat.get("bearing", 0.0)
+
+        airflow = max(0.0, wind_speed)
+        nacelle_cooling = (0.7 + min(airflow / 14.0, 0.9)) * cooling_bias.get("nacelle", 1.0)
+        exposed_cooling = (0.9 + min(airflow / 10.0, 1.1)) * cooling_bias.get("exposed", 1.0)
+        cabinet_cooling = (0.45 if not is_running else 1.15) * cooling_bias.get("cabinet", 1.0)
+        water_cooling = (0.50 if not is_running else 1.25) * cooling_bias.get("water", 1.0)
+        transformer_cooling = (0.8 + min(airflow / 16.0, 0.7)) * cooling_bias.get("transformer", 1.0)
+
+        heat_nac = heat_gen * 0.18 + heat_cnv * 0.32 + heat_bearing * 0.22 + heat_trf * 0.08 + extra_heat.get("nacelle", 0.0)
+
+        stator_env = ambient_temp + max(0.0, self.nacelle.temperature - ambient_temp) * 0.12
+        air_env = ambient_temp + max(0.0, self.gen_stator.temperature - ambient_temp) * 0.10
+        bearing_env = ambient_temp + max(0.0, self.gen_stator.temperature - ambient_temp) * 0.08
+        cabinet_env = ambient_temp + max(0.0, self.nacelle.temperature - ambient_temp) * 0.18
+
+        gen_sta_t = self.gen_stator.step(
+            heat_gen * 0.60,
+            stator_env,
+            dt,
+            cooling_factor=0.85 + exposed_cooling * 0.25,
+        )
+        gen_air_t = self.gen_air.step(
+            heat_gen * 0.30 + max(0.0, gen_sta_t - ambient_temp) * 0.08,
+            air_env,
+            dt,
+            cooling_factor=0.9 + nacelle_cooling * 0.3,
+        )
         gen_brg_t = self.gen_bearing.step(
-            heat_gen * 0.10 + heat_bearing_friction, ambient_temp, dt)
+            heat_gen * 0.10 + heat_bearing + max(0.0, gen_sta_t - ambient_temp) * 0.03,
+            bearing_env,
+            dt,
+            cooling_factor=0.8 + exposed_cooling * 0.35,
+        )
 
-        cnv_cab_t = self.cnv_cabinet.step(heat_cnv, ambient_temp, dt)
-        cnv_wtr_t = self.cnv_water.step(heat_cnv * 0.70, ambient_temp, dt)
+        cnv_cab_t = self.cnv_cabinet.step(
+            heat_cnv + max(0.0, self.cnv_water.temperature - ambient_temp) * 0.04,
+            cabinet_env,
+            dt,
+            cooling_factor=cabinet_cooling,
+        )
+        cnv_wtr_t = self.cnv_water.step(
+            heat_cnv * 0.70,
+            ambient_temp,
+            dt,
+            cooling_factor=water_cooling + airflow / 18.0,
+        )
 
-        trf_t = self.transformer.step(heat_trf, ambient_temp, dt)
+        trf_t = self.transformer.step(
+            heat_trf + max(0.0, self.nacelle.temperature - ambient_temp) * 0.02,
+            ambient_temp,
+            dt,
+            cooling_factor=transformer_cooling,
+        )
 
-        nac_t = self.nacelle.step(heat_nac, ambient_temp, dt)
-        # Cabinet temp is relative to nacelle, not ambient
-        nac_cab_t = self.nac_cabinet.step(heat_cnv * 0.10, nac_t, dt)
+        nac_t = self.nacelle.step(
+            heat_nac + max(0.0, trf_t - ambient_temp) * 0.02,
+            ambient_temp,
+            dt,
+            cooling_factor=nacelle_cooling,
+        )
+        nac_cab_t = self.nac_cabinet.step(
+            heat_cnv * 0.10 + max(0.0, cnv_cab_t - nac_t) * 0.05,
+            nac_t,
+            dt,
+            cooling_factor=cabinet_cooling,
+        )
 
-        rot_t = self.rotor.step(heat_bearing_friction * 0.1, ambient_temp, dt)
-        hub_cab_t = self.hub_cabinet.step(0, rot_t, dt)
+        rot_t = self.rotor.step(
+            heat_bearing * 0.12
+            + max(0.0, gen_brg_t - ambient_temp) * 0.02
+            + extra_heat.get("rotor", 0.0),
+            ambient_temp,
+            dt,
+            cooling_factor=exposed_cooling,
+        )
+        hub_cab_t = self.hub_cabinet.step(
+            max(0.0, rot_t - ambient_temp) * 0.03 + extra_heat.get("hub", 0.0),
+            rot_t,
+            dt,
+            cooling_factor=0.6 + exposed_cooling * 0.25,
+        )
 
         return {
             "gen_stator": round(gen_sta_t, 2),
@@ -171,3 +214,9 @@ class ThermalSystem:
             "rotor": round(rot_t, 2),
             "hub_cabinet": round(hub_cab_t, 2),
         }
+
+    @staticmethod
+    def _update_memory(current: float, target: float, dt: float, rise_tau: float, fall_tau: float) -> float:
+        tau = rise_tau if target > current else fall_tau
+        alpha = 1.0 - math.exp(-dt / max(1.0, tau))
+        return current + (target - current) * alpha

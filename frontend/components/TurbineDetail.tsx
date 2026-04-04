@@ -23,7 +23,7 @@ const TUR_STATE_LABELS: Record<number, { en: string; zh: string }> = {
   4: { en: 'Pre-Production', zh: '發電準備' },
   5: { en: 'Start Production', zh: '啟動發電' },
   6: { en: 'Production', zh: '正常發電' },
-  7: { en: 'Shutting Down', zh: '停機中' },
+  7: { en: 'Emergency Stop', zh: '緊急停機' },
   8: { en: 'Restart', zh: '重新啟動' },
   9: { en: 'Normal Stop', zh: '正常停機' },
 };
@@ -117,6 +117,8 @@ const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ t
   const isServiceMode = controlStatus?.service_mode;
   const isStopped = controlStatus?.operator_stop;
   const curtailKw = controlStatus?.curtailment_kw;
+  const stopMode = controlStatus?.stop_mode;
+  const shutdownCause = controlStatus?.shutdown_cause;
 
   return (
     <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700">
@@ -131,9 +133,17 @@ const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ t
           {isStopped && <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/50">
             {lang === 'zh' ? '手動停機' : 'Manual Stop'}
           </span>}
+          {stopMode === 'emergency' && <span className="px-2 py-0.5 rounded bg-red-700/30 text-red-200 border border-red-500/60">
+            {lang === 'zh' ? '緊急停機流程' : 'Emergency Stop'}
+          </span>}
           {curtailKw != null && <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/50">
             {lang === 'zh' ? `限載 ${curtailKw} kW` : `Curtail ${curtailKw} kW`}
           </span>}
+          {shutdownCause && shutdownCause !== 'idle' && (
+            <span className="px-2 py-0.5 rounded bg-gray-700 text-gray-200 border border-gray-600">
+              {lang === 'zh' ? `原因: ${shutdownCause}` : `Cause: ${shutdownCause}`}
+            </span>
+          )}
           {msg && <span className="text-cyan-300">{msg}</span>}
         </div>
       </div>
@@ -142,6 +152,10 @@ const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ t
         <button onClick={() => sendCmd('stop')}
           className="px-3 py-1.5 text-xs font-semibold rounded bg-red-600 hover:bg-red-700 text-white transition-colors">
           {lang === 'zh' ? '停機' : 'Stop'}
+        </button>
+        <button onClick={() => sendCmd('emergency_stop')}
+          className="px-3 py-1.5 text-xs font-semibold rounded bg-red-800 hover:bg-red-900 text-white transition-colors">
+          {lang === 'zh' ? '緊急停機' : 'Emergency Stop'}
         </button>
         <button onClick={() => sendCmd('start')}
           className="px-3 py-1.5 text-xs font-semibold rounded bg-green-600 hover:bg-green-700 text-white transition-colors">

@@ -39,8 +39,10 @@ async def get_turbine_history(
     limit: int = Query(500, ge=1, le=10000),
 ):
     """Get turbine historical data (from SQLite)."""
-    rows = get_broker().get_history(turbine_id, start, end, limit)
-    return {"turbineId": turbine_id, "count": len(rows), "data": rows}
+    broker = get_broker()
+    rows = broker.get_history(turbine_id, start, end, limit)
+    events = broker.get_history_events(turbine_id, start, end, min(limit, 1000))
+    return {"turbineId": turbine_id, "count": len(rows), "data": rows, "events": events}
 
 
 @router.get("/{turbine_id}/trend")

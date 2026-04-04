@@ -161,6 +161,10 @@ class DataBroker:
         self.storage = Storage()
         self.simulator: Optional[WindFarmSimulator] = None
         self._sim_config = SimulationConfig()
+        self._last_tur_state: Dict[str, int] = {}
+        self._last_shutdown_cause: Dict[str, Optional[str]] = {}
+        self._last_fault_trip: Dict[str, bool] = {}
+        self._last_fault_alarm_keys: Dict[str, set[str]] = {}
 
     def start(self, config: Optional[DataSourceConfig] = None,
               sim_config: Optional[SimulationConfig] = None):
@@ -177,6 +181,11 @@ class DataBroker:
     def _start_simulator(self):
         if self.simulator and self.simulator.is_running:
             self.simulator.stop()
+
+        self._last_tur_state.clear()
+        self._last_shutdown_cause.clear()
+        self._last_fault_trip.clear()
+        self._last_fault_alarm_keys.clear()
 
         self.simulator = WindFarmSimulator(
             turbine_count=self._sim_config.turbineCount,
@@ -202,6 +211,7 @@ class DataBroker:
     def _on_sim_data(self, readings: List[Dict]):
         """Callback from simulator."""
         self.storage.store_readings(readings)
+        self._detect_sim_events(readings)
 
     def _on_opc_data(self, readings: List[Dict]):
         """Callback from OPC adapter."""
@@ -242,6 +252,205 @@ class DataBroker:
     def get_history(self, turbine_id: str, start: Optional[str] = None,
                     end: Optional[str] = None, limit: int = 1000) -> List[dict]:
         return self.storage.query_history(turbine_id, start, end, limit)
+
+    def get_history_events(self, turbine_id: Optional[str] = None, start: Optional[str] = None,
+                           end: Optional[str] = None, limit: int = 500) -> List[dict]:
+        return self.storage.query_events(turbine_id, start, end, limit)
+
+    def record_event(self, event_type: str, source: str, title: str,
+                     turbine_id: Optional[str] = None, detail: Optional[str] = None,
+                     payload: Optional[Dict] = None, end_timestamp: Optional[str] = None):
+        self.storage.record_event(
+            event_type=event_type,
+            source=source,
+            title=title,
+            turbine_id=turbine_id,
+            detail=detail,
+            payload=payload,
+            end_timestamp=end_timestamp,
+        )
+
+    def close_open_events(self, event_type: str, source: Optional[str] = None,
+                          turbine_id: Optional[str] = None, closed_at: Optional[str] = None):
+        self.storage.close_open_events(
+            event_type=event_type,
+            source=source,
+            turbine_id=turbine_id,
+            closed_at=closed_at,
+        )
+
+    def _detect_sim_events(self, readings: List[Dict]):
+        if not self.simulator:
+            return
+
+        fault_status = self.simulator.fault_engine.get_fault_status()
+        fault_by_turbine = {
+            tid: [f for f in fault_status if f.get("turbine_id") == tid]
+            for tid in self.simulator.turbines.keys()
+        }
+
+        for reading in readings:
+            turbine_id = reading.get("turbine_id")
+            if not turbine_id:
+                continue
+
+            scada = reading.get("scada", {})
+            current_state = int(scada.get("WTUR_TurSt", 0) or 0)
+            last_state = self._last_tur_state.get(turbine_id)
+            model = self.simulator.turbines.get(turbine_id)
+            control = model.get_control_status() if model else {}
+            shutdown_cause = control.get("shutdown_cause")
+            last_cause = self._last_shutdown_cause.get(turbine_id)
+
+            if last_state is None:
+                self._last_tur_state[turbine_id] = current_state
+                self._last_shutdown_cause[turbine_id] = shutdown_cause
+            elif last_state != current_state:
+                self._record_state_transition_event(
+                    turbine_id=turbine_id,
+                    previous_state=last_state,
+                    current_state=current_state,
+                    shutdown_cause=shutdown_cause,
+                )
+                self._last_tur_state[turbine_id] = current_state
+                self._last_shutdown_cause[turbine_id] = shutdown_cause
+            elif shutdown_cause != last_cause:
+                self._last_shutdown_cause[turbine_id] = shutdown_cause
+
+            active_faults = fault_by_turbine.get(turbine_id, [])
+            current_tripped = any(bool(f.get("tripped")) for f in active_faults)
+            last_tripped = self._last_fault_trip.get(turbine_id)
+            if last_tripped is None:
+                self._last_fault_trip[turbine_id] = current_tripped
+            elif last_tripped != current_tripped:
+                if current_tripped:
+                    tripped_faults = [f.get("scenario_id") for f in active_faults if f.get("tripped")]
+                    self.record_event(
+                        event_type="fault",
+                        source="simulator",
+                        title="Automatic fault trip",
+                        turbine_id=turbine_id,
+                        detail=f"Trip triggered by {', '.join(tripped_faults) if tripped_faults else 'active fault'}",
+                        payload={"turbineId": turbine_id, "faults": tripped_faults},
+                    )
+                else:
+                    self.record_event(
+                        event_type="fault",
+                        source="simulator",
+                        title="Fault trip cleared in simulator",
+                        turbine_id=turbine_id,
+                        detail=f"{turbine_id} no longer has a tripped fault state",
+                        payload={"turbineId": turbine_id},
+                    )
+                self._last_fault_trip[turbine_id] = current_tripped
+
+            current_alarm_keys = set()
+            last_alarm_keys = self._last_fault_alarm_keys.get(turbine_id, set())
+            for fault in active_faults:
+                scenario_id = str(fault.get("scenario_id") or "")
+                phase = str(fault.get("phase") or "")
+                severity = fault.get("severity")
+                for alarm in fault.get("active_alarms") or []:
+                    alarm_type = str(alarm.get("type") or "")
+                    alarm_code = str(alarm.get("code") or "")
+                    alarm_key = f"{scenario_id}:{alarm_type}:{alarm_code}"
+                    current_alarm_keys.add(alarm_key)
+                    if alarm_key not in last_alarm_keys:
+                        self.record_event(
+                            event_type="fault",
+                            source="simulator",
+                            title=f"Fault alarm threshold reached: {scenario_id}",
+                            turbine_id=turbine_id,
+                            detail=f"{scenario_id} entered {phase} with alarm {alarm_type}{alarm_code and f' {alarm_code}'} at severity {severity}",
+                            payload={
+                                "turbineId": turbine_id,
+                                "scenarioId": scenario_id,
+                                "phase": phase,
+                                "severity": severity,
+                                "alarm": alarm,
+                            },
+                        )
+            self._last_fault_alarm_keys[turbine_id] = current_alarm_keys
+
+    def _record_state_transition_event(self, turbine_id: str, previous_state: int,
+                                       current_state: int, shutdown_cause: Optional[str]):
+        state_name = self._state_name(current_state)
+        detail = f"{turbine_id} moved from {self._state_name(previous_state)} to {state_name}"
+        payload = {
+            "turbineId": turbine_id,
+            "fromState": previous_state,
+            "toState": current_state,
+            "shutdownCause": shutdown_cause,
+        }
+
+        if current_state == 6:
+            self.record_event(
+                event_type="state",
+                source="simulator",
+                title="Entered production",
+                turbine_id=turbine_id,
+                detail=detail,
+                payload=payload,
+            )
+            return
+
+        if current_state in (7, 9):
+            event_type = "state"
+            title = "Turbine stopping"
+            if shutdown_cause in ("grid_trip", "grid_protection"):
+                event_type = "grid"
+                title = "Automatic grid protection stop"
+            elif isinstance(shutdown_cause, str) and shutdown_cause.startswith("fault:"):
+                event_type = "fault"
+                title = f"Automatic fault stop: {shutdown_cause.split(':', 1)[1]}"
+            elif shutdown_cause in ("operator", "operator_emergency", "service"):
+                event_type = "operator"
+                title = "Operator-driven stop"
+
+            self.record_event(
+                event_type=event_type,
+                source="simulator",
+                title=title,
+                turbine_id=turbine_id,
+                detail=f"{detail} ({shutdown_cause or 'unknown cause'})",
+                payload=payload,
+            )
+            return
+
+        if current_state in (4, 5, 8):
+            self.record_event(
+                event_type="state",
+                source="simulator",
+                title="Startup / restart transition",
+                turbine_id=turbine_id,
+                detail=detail,
+                payload=payload,
+            )
+            return
+
+        if current_state in (1, 2, 3):
+            self.record_event(
+                event_type="state",
+                source="simulator",
+                title="Returned to idle state",
+                turbine_id=turbine_id,
+                detail=detail,
+                payload=payload,
+            )
+
+    @staticmethod
+    def _state_name(state: int) -> str:
+        return {
+            1: "Shutdown",
+            2: "Standby",
+            3: "Wait Restart",
+            4: "Pre-Production",
+            5: "Synchronization",
+            6: "Production",
+            7: "Emergency Stop",
+            8: "Restart",
+            9: "Normal Stop",
+        }.get(state, f"State {state}")
 
     def get_farm_status(self) -> FarmStatus:
         turbines = self.get_all_turbines()

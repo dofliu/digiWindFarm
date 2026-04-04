@@ -8,11 +8,12 @@ import FarmOverview from './components/FarmOverview';
 import TurbineDetail from './components/TurbineDetail';
 import MaintenanceHub from './components/MaintenanceHub';
 import FaultInjectionPanel from './components/FaultInjectionPanel';
-import { HeaderIcon, WrenchScrewdriverIcon, ChartBarIcon, CogIcon } from './components/icons';
+import { HeaderIcon, WrenchScrewdriverIcon, ChartBarIcon, CogIcon, ClockIcon } from './components/icons';
 import DispatchModal from './components/DispatchModal';
 import WorkOrderDetailModal from './components/WorkOrderDetailModal';
 import SettingsPage from './components/SettingsPage';
 import { useSettings } from './hooks/useSettings';
+import HistoryPage from './components/HistoryPage';
 
 const NavButton = ({ isActive, onClick, children }: {isActive: boolean, onClick: ()=>void, children: React.ReactNode}) => (
     <button
@@ -41,7 +42,7 @@ const App: React.FC = () => {
   const { workOrders } = maintenance;
 
   const [selectedTurbine, setSelectedTurbine] = useState<TurbineData | null>(null);
-  const [view, setView] = useState<'dashboard' | 'maintenance' | 'faults' | 'settings'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'history' | 'maintenance' | 'faults' | 'settings'>('dashboard');
 
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
   const [turbineToDispatch, setTurbineToDispatch] = useState<TurbineData | null>(null);
@@ -130,6 +131,8 @@ const App: React.FC = () => {
                 maintenanceData={maintenance}
                 onSelectWorkOrder={(wo) => setSelectedWorkOrder(wo)}
             />;
+        case 'history':
+            return <HistoryPage turbines={turbines} lang={lang} />;
         case 'faults':
             return <FaultInjectionPanel lang={lang} />;
         case 'settings':
@@ -154,6 +157,10 @@ const App: React.FC = () => {
             <NavButton isActive={view === 'maintenance'} onClick={() => setView('maintenance')}>
                 <WrenchScrewdriverIcon />
                 <span className="hidden sm:inline">{ui('Maintenance', '維護中心')}</span>
+            </NavButton>
+            <NavButton isActive={view === 'history'} onClick={() => { setView('history'); setSelectedTurbine(null); }}>
+                <ClockIcon />
+                <span className="hidden sm:inline">{ui('History', '歷史資料')}</span>
             </NavButton>
             <NavButton isActive={view === 'faults'} onClick={() => setView('faults')}>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">

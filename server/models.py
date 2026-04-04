@@ -128,6 +128,12 @@ class WindOverrideRequest(BaseModel):
     profile: Optional[str] = None           # 'calm','moderate','rated','strong','storm','gusty','ramp_up','ramp_down','auto'
 
 
+class GridOverrideRequest(BaseModel):
+    frequencyHz: Optional[float] = None
+    voltageV: Optional[float] = None
+    profile: Optional[str] = None  # 'nominal','low_freq','high_freq','undervoltage','overvoltage','weak_grid','recovery','auto'
+
+
 class FaultInjectionRequest(BaseModel):
     scenarioId: str
     turbineId: str

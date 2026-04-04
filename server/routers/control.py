@@ -15,7 +15,7 @@ def get_broker():
 class TurbineCommand(BaseModel):
     """Command payload for turbine control."""
     turbineId: str
-    command: str   # "stop", "start", "reset", "service_on", "service_off"
+    command: str   # "stop", "emergency_stop", "start", "reset", "service_on", "service_off"
 
 
 class CurtailCommand(BaseModel):
@@ -30,6 +30,7 @@ async def send_command(cmd: TurbineCommand):
 
     Commands (mapped to Bachmann Modbus Coil[1-3]):
       - stop:        Manual stop (Coil[2], normal shutdown)
+      - emergency_stop: Immediate shutdown / trip-style stop
       - start:       Manual start (Coil[1], resume from stop/standby)
       - reset:       Reset faults & restart (Coil[3])
       - service_on:  Enter maintenance/inspection mode (WSRV_SrvOn=1)
@@ -45,6 +46,8 @@ async def send_command(cmd: TurbineCommand):
 
     if cmd.command == "stop":
         model.cmd_stop()
+    elif cmd.command == "emergency_stop":
+        model.cmd_emergency_stop(cause="operator_emergency")
     elif cmd.command == "start":
         model.cmd_start()
     elif cmd.command == "reset":
@@ -56,7 +59,16 @@ async def send_command(cmd: TurbineCommand):
     elif cmd.command == "service_off":
         model.cmd_service(False)
     else:
-        raise HTTPException(400, f"Unknown command: {cmd.command}. Use: stop, start, reset, service_on, service_off")
+        raise HTTPException(400, f"Unknown command: {cmd.command}. Use: stop, emergency_stop, start, reset, service_on, service_off")
+
+    b.record_event(
+        event_type="operator",
+        source="control",
+        title=f"Operator command: {cmd.command}",
+        turbine_id=cmd.turbineId,
+        detail=f"Command {cmd.command} issued to {cmd.turbineId}",
+        payload={"command": cmd.command, "turbineId": cmd.turbineId},
+    )
 
     return {
         "status": "ok",
@@ -82,6 +94,14 @@ async def set_curtailment(cmd: CurtailCommand):
         raise HTTPException(404, f"Turbine {cmd.turbineId} not found")
 
     model.cmd_curtail(cmd.powerLimitKw)
+    b.record_event(
+        event_type="operator",
+        source="control",
+        title="Curtailment updated",
+        turbine_id=cmd.turbineId,
+        detail=f"Curtailment set to {cmd.powerLimitKw if cmd.powerLimitKw is not None else 'off'} kW",
+        payload={"turbineId": cmd.turbineId, "powerLimitKw": cmd.powerLimitKw},
+    )
     return {
         "status": "ok",
         "turbineId": cmd.turbineId,

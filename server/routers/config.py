@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from server.models import DataSourceConfig, SimulationConfig, DataSourceMode, WindOverrideRequest
+from server.models import DataSourceConfig, SimulationConfig, DataSourceMode, WindOverrideRequest, GridOverrideRequest
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -77,6 +77,7 @@ async def set_wind(req: WindOverrideRequest):
         raise HTTPException(400, "Simulator not running")
 
     wm = b.simulator.wind_model
+    b.close_open_events("wind", source="config")
     if req.profile:
         wm.set_profile(req.profile)
     else:
@@ -86,6 +87,13 @@ async def set_wind(req: WindOverrideRequest):
             ambient_temp=req.ambientTemp,
             turbulence=req.turbulence,
         )
+    b.record_event(
+        event_type="wind",
+        source="config",
+        title=f"Wind config updated{f': {req.profile}' if req.profile else ''}",
+        detail="Wind profile or override changed",
+        payload=req.model_dump(),
+    )
     return wm.get_status()
 
 
@@ -96,6 +104,61 @@ async def clear_wind():
     if not b.simulator:
         raise HTTPException(400, "Simulator not running")
     b.simulator.wind_model.clear_override()
+    b.close_open_events("wind", source="config")
+    b.record_event(
+        event_type="wind",
+        source="config",
+        title="Wind config cleared",
+        detail="Returned wind model to auto mode",
+        payload={"mode": "auto"},
+    )
+    return {"status": "ok", "mode": "auto"}
+
+
+@router.get("/grid")
+async def get_grid_status():
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    return b.simulator.grid_model.get_status()
+
+
+@router.post("/grid")
+async def set_grid(req: GridOverrideRequest):
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+
+    gm = b.simulator.grid_model
+    b.close_open_events("grid", source="config")
+    if req.profile:
+        gm.set_profile(req.profile)
+    else:
+        gm.set_override(req.frequencyHz, req.voltageV)
+    b.record_event(
+        event_type="grid",
+        source="config",
+        title=f"Grid config updated{f': {req.profile}' if req.profile else ''}",
+        detail="Grid profile or override changed",
+        payload=req.model_dump(),
+    )
+    return gm.get_status()
+
+
+@router.post("/grid/clear")
+async def clear_grid():
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    b.simulator.grid_model.clear_override()
+    b.close_open_events("grid", source="config")
+    b.record_event(
+        event_type="grid",
+        source="config",
+        title="Grid config cleared",
+        detail="Returned grid model to auto mode",
+        payload={"mode": "auto"},
+    )
     return {"status": "ok", "mode": "auto"}
 
 

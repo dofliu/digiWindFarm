@@ -10,6 +10,7 @@ from collections import deque
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from wind_model import WindEnvironmentModel
+from simulator.grid_model import GridEnvironmentModel
 from simulator.physics import TurbinePhysicsModel, FaultEngine
 from simulator.physics.wind_field import TurbulenceGenerator, PerTurbineWind
 from simulator.modbus_server import ModbusSimServer
@@ -26,6 +27,7 @@ class WindFarmSimulator:
     def __init__(self, turbine_count: int = 14, base_wind_speed: float = 10.0,
                  turbulence_intensity: float = 0.1):
         self.wind_model = WindEnvironmentModel()
+        self.grid_model = GridEnvironmentModel()
         self.wind_model.turbulence_intensity = turbulence_intensity
         self.turbines: Dict[str, TurbinePhysicsModel] = {}
         self.latest_data: Dict[str, Dict] = {}
@@ -79,6 +81,8 @@ class WindFarmSimulator:
                 base_wind = self.wind_model.get_wind_speed(now)
                 wind_direction = self.wind_model.get_wind_direction(now)
                 ambient_temp = self.wind_model.get_ambient_temp(now)
+                grid_frequency = self.grid_model.get_frequency(now)
+                grid_voltage = self.grid_model.get_voltage(now)
 
                 # Add autocorrelated turbulence
                 turb_component = self._turbulence_gen.step(
@@ -97,14 +101,30 @@ class WindFarmSimulator:
 
                     # Apply fault modifiers for this turbine
                     model.fault_modifiers = fault_modifiers.get(tid, {})
+                    model.active_faults = [
+                        {
+                            "scenario_id": fault.scenario_id,
+                            "severity": fault.severity,
+                            "tripped": fault.tripped,
+                        }
+                        for fault in self.fault_engine.active_faults
+                        if fault.turbine_id == tid
+                    ]
 
                     # Check if fault engine tripped this turbine
                     for fault in self.fault_engine.active_faults:
                         if fault.turbine_id == tid and fault.tripped:
-                            model.force_state(7)  # → Shutdown
+                            model.cmd_emergency_stop(cause=f"fault:{fault.scenario_id}")
 
                     # Run physics step
-                    scada_output = model.step(local_wind, wind_direction, ambient_temp, time_step)
+                    scada_output = model.step(
+                        local_wind,
+                        wind_direction,
+                        ambient_temp,
+                        time_step,
+                        grid_frequency_ref=grid_frequency,
+                        grid_voltage_ref=grid_voltage,
+                    )
 
                     # Build output dict (compatible with data_broker expectations)
                     output = self._scada_to_output(tid, now, scada_output, local_wind, wind_direction)

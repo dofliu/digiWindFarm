@@ -1,13 +1,56 @@
-我想要開發一個能夠模擬真實世界離岸風力發電場的系統，他可以模擬一個風場中可能數十部風力發電機的運轉資料。呈現詳細的運轉資訊，比如風速 發電量 各個內部細部元件系統的運轉資訊。
-他必須能夠有底層的物理模型來呈現，而不是隨機產生的資料。比如風機啟動起來的轉速、發電量、乃至於對應的葉片角度，是基於風速 風能基本理論的功率曲線 轉換效率等等
-1.我們可以先從一部風力機開始就好
-2.然後先設定好 要有那些物理模型 ，比如齒輪箱 發電機 液壓系統 旋角系統 以其其他
-3.每個物理模型可以慢慢產生，還沒有產生之前可用假設的資料
-4.所有資料整合之後才是實際的發電機產出
-(比如說 一開始假設環境中的風速是 很規律的每天 白天從3m/s 到中午7m/s 然後 下午10m/s 然後晚上4m/s，加入一個固定的turbulence)
-然後 此時齒輪箱可能簡單的模型就是 一個固定增速比、發電機也是固定的 遵守 0.5x密度xAx風速三次方xCp來轉換
-每個系統可以設定是否導入 物理模型(如果有的話)
-5.然後假設這些資料可以整合成功 每個子系統都有設定訊號，可以把這些所有訊號，輸出 透過opcua通訊協定，傳給opc ua server
-6.然後後臺會設計另外一個 資料庫，然後會有一個監控系統 負責把opc ua server的資料 除存到資料庫中。然後這個scada扮演另外一個監控角色，可以顯示即時資料與歷史資料查詢。
-等於要建構一個 可以模擬真實風場的運轉資料輸出系統  然後也可以實現即時監控
-這個具備物理模型的系統 可以持續的改善物理模型，然後必要時可以讓她有故障、損壞等情形，也會觸發警報警告 也可以讓監控系統根據歷史資料來進行診斷趨勢分析
+# Idea Notes
+
+## Product Vision
+
+Build a wind farm monitoring digital twin that can be used for:
+- realistic SCADA data generation
+- control and fault response exploration
+- training and demonstration
+- algorithm and diagnostics experimentation
+- industrial integration testing
+
+## What Makes This Project Valuable
+
+The value is not only showing a dashboard.
+The value is producing believable time-series behavior:
+- wind changes should produce realistic power and speed responses
+- startup and stop should take time
+- faults should change temperature, vibration, power, and control behavior
+- grid events should affect different turbines differently
+- history should explain what happened and when
+
+## Near-Term Idea Direction
+
+### 1. Make History Explainable
+Add event markers for:
+- grid events
+- fault injection and clearing
+- operator actions
+
+### 2. Improve Farm-Level Realism
+Add:
+- gust propagation
+- ramp propagation
+- direction-shift propagation
+- stronger turbine-to-turbine coupling through the wind field
+
+### 3. Improve Diagnostic Quality
+Add:
+- better vibration signatures
+- more detailed cooling behavior
+- better electrical behavior under grid disturbances
+
+### 4. Improve Research Usefulness
+Allow users to:
+- compare turbines under the same event
+- export larger history slices
+- replay key events
+- annotate event windows
+
+## Non-Immediate Ideas
+
+Useful later, but not first:
+- maintenance work order workflows
+- authentication and deployment features
+- deeper AI diagnosis integration
+- long-term database migration

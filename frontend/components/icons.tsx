@@ -81,6 +81,13 @@ export const ChartBarIcon: React.FC = () => (
     </svg>
 );
 
+export const ClockIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
 export const UserGroupIcon: React.FC<{className?: string}> = ({className}) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className || "w-6 h-6"}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962c.57-.063 1.14-.096 1.72-.096s1.15.033 1.72.096m-3.44 0a6.682 6.682 0 01-3.44 0m6.88 0c.631.063 1.292.096 1.96.096s1.329-.033 1.96-.096M18 18.72a8.962 8.962 0 01-3.741-.479m0 0a8.962 8.962 0 013.741-.479M12 15a3 3 0 100-6 3 3 0 000 6z" />

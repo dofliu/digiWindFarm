@@ -21,6 +21,17 @@ const WIND_PROFILES = [
     { id: 'ramp_down', en: 'Ramp Down (15→3 m/s)', zh: '漸減 (15→3 m/s)' },
 ];
 
+const GRID_PROFILES = [
+    { id: 'auto', en: 'Auto Grid', zh: '自動電網' },
+    { id: 'nominal', en: 'Nominal (50 Hz / 690 V)', zh: '標稱 (50 Hz / 690 V)' },
+    { id: 'low_freq', en: 'Low Frequency', zh: '低頻事件' },
+    { id: 'high_freq', en: 'High Frequency', zh: '高頻事件' },
+    { id: 'undervoltage', en: 'Undervoltage', zh: '欠壓事件' },
+    { id: 'overvoltage', en: 'Overvoltage', zh: '過壓事件' },
+    { id: 'weak_grid', en: 'Weak Grid', zh: '弱電網' },
+    { id: 'recovery', en: 'Recovery Ramp', zh: '電網恢復' },
+];
+
 const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'zh' }) => {
     const [formData, setFormData] = useState<AppSettings>(settings);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success'>('idle');
@@ -30,14 +41,25 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
     const [windProfile, setWindProfile] = useState('auto');
     const [customWind, setCustomWind] = useState({ speed: '10', direction: '270', temp: '25', turbulence: '0.1' });
     const [windMsg, setWindMsg] = useState('');
+    const [gridStatus, setGridStatus] = useState<any>(null);
+    const [gridProfile, setGridProfile] = useState('auto');
+    const [customGrid, setCustomGrid] = useState({ frequency: '50.0', voltage: '690' });
+    const [gridMsg, setGridMsg] = useState('');
 
     const refreshWindStatus = () => {
         fetch(`${API_BASE}/api/config/wind`).then(r => r.json()).then(setWindStatus).catch(() => {});
     };
+    const refreshGridStatus = () => {
+        fetch(`${API_BASE}/api/config/grid`).then(r => r.json()).then(setGridStatus).catch(() => {});
+    };
 
     useEffect(() => {
         refreshWindStatus();
-        const iv = setInterval(refreshWindStatus, 5000);
+        refreshGridStatus();
+        const iv = setInterval(() => {
+            refreshWindStatus();
+            refreshGridStatus();
+        }, 5000);
         return () => clearInterval(iv);
     }, []);
 
@@ -65,6 +87,30 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
         setWindMsg(lang === 'zh' ? '已套用自訂風況' : 'Custom wind applied');
         refreshWindStatus();
         setTimeout(() => setWindMsg(''), 3000);
+    };
+
+    const handleSetGridProfile = async (profile: string) => {
+        setGridProfile(profile);
+        await fetch(`${API_BASE}/api/config/grid`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile }),
+        });
+        setGridMsg(lang === 'zh' ? `已切換電網: ${profile}` : `Switched grid: ${profile}`);
+        refreshGridStatus();
+        setTimeout(() => setGridMsg(''), 3000);
+    };
+
+    const handleSetCustomGrid = async () => {
+        await fetch(`${API_BASE}/api/config/grid`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                frequencyHz: parseFloat(customGrid.frequency) || null,
+                voltageV: parseFloat(customGrid.voltage) || null,
+            }),
+        });
+        setGridMsg(lang === 'zh' ? '已套用自訂電網' : 'Custom grid applied');
+        refreshGridStatus();
+        setTimeout(() => setGridMsg(''), 3000);
     };
 
     useEffect(() => {
@@ -474,6 +520,73 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
                                     {lang === 'zh'
                                         ? '設定風況後，物理模型會自動計算對應的功率、轉速、溫度、振動等所有 SCADA 數據。選「自動」回到日變化模式。'
                                         : 'After setting wind conditions, the physics model automatically computes all SCADA outputs. Select "Auto" to return to daily pattern.'}
+                                </p>
+                            </div>
+                        )}
+
+                        {(formData.dataSource === DataSourceType.SIMULATION) && (
+                            <div className="bg-gray-900/50 p-4 rounded-md border-l-4 border-orange-500">
+                                <h3 className="text-lg font-semibold text-white mb-3">
+                                    {lang === 'zh' ? '電網條件控制' : 'Grid Condition Control'}
+                                </h3>
+
+                                {gridStatus && (
+                                    <div className="mb-3 text-sm text-gray-400">
+                                        {lang === 'zh' ? '目前模式' : 'Current mode'}: <span className="text-white font-semibold">{gridStatus.mode}</span>
+                                        {gridStatus.profile && <span className="ml-2">({gridStatus.profile})</span>}
+                                        {gridStatus.override_frequency_hz != null && (
+                                            <span className="ml-3">{lang === 'zh' ? '頻率' : 'Frequency'}: <span className="text-orange-300">{gridStatus.override_frequency_hz} Hz</span></span>
+                                        )}
+                                        {gridStatus.override_voltage_v != null && (
+                                            <span className="ml-3">{lang === 'zh' ? '電壓' : 'Voltage'}: <span className="text-orange-300">{gridStatus.override_voltage_v} V</span></span>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="mb-4">
+                                    <label className="block text-sm text-gray-300 mb-2">{lang === 'zh' ? '電網情境' : 'Grid Profiles'}</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {GRID_PROFILES.map(p => (
+                                            <button key={p.id} onClick={() => handleSetGridProfile(p.id)}
+                                                className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                                                    gridProfile === p.id || gridStatus?.profile === p.id
+                                                    ? 'bg-orange-600 border-orange-500 text-white'
+                                                    : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-orange-400'
+                                                }`}>
+                                                {lang === 'zh' ? p.zh : p.en}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mb-3">
+                                    <label className="block text-sm text-gray-300 mb-2">{lang === 'zh' ? '自訂電網' : 'Custom Grid'}</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs text-gray-500">{lang === 'zh' ? '頻率 (Hz)' : 'Frequency (Hz)'}</label>
+                                            <input type="number" step="0.05" min="45" max="55" value={customGrid.frequency}
+                                                onChange={e => setCustomGrid(p => ({ ...p, frequency: e.target.value }))}
+                                                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-gray-500">{lang === 'zh' ? '電壓 (V)' : 'Voltage (V)'}</label>
+                                            <input type="number" step="1" min="500" max="800" value={customGrid.voltage}
+                                                onChange={e => setCustomGrid(p => ({ ...p, voltage: e.target.value }))}
+                                                className="mt-1 w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white" />
+                                        </div>
+                                    </div>
+                                    <button onClick={handleSetCustomGrid}
+                                        className="mt-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-4 py-1.5 rounded transition-colors">
+                                        {lang === 'zh' ? '套用自訂電網' : 'Apply Custom Grid'}
+                                    </button>
+                                </div>
+
+                                {gridMsg && <div className="text-sm text-orange-300 bg-orange-900/30 px-3 py-1 rounded mt-2">{gridMsg}</div>}
+
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {lang === 'zh'
+                                        ? '電網事件會影響併網條件、功率降載，以及在偏差過大時觸發正常或緊急停機。'
+                                        : 'Grid events affect synchronization, power derating, and can trigger normal or emergency shutdowns under severe deviations.'}
                                 </p>
                             </div>
                         )}
