@@ -4,6 +4,14 @@ import StatusIndicator from './StatusIndicator';
 import { WindTurbineIcon } from './icons';
 import FarmTrendChart from './FarmTrendChart';
 
+/** Format power: show kW when < 1 MW, otherwise MW */
+const fmtPower = (mw: number): string => {
+  const kw = mw * 1000;
+  if (Math.abs(kw) < 1) return '0 kW';
+  if (Math.abs(mw) < 1.0) return `${kw.toFixed(0)} kW`;
+  return `${mw.toFixed(2)} MW`;
+};
+
 interface FarmOverviewProps {
   turbines: TurbineData[];
   onSelectTurbine: (turbine: TurbineData) => void;
@@ -44,7 +52,7 @@ const TurbineCard: React.FC<{ turbine: TurbineData; onSelect: (t: TurbineData) =
       <div className="mt-3 flex items-end justify-between">
         <div>
           <p className="text-xs text-gray-400">{lang === 'zh' ? '發電功率' : 'Power'}</p>
-          <p className="font-orbitron text-2xl font-bold text-white">{turbine.powerOutput.toFixed(2)} <span className="text-lg">MW</span></p>
+          <p className="font-orbitron text-2xl font-bold text-white">{fmtPower(turbine.powerOutput)}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-gray-400">{lang === 'zh' ? '風速' : 'Wind'}</p>
@@ -95,7 +103,7 @@ const SummaryView: React.FC<{ turbines: TurbineData[]; onSelect: (t: TurbineData
         <div className="bg-gray-800/50 rounded-lg p-4 border border-cyan-500/30">
           <h3 className="text-sm text-gray-400 mb-3 uppercase tracking-wider">{u('Farm Statistics', '風場統計')}</h3>
           <div className="space-y-2">
-            <StatRow label={u('Total Power', '總發電量')} value={`${stats.totalPower.toFixed(2)} MW`} color="text-cyan-300" />
+            <StatRow label={u('Total Power', '總發電量')} value={fmtPower(stats.totalPower)} color="text-cyan-300" />
             <StatRow label={u('Avg Wind Speed', '平均風速')} value={`${stats.avgWind.toFixed(1)} m/s`} />
             <StatRow label={u('Avg Temperature', '平均溫度')} value={`${stats.avgTemp.toFixed(1)} °C`} />
             <div className="border-t border-gray-700 my-2" />
@@ -105,7 +113,7 @@ const SummaryView: React.FC<{ turbines: TurbineData[]; onSelect: (t: TurbineData
             <StatRow label={u('Fault', '故障')} value={`${stats.fault.length}`} color={stats.fault.length > 0 ? 'text-red-400' : ''} />
             <StatRow label={u('Service / Inspection', '定檢中')} value={`${stats.service.length}`} color={stats.service.length > 0 ? 'text-orange-400' : ''} />
             <div className="border-t border-gray-700 my-2" />
-            <StatRow label={u('Capacity Factor', '容量因數')} value={`${turbines.length > 0 ? ((stats.totalPower / (turbines.length * 5)) * 100).toFixed(1) : 0}%`} />
+            <StatRow label={u('Capacity Factor', '容量因數')} value={`${turbines.length > 0 ? ((stats.totalPower / (turbines.length * 2)) * 100).toFixed(1) : 0}%`} />
           </div>
         </div>
       </div>
@@ -132,7 +140,7 @@ const SummaryView: React.FC<{ turbines: TurbineData[]; onSelect: (t: TurbineData
                   'bg-yellow-400'
                 }`} />
               </div>
-              <div className="text-lg font-orbitron font-bold text-white">{t.powerOutput.toFixed(1)}<span className="text-xs text-gray-400 ml-0.5">MW</span></div>
+              <div className="text-lg font-orbitron font-bold text-white">{fmtPower(t.powerOutput)}</div>
               <div className="text-xs text-gray-500">{t.windSpeed.toFixed(1)} m/s</div>
             </div>
           ))}
