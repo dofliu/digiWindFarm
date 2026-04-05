@@ -71,7 +71,11 @@ class CpSurfaceModel:
         self._stall_factor = 1.0
 
     def _lambda_i(self, lam: float, beta: float) -> float:
-        beta_r = max(beta, -2.0)
+        # The parametric Cp model assumes beta=0 is optimal fine pitch,
+        # and positive beta is toward feather. Clamp to >= 0 so that
+        # turbines with pitch_work < 0 (like Z72 at -1°) still get
+        # full Cp at their operating position.
+        beta_r = max(beta, 0.0)
         denom1 = lam + 0.08 * beta_r
         denom2 = beta_r ** 3 + 1.0
         if abs(denom1) < 0.01:
@@ -81,10 +85,11 @@ class CpSurfaceModel:
         return 1.0 / (1.0 / denom1 - 0.035 / denom2)
 
     def _cp_raw(self, lam: float, beta: float) -> float:
-        li = self._lambda_i(lam, beta)
+        beta_r = max(beta, 0.0)
+        li = self._lambda_i(lam, beta_r)
         if abs(li) < 0.01:
             return 0.0
-        return self.c1 * (self.c2 / li - self.c3 * beta - self.c4) * math.exp(-self.c5 / li) + self.c6 * lam
+        return self.c1 * (self.c2 / li - self.c3 * beta_r - self.c4) * math.exp(-self.c5 / li) + self.c6 * lam
 
     def get_cp(self, tsr: float, pitch_deg: float) -> float:
         """Compute power coefficient Cp for given tip-speed ratio and pitch angle."""
@@ -228,9 +233,18 @@ class PowerCurveModel:
         p_aero_w = cp * 0.5 * self.air_density * area * wind_speed ** 3
         p_aero_kw = p_aero_w / 1000.0
 
-        # Blend with lookup curve for stability: 70% Cp-based, 30% lookup
+        # Blend Cp-based with lookup curve.
+        # Region 2 (partial load): Cp model is primary — captures TSR tracking.
+        # Region 3 (rated): lookup is primary — pitch controller holds rated power.
         p_lookup = self.get_power(wind_speed)
-        out.power_kw = min(self.rated_power_kw, p_aero_kw * 0.7 + p_lookup * 0.3)
+        region = self.get_region(wind_speed)
+        if region == 2:
+            # Partial load: Cp drives power, lookup as safety floor
+            out.power_kw = max(p_aero_kw, p_lookup * 0.85)
+        else:
+            # Region 3: pitch controls power to rated — use lookup
+            out.power_kw = p_lookup
+        out.power_kw = min(self.rated_power_kw, out.power_kw)
 
         # Thrust coefficient and force
         out.ct = self.cp_surface.get_ct(tsr, pitch_deg) * out.stall_factor
