@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { type TurbineData, TurbineStatus, type WorkOrder, WorkOrderStatus, type FaultInfo } from '../types';
 import StatusIndicator from './StatusIndicator';
-import Gauge from './Gauge';
+
 import MiniTrendChart from './MiniTrendChart';
 import TrendChartPanel from './TrendChartPanel';
 import DataCard from './DataCard';
@@ -253,30 +253,69 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
     const u = (en: string, zh: string) => lang === 'zh' ? zh : en;
 
     const renderTabContent = () => {
-      switch (activeTab) {
-        case 'overview':
-          return (
-            <>
-              {/* Gauges row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <Gauge value={turbine.powerOutput} maxValue={5} label={u('Power Output', '發電功率')} unit="MW" />
-                <Gauge value={turbine.rotorSpeed} maxValue={15} label={u('Rotor Speed', '葉輪轉速')} unit="RPM" />
-                <Gauge value={turbine.windSpeed} maxValue={25} label={u('Wind Speed', '風速')} unit="m/s" />
-                <div className="bg-gray-800/50 p-4 rounded-lg flex flex-col justify-center">
-                   <h3 className="text-gray-400 text-sm mb-2 text-center">{u('Power Trend', '功率趨勢')}</h3>
-                   <MiniTrendChart data={turbine.history} />
-                </div>
-              </div>
-              {/* Trend Chart - prominently placed in overview */}
-              <div className="mb-6">
-                <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-              </div>
-            </>
-          );
+      // Compact key metrics bar (replaces 3 large gauges)
+      const metricsBar = (
+        <div className="bg-gray-800/50 rounded-lg p-3 mb-4 flex flex-wrap items-center gap-4 border border-gray-700">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">{u('Power', '功率')}</span>
+            <span className="text-cyan-300 font-bold text-lg font-orbitron">
+              {turbine.powerOutput >= 1 ? `${fmt(turbine.powerOutput)} MW` : `${fmt(turbine.powerOutput * 1000, 0)} kW`}
+            </span>
+          </div>
+          <div className="w-px h-5 bg-gray-600" />
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">{u('RPM', '轉速')}</span>
+            <span className="text-white font-bold text-lg font-orbitron">{fmt(turbine.rotorSpeed, 1)}</span>
+          </div>
+          <div className="w-px h-5 bg-gray-600" />
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">{u('Wind', '風速')}</span>
+            <span className="text-green-300 font-bold text-lg font-orbitron">{fmt(turbine.windSpeed, 1)} <span className="text-xs font-normal">m/s</span></span>
+          </div>
+          <div className="w-px h-5 bg-gray-600" />
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">{u('Voltage', '電壓')}</span>
+            <span className="text-white font-semibold">{fmt(turbine.voltage, 0)} V</span>
+          </div>
+          <div className="w-px h-5 bg-gray-600" />
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-xs">{u('Gen Freq', '頻率')}</span>
+            <span className="text-white font-semibold">{fmt(turbine.cnvGenFreq, 2)} Hz</span>
+          </div>
+          <div className="ml-auto flex-shrink-0 w-40 h-10">
+            <MiniTrendChart data={turbine.history} />
+          </div>
+        </div>
+      );
 
-        case 'generator':
-          return (
-            <div className="space-y-6">
+      // Subsystem panel for the current tab (left side)
+      const subsystemContent = (() => {
+        switch (activeTab) {
+          case 'overview':
+            return (
+              <div className="space-y-3">
+                <SubsystemPanel title={u('WGEN Generator', 'WGEN 發電機')}>
+                  <DataRow label={u('Power', '功率')} value={`${fmt(turbine.genPower)} kW`} />
+                  <DataRow label={u('Speed', '轉速')} value={`${fmt(turbine.genSpeed, 0)} RPM`} />
+                  <DataRow label={u('Stator Temp', '定子溫度')} value={`${fmt(turbine.genStatorTemp1)}°C`}
+                    warn={(turbine.genStatorTemp1 || 0) > 100} alert={(turbine.genStatorTemp1 || 0) > 130} />
+                  <DataRow label={u('Bearing Temp', '軸承溫度')} value={`${fmt(turbine.genBearingTemp1)}°C`}
+                    warn={(turbine.genBearingTemp1 || 0) > 70} alert={(turbine.genBearingTemp1 || 0) > 90} />
+                </SubsystemPanel>
+                <SubsystemPanel title={u('WNAC Nacelle', 'WNAC 機艙')} color="yellow">
+                  <DataRow label={u('Nacelle Temp', '機艙溫度')} value={`${fmt(turbine.nacelleTemp)}°C`} />
+                  <DataRow label={u('Vibration X/Y', '振動 X/Y')} value={`${fmt(turbine.vibrationX, 2)} / ${fmt(turbine.vibrationY, 2)} mm/s`}
+                    warn={(turbine.vibrationX || 0) > 4 || (turbine.vibrationY || 0) > 4} />
+                </SubsystemPanel>
+                <SubsystemPanel title={u('WROT Pitch', 'WROT 旋角')} color="green">
+                  <DataRow label={u('Blades', '葉片角度')} value={`${fmt(turbine.bladeAngle1)}° / ${fmt(turbine.bladeAngle2)}° / ${fmt(turbine.bladeAngle3)}°`} />
+                  <DataRow label={u('Locked/Brake', '鎖固/剎車')}
+                    value={`${turbine.rotorLocked ? 'Locked' : '-'} / ${turbine.brakeActive ? 'Active' : '-'}`} />
+                </SubsystemPanel>
+              </div>
+            );
+          case 'generator':
+            return (
               <SubsystemPanel title={u('WGEN Generator', 'WGEN 發電機')}>
                 <DataRow label={u('Power', '功率')} value={`${fmt(turbine.genPower)} kW`} />
                 <DataRow label={u('Speed', '轉速')} value={`${fmt(turbine.genSpeed, 0)} RPM`} />
@@ -289,13 +328,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Bearing Temp', '軸承溫度')} value={`${fmt(turbine.genBearingTemp1)}°C`}
                   warn={(turbine.genBearingTemp1 || 0) > 70} alert={(turbine.genBearingTemp1 || 0) > 90} />
               </SubsystemPanel>
-              <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-            </div>
-          );
-
-        case 'pitch':
-          return (
-            <div className="space-y-6">
+            );
+          case 'pitch':
+            return (
               <SubsystemPanel title={u('WROT Rotor/Pitch', 'WROT 葉輪/旋角')} color="green">
                 <DataRow label={u('Rotor RPM', '葉輪轉速')} value={`${fmt(turbine.rotorSpeed, 2)} RPM`} />
                 <DataRow label={u('Blade 1', '葉片1角度')} value={`${fmt(turbine.bladeAngle1)}°`} />
@@ -306,13 +341,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Locked/Brake', '鎖固/剎車')}
                   value={`${turbine.rotorLocked ? 'Locked' : '-'} / ${turbine.brakeActive ? 'Active' : '-'}`} />
               </SubsystemPanel>
-              <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-            </div>
-          );
-
-        case 'converter':
-          return (
-            <div className="space-y-6">
+            );
+          case 'converter':
+            return (
               <SubsystemPanel title={u('WCNV Converter', 'WCNV 變頻器')} color="purple">
                 <DataRow label={u('Gen Power', '發電機功率')} value={`${fmt(turbine.cnvGenPower)} kW`} />
                 <DataRow label={u('Grid Power', '電網功率')} value={`${fmt(turbine.cnvGridPower)} kW`} />
@@ -324,13 +355,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                   warn={(turbine.igctWaterTemp || 0) > 40} />
                 <DataRow label={u('IGCT Pressure', 'IGCT水壓')} value={`${fmt(turbine.igctWaterPres1)} / ${fmt(turbine.igctWaterPres2)} bar`} />
               </SubsystemPanel>
-              <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-            </div>
-          );
-
-        case 'nacelle':
-          return (
-            <div className="space-y-6">
+            );
+          case 'nacelle':
+            return (
               <SubsystemPanel title={u('WNAC Nacelle', 'WNAC 機艙')} color="yellow">
                 <DataRow label={u('Nacelle Temp', '機艙溫度')} value={`${fmt(turbine.nacelleTemp)}°C`} />
                 <DataRow label={u('Cabinet Temp', '控制櫃溫度')} value={`${fmt(turbine.nacelleCabTemp)}°C`} />
@@ -339,13 +366,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Vibration Y', 'Y方向振動')} value={`${fmt(turbine.vibrationY, 2)} mm/s`}
                   warn={(turbine.vibrationY || 0) > 4} alert={(turbine.vibrationY || 0) > 8} />
               </SubsystemPanel>
-              <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-            </div>
-          );
-
-        case 'yaw':
-          return (
-            <div className="space-y-6">
+            );
+          case 'yaw':
+            return (
               <SubsystemPanel title={u('WYAW Yaw System', 'WYAW 轉向系統')} color="blue">
                 <DataRow label={u('Yaw Error (5s)', '風向誤差(5s)')} value={`${fmt(turbine.yawError)}°`}
                   warn={Math.abs(turbine.yawError || 0) > 10} />
@@ -353,13 +376,9 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Cable Windup', '纜線圈數')} value={`${fmt(turbine.cableWindup, 2)} turns`}
                   warn={Math.abs(turbine.cableWindup || 0) > 3} />
               </SubsystemPanel>
-              <TrendChartPanel turbineId={turbineApiId} lang={lang} />
-            </div>
-          );
-
-        case 'grid':
-          return (
-            <div className="space-y-6">
+            );
+          case 'grid':
+            return (
               <SubsystemPanel title={u('WGDC/WMET Grid/Met', 'WGDC/WMET 電網/氣象')} color="orange">
                 <DataRow label={u('Transformer Temp', '變壓器溫度')} value={`${fmt(turbine.transformerTemp)}°C`}
                   warn={(turbine.transformerTemp || 0) > 80} />
@@ -367,10 +386,27 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Wind Dir', '風向')} value={`${fmt(turbine.windDirection, 0)}°`} />
                 <DataRow label={u('Outside Temp', '室外溫度')} value={`${fmt(turbine.outsideTemp)}°C`} />
               </SubsystemPanel>
+            );
+          default:
+            return null;
+        }
+      })();
+
+      return (
+        <>
+          {metricsBar}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Left: Subsystem data (compact) */}
+            <div className="lg:col-span-4">
+              {subsystemContent}
+            </div>
+            {/* Right: Trend chart (always visible) */}
+            <div className="lg:col-span-8">
               <TrendChartPanel turbineId={turbineApiId} lang={lang} />
             </div>
-          );
-      }
+          </div>
+        </>
+      );
     };
 
   return (

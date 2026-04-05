@@ -228,7 +228,7 @@ const TableView: React.FC<{ turbines: TurbineData[]; onSelect: (t: TurbineData) 
 // ─── Main FarmOverview ────────────────────────────────────────────
 
 const FarmOverview: React.FC<FarmOverviewProps> = ({ turbines, onSelectTurbine, settings, lang = 'zh' }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>('summary');
   const u = (en: string, zh: string) => lang === 'zh' ? zh : en;
 
   const viewButtons: { mode: ViewMode; label_en: string; label_zh: string }[] = [
