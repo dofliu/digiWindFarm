@@ -362,13 +362,13 @@ Why:
 - but cross-turbine and lifecycle analysis are still limited.
 
 ### Priority B: Wind Event Realism
-Recommended next:
-- gust front
-- ramp propagation
-- direction shift propagation
+Status: **done**
 
-Why:
-- this will improve farm-wide realism without destabilizing the current turbine models.
+Implemented:
+- gust front propagation with time delay
+- ramp propagation across turbines
+- direction shift propagation
+- farm layout model with direction-aware wake
 
 ### Priority C: Electrical Response Detail
 Recommended next:
@@ -402,10 +402,9 @@ Why:
 ### Still Weak
 - spectral vibration realism
 - detailed electrical control behavior
-- farm-event visualization / wind propagation
 
 ### Recommended Immediate Direction
-1. wind-event propagation realism
-2. electrical response refinement
-3. vibration feature upgrade
-4. event lifecycle and multi-turbine analysis
+1. electrical response refinement (#22)
+2. event lifecycle and multi-turbine analysis (#20)
+3. history storage and query improvements (#24)
+4. maintenance workflow backend (#25)
