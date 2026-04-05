@@ -1,5 +1,7 @@
 import sys
 import os
+import threading
+import time as _time
 from datetime import datetime
 from typing import List, Optional, Dict
 from collections import deque
@@ -154,7 +156,23 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
 
 
 class DataBroker:
-    """Unified data interface for simulation and real OPC data."""
+    """Unified data interface for simulation and real OPC data.
+
+    Storage strategy:
+      - Simulator runs at 1Hz, in-memory buffer keeps 1 hour
+      - SQLite writes throttled to every 10 seconds (configurable)
+      - Events trigger 1s snapshot capture (±10 min around event)
+      - Background task does downsampling and cleanup
+    """
+
+    # Default: write to SQLite every N seconds
+    WRITE_INTERVAL_S = 10
+    # Raw data retention (days)
+    RAW_RETENTION_DAYS = 3
+    # 1-min aggregate retention (days)
+    AGG_1M_RETENTION_DAYS = 90
+    # Snapshot window: seconds of 1s data to capture before/after event
+    SNAPSHOT_WINDOW_S = 600  # 10 minutes
 
     def __init__(self):
         self.mode = DataSourceMode.SIMULATION
@@ -165,6 +183,16 @@ class DataBroker:
         self._last_shutdown_cause: Dict[str, Optional[str]] = {}
         self._last_fault_trip: Dict[str, bool] = {}
         self._last_fault_alarm_keys: Dict[str, set[str]] = {}
+        # Session tracking
+        self._session_id: Optional[int] = None
+        # Write throttle state
+        self._last_write_time: float = 0
+        # Snapshot state: when an event occurs, capture 1s data for a window
+        self._snapshot_active: Dict[str, float] = {}  # turbine_id -> end_time
+        self._snapshot_event_ref: Dict[str, str] = {}
+        # Background maintenance thread
+        self._maintenance_thread: Optional[threading.Thread] = None
+        self._maintenance_running = False
 
     def start(self, config: Optional[DataSourceConfig] = None,
               sim_config: Optional[SimulationConfig] = None):
@@ -178,9 +206,16 @@ class DataBroker:
         else:
             self._start_opc(config)
 
+        # Start background maintenance (downsampling + cleanup)
+        self._start_maintenance()
+
     def _start_simulator(self):
         if self.simulator and self.simulator.is_running:
             self.simulator.stop()
+
+        # End previous session if any
+        if self._session_id is not None:
+            self.storage.end_session(self._session_id)
 
         self._last_tur_state.clear()
         self._last_shutdown_cause.clear()
@@ -192,7 +227,22 @@ class DataBroker:
             base_wind_speed=self._sim_config.baseWindSpeed,
             turbulence_intensity=self._sim_config.turbulenceIntensity,
         )
-        # Store every reading to SQLite
+
+        # Create a new session
+        self._session_id = self.storage.create_session(
+            data_source="simulation",
+            turbine_count=self._sim_config.turbineCount,
+            rated_power_kw=5000,  # default 5MW
+            model_name="Simulated 5MW",
+            config={
+                "baseWindSpeed": self._sim_config.baseWindSpeed,
+                "turbulenceIntensity": self._sim_config.turbulenceIntensity,
+                "timeStep": self._sim_config.timeStep,
+            },
+        )
+        print(f"[DataBroker] Created session #{self._session_id}")
+
+        # Register data callback (throttled writes)
         self.simulator.on_data(self._on_sim_data)
         self.simulator.start(time_step=self._sim_config.timeStep)
 
@@ -209,23 +259,103 @@ class DataBroker:
             self._start_simulator()
 
     def _on_sim_data(self, readings: List[Dict]):
-        """Callback from simulator."""
-        self.storage.store_readings(readings)
+        """Callback from simulator — called every 1s.
+
+        - Always checks for events (state changes, faults)
+        - Writes to SQLite only every WRITE_INTERVAL_S seconds
+        - If a snapshot is active for a turbine, writes 1s data to snapshots table
+        """
+        now = _time.time()
         self._detect_sim_events(readings)
 
+        # Check if any turbine has an active snapshot window
+        for reading in readings:
+            tid = reading.get('turbine_id', '')
+            snap_end = self._snapshot_active.get(tid)
+            if snap_end and now < snap_end:
+                event_ref = self._snapshot_event_ref.get(tid, '')
+                self.storage.store_snapshot(reading, event_ref, self._session_id)
+            elif snap_end and now >= snap_end:
+                del self._snapshot_active[tid]
+                del self._snapshot_event_ref[tid]
+
+        # Throttled regular writes
+        if now - self._last_write_time >= self.WRITE_INTERVAL_S:
+            self._last_write_time = now
+            self.storage.store_readings(readings, self._session_id)
+
+    def _trigger_snapshot(self, turbine_id: str, event_ref: str):
+        """Activate 1s snapshot capture for a turbine around an event.
+
+        Also retroactively saves recent in-memory history as snapshot data.
+        """
+        now = _time.time()
+        self._snapshot_active[turbine_id] = now + self.SNAPSHOT_WINDOW_S
+        self._snapshot_event_ref[turbine_id] = event_ref
+
+        # Retroactively save recent history from in-memory buffer
+        if self.simulator:
+            recent = self.simulator.get_history(turbine_id, limit=self.SNAPSHOT_WINDOW_S)
+            if recent:
+                self.storage.store_snapshots(recent, event_ref, self._session_id)
+
     def _on_opc_data(self, readings: List[Dict]):
-        """Callback from OPC adapter."""
-        self.storage.store_readings(readings)
+        """Callback from OPC adapter — uses same throttled write."""
+        now = _time.time()
+        if now - self._last_write_time >= self.WRITE_INTERVAL_S:
+            self._last_write_time = now
+            self.storage.store_readings(readings, self._session_id)
 
     def stop(self):
+        self._stop_maintenance()
         if self.simulator and self.simulator.is_running:
             self.simulator.stop()
+        if self._session_id is not None:
+            self.storage.end_session(self._session_id)
+            self._session_id = None
 
     def switch_mode(self, config: DataSourceConfig,
                     sim_config: Optional[SimulationConfig] = None):
         self.stop()
         self.mode = config.mode
         self.start(config, sim_config)
+
+    # ── Background maintenance ──
+
+    def _start_maintenance(self):
+        """Start background thread for downsampling and cleanup."""
+        if self._maintenance_running:
+            return
+        self._maintenance_running = True
+        self._maintenance_thread = threading.Thread(
+            target=self._maintenance_loop, daemon=True, name="storage-maintenance"
+        )
+        self._maintenance_thread.start()
+
+    def _stop_maintenance(self):
+        self._maintenance_running = False
+        if self._maintenance_thread:
+            self._maintenance_thread.join(timeout=5)
+            self._maintenance_thread = None
+
+    def _maintenance_loop(self):
+        """Run downsampling every 5 minutes, cleanup every hour."""
+        last_cleanup = 0
+        while self._maintenance_running:
+            _time.sleep(300)  # 5 minutes
+            if not self._maintenance_running:
+                break
+            try:
+                self.storage.run_downsampling()
+                now = _time.time()
+                if now - last_cleanup > 3600:  # hourly
+                    self.storage.run_cleanup(
+                        raw_retention_days=self.RAW_RETENTION_DAYS,
+                        agg_1m_retention_days=self.AGG_1M_RETENTION_DAYS,
+                    )
+                    last_cleanup = now
+            except Exception as e:
+                print(f"[DataBroker] Maintenance error: {e}")
 
     def get_all_turbines(self) -> List[TurbineReading]:
         if self.mode == DataSourceMode.SIMULATION and self.simulator:
@@ -325,6 +455,7 @@ class DataBroker:
             elif last_tripped != current_tripped:
                 if current_tripped:
                     tripped_faults = [f.get("scenario_id") for f in active_faults if f.get("tripped")]
+                    event_ref = f"fault_trip:{turbine_id}:{datetime.now().isoformat()}"
                     self.record_event(
                         event_type="fault",
                         source="simulator",
@@ -333,6 +464,8 @@ class DataBroker:
                         detail=f"Trip triggered by {', '.join(tripped_faults) if tripped_faults else 'active fault'}",
                         payload={"turbineId": turbine_id, "faults": tripped_faults},
                     )
+                    # Trigger high-frequency snapshot capture
+                    self._trigger_snapshot(turbine_id, event_ref)
                 else:
                     self.record_event(
                         event_type="fault",
@@ -406,6 +539,12 @@ class DataBroker:
             elif shutdown_cause in ("operator", "operator_emergency", "service"):
                 event_type = "operator"
                 title = "Operator-driven stop"
+
+            # Trigger snapshot for emergency stops and fault-caused stops
+            if current_state == 7 or (isinstance(shutdown_cause, str) and
+                                       ("fault" in shutdown_cause or "grid" in shutdown_cause or "emergency" in shutdown_cause)):
+                event_ref = f"stop:{turbine_id}:{current_state}:{datetime.now().isoformat()}"
+                self._trigger_snapshot(turbine_id, event_ref)
 
             self.record_event(
                 event_type=event_type,
