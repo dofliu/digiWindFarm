@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -188,29 +188,52 @@ Current realism level:
 
 These areas exist and are usable, but are still first-generation models.
 
-### 2.1 Aerodynamics Beyond Lookup Power Curve
-Current state:
-- mostly power-curve driven
+### 2.1 Aerodynamics — Cp(λ,β) Surface Model
+File: `simulator/physics/power_curve.py`
 
-Missing detail:
-- `Cp(lambda, beta)` surface
-- dynamic stall / gust transient loading
-- thrust coefficient modeling
-- more direct aero-load coupling into vibration and drivetrain stress
+Status: **upgraded** (previously lookup-only, now has Cp surface)
 
-### 2.2 Drivetrain Detail
-Current state:
-- rotor/gen speed split and shaft twist are implemented
+Implemented:
+- `Cp(λ, β)` analytical surface model (parametric c1–c6 coefficients)
+- dynamic stall factor (transient Cp reduction during rapid wind changes)
+- thrust coefficient `Ct(λ, β)` with Glauert correction
+- aerodynamic thrust force computation
+- aero torque output for drivetrain coupling
+- aero load factor output for vibration coupling
+- blended output (70% Cp-based + 30% lookup) for stability
 
-Missing detail:
-- gearbox stage-specific dynamics
-- main bearing vs gearbox bearing separation
-- multiple torsional modes
-- detailed brake pressure / torque build-up dynamics
+Still missing:
+- full BEM (blade element momentum) method
+- detailed blade aerodynamic loading distribution
+- tower shadow effect
+
+### 2.2 Drivetrain — Multi-Stage Gearbox Model
+File: `simulator/physics/drivetrain_model.py`
+
+Status: **upgraded** (previously inline, now dedicated model with gearbox stages)
+
+Implemented:
+- `DrivetrainModel` class with `DrivetrainSpec` configuration
+- multi-stage gearbox (3 stages for geared turbines: 2 planetary + 1 helical)
+- per-stage gear ratio, efficiency, and loss calculation
+- main bearing friction with axial load (thrust) coupling
+- gearbox bearing friction (separate from main bearing)
+- two torsional modes: low-speed shaft (LSS) and high-speed shaft (HSS)
+- hydraulic brake pressure build-up dynamics (pressure rise/fall rate)
+- brake torque from pressure (proportional model)
+- separate bearing heat outputs for thermal model coupling
+- automatic direct-drive vs geared selection from TurbineSpec
+- per-turbine individuality for stiffness, damping, and brake response
+
+Still missing:
+- gear tooth contact modeling
+- oil temperature / viscosity effects
+- detailed bearing defect frequency computation
 
 ### 2.3 Vibration Feature Detail
 Current state:
 - trend-level vibration behavior is implemented
+- HSS and LSS torsional vibration now contribute separately
 
 Missing detail:
 - frequency-band features
@@ -218,15 +241,28 @@ Missing detail:
 - sideband behavior
 - fault-specific vibration fingerprints beyond amplitude changes
 
-### 2.4 Cooling System Detail
-Current state:
-- cabinet / nacelle / water cooling effects are implemented
+### 2.4 Cooling System — Active Component Model
+File: `simulator/physics/cooling_model.py`
 
-Missing detail:
-- pump state
-- fan state
-- coolant flow / pressure loop
-- reduced-flow or fouling propagation
+Status: **upgraded** (previously implicit, now explicit cooling component model)
+
+Implemented:
+- `CoolingSystem` class with `CoolingSpec` configuration
+- water cooling loop: pump state, flow rate dynamics, pressure dynamics
+- coolant temperature tracking with heat load and radiator effectiveness
+- nacelle fan bank (2 fans, independent health/state)
+- cabinet fan bank (3 fans, independent health/state)
+- fouling / degradation accumulation over time
+- fouling reduces flow rate and radiator effectiveness
+- fouling increases loop pressure (restriction)
+- cooling_bias output feeds directly into existing ThermalSystem
+- IGCT water pressure now driven by actual pump state
+- API hooks for pump degradation, fan failure/repair, loop cleaning
+
+Still missing:
+- coolant level / leak detection
+- detailed radiator fin model
+- ambient humidity effect on air cooling
 
 ### 2.5 Electrical / Converter Detail
 Current state:
@@ -348,12 +384,14 @@ Why:
 - grid-event response
 - turbine individuality
 - SCADA signal realism
+- aerodynamic Cp surface and thrust (new)
+- multi-stage drivetrain with gearbox (new)
+- active cooling system with fouling (new)
 
 ### Still Weak
-- deep aerodynamics
 - spectral vibration realism
 - detailed electrical control behavior
-- farm-event visualization
+- farm-event visualization / wind propagation
 
 ### Recommended Immediate Direction
 1. wind-event propagation realism

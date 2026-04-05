@@ -16,10 +16,12 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel
+from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel, AeroOutput
 from simulator.physics.thermal_model import ThermalSystem
 from simulator.physics.vibration_model import VibrationModel
 from simulator.physics.yaw_model import YawModel
+from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
+from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
 
 
 @dataclass
@@ -175,6 +177,9 @@ class TurbinePhysicsModel:
             cut_in=self.spec.cut_in_speed + self._individuality["cut_in_offset"],
             rated_speed=self.spec.rated_speed,
             cut_out=self.spec.cut_out_speed,
+            rotor_diameter=self.spec.rotor_diameter,
+            cp_max=self.spec.cp_max,
+            air_density=self.spec.air_density,
         )
         self.rotor_model = RotorSpeedModel(
             rotor_diameter=self.spec.rotor_diameter,
@@ -186,6 +191,19 @@ class TurbinePhysicsModel:
         self.thermal = ThermalSystem()
         self.vibration = VibrationModel(seed=_seed)
         self.yaw = YawModel()
+
+        # Drivetrain model (#28)
+        if self.spec.gear_ratio > 1.0:
+            dt_spec = DrivetrainSpec.for_geared(overall_ratio=self.spec.gear_ratio)
+        else:
+            dt_spec = DrivetrainSpec.for_direct_drive()
+        self.drivetrain = DrivetrainModel(spec=dt_spec, individuality=self._individuality)
+
+        # Cooling system model (#29)
+        self.cooling = CoolingSystem(
+            spec=CoolingSpec(),
+            individuality_scale=self._individuality["cooling_scale"],
+        )
 
         self.tur_state = 1
         self.rotor_speed = 0.0
@@ -237,6 +255,9 @@ class TurbinePhysicsModel:
             cut_in=spec.cut_in_speed + self._individuality["cut_in_offset"],
             rated_speed=spec.rated_speed,
             cut_out=spec.cut_out_speed,
+            rotor_diameter=spec.rotor_diameter,
+            cp_max=spec.cp_max,
+            air_density=spec.air_density,
         )
         self.rotor_model = RotorSpeedModel(
             rotor_diameter=spec.rotor_diameter,
@@ -245,6 +266,11 @@ class TurbinePhysicsModel:
             rated_speed=spec.rated_speed,
             gear_ratio=spec.gear_ratio,
         )
+        if spec.gear_ratio > 1.0:
+            dt_spec = DrivetrainSpec.for_geared(overall_ratio=spec.gear_ratio)
+        else:
+            dt_spec = DrivetrainSpec.for_direct_drive()
+        self.drivetrain = DrivetrainModel(spec=dt_spec, individuality=self._individuality)
 
     def step(self, wind_speed: float, wind_direction: float,
              ambient_temp: float = 25.0, dt: float = 1.0,
@@ -281,28 +307,48 @@ class TurbinePhysicsModel:
             is_producing, is_starting, dt
         )
         aero_rotor_speed += fault_physics["rotor_speed_bias"] * dt
+
+        # Compute full aerodynamics via Cp(λ,β) surface (#27)
+        aero_out = self.power_curve.get_power_cp(
+            effective_wind_speed, self.rotor_speed, self.pitch_angle, dt)
+
+        # Use new DrivetrainModel (#28) instead of inline dynamics
         (
             self.rotor_speed,
             gen_speed,
             drivetrain_loss_kw,
             brake_heat_kw,
-            torsion_vib,
-        ) = self._apply_drivetrain_dynamics(
+            torsion_vib_lss,
+            torsion_vib_hss,
+        ) = self.drivetrain.step(
             aero_rotor_speed=aero_rotor_speed,
-            effective_wind_speed=effective_wind_speed,
+            current_rotor_speed=self.rotor_speed,
+            aero_torque_knm=aero_out.aero_torque_knm,
+            aero_load_factor=aero_out.aero_load_factor,
             dt=dt,
             is_producing=is_producing,
             is_starting=is_starting,
             is_normal_stop=is_normal_stop,
             is_emergency_stop=is_emergency_stop,
         )
+        # Combined torsion vibration (backward compatible single value)
+        torsion_vib = torsion_vib_lss + torsion_vib_hss * 0.5
 
-        aerodynamic_power_kw = (
-            self.power_curve.get_power(effective_wind_speed)
-            * fault_physics["power_scale"]
-            * self._individuality["power_scale"]
-            * grid_derate
-        )
+        # Use Cp-based power when producing, fallback to lookup otherwise
+        if is_producing and aero_out.power_kw > 0:
+            aerodynamic_power_kw = (
+                aero_out.power_kw
+                * fault_physics["power_scale"]
+                * self._individuality["power_scale"]
+                * grid_derate
+            )
+        else:
+            aerodynamic_power_kw = (
+                self.power_curve.get_power(effective_wind_speed)
+                * fault_physics["power_scale"]
+                * self._individuality["power_scale"]
+                * grid_derate
+            )
         effective_limit = s.rated_power_kw
         if self.curtailment_kw is not None:
             effective_limit = min(effective_limit, self.curtailment_kw)
@@ -371,6 +417,19 @@ class TurbinePhysicsModel:
         yaw_out["yaw_error"] += fault_physics["yaw_error_bias"] + self._individuality["yaw_sensor_bias"]
         yaw_out["brake_pressure"] += fault_physics["yaw_brake_bias"]
 
+        # Cooling system model (#29) — produces cooling_bias for thermal model
+        cooling_bias = self.cooling.step(
+            gen_power_kw, ambient_temp, effective_wind_speed, dt,
+            turbine_running=is_producing,
+        )
+        # Merge fault cooling bias (multiplicative)
+        for key in cooling_bias:
+            cooling_bias[key] *= fault_physics["cooling_bias"].get(key, 1.0)
+
+        # Separate main bearing and gearbox bearing heat (#28)
+        main_brg_heat = self.drivetrain.main_bearing_heat_kw
+        gbx_brg_heat = self.drivetrain.gearbox_bearing_heat_kw
+
         temps = self.thermal.step(
             gen_power_kw, cnv_gd_pwr, self.rotor_speed,
             ambient_temp, s.generator_efficiency, dt,
@@ -381,24 +440,25 @@ class TurbinePhysicsModel:
                 key: value * self._individuality["thermal_scale"]
                 for key, value in fault_physics["extra_heat"].items()
             } | {
-                "bearing": drivetrain_loss_kw * 0.85,
+                "bearing": main_brg_heat + gbx_brg_heat * 0.6,
                 "rotor": brake_heat_kw * 0.30,
                 "hub": brake_heat_kw * 0.24,
-                "nacelle": brake_heat_kw * 0.10,
+                "nacelle": brake_heat_kw * 0.10 + gbx_brg_heat * 0.4,
                 "converter": max(0.0, cnv_gn_pwr - cnv_gd_pwr),
             },
-            cooling_bias={
-                key: value * self._individuality["cooling_scale"]
-                for key, value in fault_physics["cooling_bias"].items()
-            },
+            cooling_bias=cooling_bias,
         )
 
         vib_x, vib_y = self.vibration.step(
             self.rotor_speed, effective_wind_speed, gen_power_kw,
             turbulence=0.1, dt=dt
         )
-        vib_x += torsion_vib * 0.85
+        # Aero-load coupling into vibration (#27): thrust transients cause nacelle vibration
+        vib_x += torsion_vib * 0.85 + aero_out.thrust_kn * 0.0008
         vib_y += torsion_vib * 0.55
+        # HSS torsional mode adds higher-frequency vibration component
+        vib_x += torsion_vib_hss * 0.35
+        vib_y += torsion_vib_hss * 0.20
         vib_x += fault_physics["vibration_x"]
         vib_y += fault_physics["vibration_y"]
         if is_normal_stop:
@@ -408,17 +468,19 @@ class TurbinePhysicsModel:
             vib_x += 1.30 + abs(self._rng.normal(0, 0.45))
             vib_y += 1.10 + abs(self._rng.normal(0, 0.40))
 
+        # IGCT water pressure now driven by cooling system pump (#29)
+        water_pres = self.cooling.water_loop.pressure_bar
         if is_producing:
-            igct_pres1 = 3.5 + self._rng.normal(0, 0.08)
-            igct_pres2 = 3.3 + self._rng.normal(0, 0.08)
-            igct_cond = 1.0
+            igct_pres1 = water_pres * 1.0 + self._rng.normal(0, 0.08)
+            igct_pres2 = water_pres * 0.94 + self._rng.normal(0, 0.08)
+            igct_cond = min(1.0, self.cooling.water_loop.flow_lpm / max(self.cooling.spec.pump_flow_rated_lpm, 1.0))
         elif is_starting:
-            igct_pres1 = 2.4 + self._sync_progress * 0.8 + self._rng.normal(0, 0.05)
-            igct_pres2 = 2.2 + self._sync_progress * 0.7 + self._rng.normal(0, 0.05)
+            igct_pres1 = water_pres * 0.7 + self._sync_progress * 0.8 + self._rng.normal(0, 0.05)
+            igct_pres2 = water_pres * 0.65 + self._sync_progress * 0.7 + self._rng.normal(0, 0.05)
             igct_cond = 0.65 + self._sync_progress * 0.35
         else:
-            igct_pres1 = 0.4 if is_normal_stop else 0.1 if is_emergency_stop else 0.0
-            igct_pres2 = 0.3 if is_normal_stop else 0.05 if is_emergency_stop else 0.0
+            igct_pres1 = water_pres * 0.3 if is_normal_stop else 0.1 if is_emergency_stop else 0.0
+            igct_pres2 = water_pres * 0.25 if is_normal_stop else 0.05 if is_emergency_stop else 0.0
             igct_cond = 0.2 if is_normal_stop else 0.0
 
         rotor_locked = 1 if self.tur_state in (1, 2, 3) else 0
@@ -682,6 +744,7 @@ class TurbinePhysicsModel:
         self._grid_normal_trip_accum = 0.0
         self._grid_emergency_trip_accum = 0.0
         self.fault_modifiers.clear()
+        self.drivetrain.reset()
         if self.tur_state in (3, 7, 8, 9):
             self._enter_state(1)
 
@@ -743,6 +806,8 @@ class TurbinePhysicsModel:
         self._sensor_bias.clear()
         self._sensor_stuck_until.clear()
         self._sensor_last.clear()
+        self.drivetrain.reset()
+        self.cooling.reset()
 
     def _enter_state(self, state: int):
         self.tur_state = state
@@ -843,77 +908,6 @@ class TurbinePhysicsModel:
             self._grid_normal_trip_accum = 0.0
             return "normal"
         return None
-
-    def _apply_drivetrain_dynamics(
-        self,
-        aero_rotor_speed: float,
-        effective_wind_speed: float,
-        dt: float,
-        is_producing: bool,
-        is_starting: bool,
-        is_normal_stop: bool,
-        is_emergency_stop: bool,
-    ) -> Tuple[float, float, float, float, float]:
-        gear_ratio = max(1.0, self.spec.gear_ratio)
-        stiffness = 0.36 * self._individuality["drivetrain_stiffness_scale"]
-        damping = 0.24 * self._individuality["shaft_damping_scale"]
-        shaft_target = aero_rotor_speed * gear_ratio if (is_producing or is_starting) else 0.0
-        slip_error = shaft_target - self._generator_speed
-
-        # Elastic shaft twist lets rotor and generator speeds separate during transients.
-        self._drivetrain_twist += (
-            slip_error * 0.12 * stiffness - self._drivetrain_twist * damping
-        ) * dt
-
-        normal_brake = 0.0
-        emergency_brake = 0.0
-        if is_normal_stop:
-            normal_brake = (
-                (0.75 + 0.02 * self.pitch_angle + max(0.0, self.rotor_speed - 1.5) * 0.16)
-                * self._individuality["normal_brake_scale"]
-            )
-        elif is_emergency_stop:
-            emergency_brake = (
-                (3.8 + 0.10 * self.pitch_angle + max(0.0, self.rotor_speed - 1.0) * 0.30)
-                * self._individuality["emergency_brake_scale"]
-            )
-
-        rotor_brake_rate = normal_brake * 0.22 + emergency_brake * 0.44
-        generator_brake_rate = normal_brake * 18.0 + emergency_brake * 40.0
-        coupling_to_rotor = self._drivetrain_twist / (gear_ratio * 24.0)
-        coupling_to_generator = self._drivetrain_twist * 0.62
-
-        rotor_speed = aero_rotor_speed - rotor_brake_rate * dt - coupling_to_rotor
-        if not (is_producing or is_starting) and not (is_normal_stop or is_emergency_stop):
-            rotor_speed = max(0.0, rotor_speed - 0.30 * dt)
-        rotor_speed = max(0.0, rotor_speed)
-
-        self._generator_speed += (
-            slip_error * 0.48 * stiffness + coupling_to_generator - generator_brake_rate
-        ) * dt
-        if not (is_producing or is_starting):
-            coast_down = 12.0 if is_normal_stop else 26.0 if is_emergency_stop else 8.0
-            self._generator_speed = max(0.0, self._generator_speed - coast_down * dt)
-        else:
-            self._generator_speed = max(0.0, self._generator_speed)
-
-        # Avoid unrealistic negative slip during aggressive stops while preserving torsional lag.
-        max_sync_speed = max(shaft_target, rotor_speed * gear_ratio)
-        if is_producing or is_starting:
-            self._generator_speed = min(self._generator_speed, max_sync_speed + 120.0)
-
-        brake_heat_kw = (normal_brake * 6.0 + emergency_brake * 18.0) * (1.0 + 0.03 * effective_wind_speed)
-        drivetrain_loss_kw = (
-            abs(self._drivetrain_twist) * 0.06
-            + rotor_speed * 0.8 * self._individuality["bearing_friction_scale"]
-            + brake_heat_kw * 0.08
-        )
-        torsion_vib = min(
-            2.8,
-            abs(self._drivetrain_twist) * 0.02
-            + abs((rotor_speed * gear_ratio) - self._generator_speed) / max(gear_ratio, 1.0) * 0.10,
-        )
-        return rotor_speed, self._generator_speed, drivetrain_loss_kw, brake_heat_kw, torsion_vib
 
     def _apply_sensor_model(self, output: Dict[str, float]) -> Dict[str, float]:
         sensorized: Dict[str, float] = {}
