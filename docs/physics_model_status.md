@@ -276,14 +276,25 @@ Missing detail:
 - grid-code style ride-through curves
 
 ### 2.6 Wind Event Realism
-Current state:
-- turbulence, decorrelation, wake, and preset wind profiles are implemented
+File: `simulator/physics/wind_field.py`
 
-Missing detail:
-- gust-front propagation across the farm
-- directional shift wave
+Status: **upgraded** (previously static offsets, now full spatial propagation)
+
+Implemented:
+- wind farm layout model with turbine positions (staggered 2-row grid)
+- gust front propagation across turbines with time delay
+- wind speed ramp propagation (gradual increase/decrease wave)
+- wind direction shift propagation
+- cosine-shaped event envelope (rise → hold → fall)
+- direction-aware wake model (Jensen/Park-like)
+- per-turbine turbulence generators (spatial decorrelation)
+- stochastic natural event generation (gusts ~10-20 min, ramps ~30-60 min, dir shifts ~20-40 min)
+- API for injecting custom wind events
+
+Still missing:
 - localized turbulence pockets
-- stronger time-space coupling between turbines
+- terrain-dependent wind shear
+- more sophisticated wake model (e.g. Frandsen, Bastankhah)
 
 ## 3. Not Yet Modeled
 

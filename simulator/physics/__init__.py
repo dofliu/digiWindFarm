@@ -24,7 +24,10 @@ from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel, CpSu
 from simulator.physics.thermal_model import ThermalSystem, ThermalSystemConfig
 from simulator.physics.vibration_model import VibrationModel
 from simulator.physics.yaw_model import YawModel
-from simulator.physics.wind_field import TurbulenceGenerator, WindDirectionModel, PerTurbineWind
+from simulator.physics.wind_field import (
+    TurbulenceGenerator, WindDirectionModel, PerTurbineWind,
+    WindEventPropagation, WindEvent, TurbinePosition, default_farm_layout,
+)
 from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
 from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
 
@@ -38,4 +41,5 @@ __all__ = [
     "CoolingSystem", "CoolingSpec",
     "VibrationModel", "YawModel",
     "TurbulenceGenerator", "WindDirectionModel", "PerTurbineWind",
+    "WindEventPropagation", "WindEvent", "TurbinePosition", "default_farm_layout",
 ]
