@@ -73,10 +73,10 @@ These parts are implemented, but still first-generation models:
 - [ ] Add multi-turbine event comparison view
 
 ### Priority B: Wind Event Realism
-- [ ] Gust front propagation
-- [ ] Ramp propagation across turbines
-- [ ] Direction-shift propagation
-- [ ] Stronger time-space coupling in farm wind model
+- [x] Gust front propagation
+- [x] Ramp propagation across turbines
+- [x] Direction-shift propagation
+- [x] Stronger time-space coupling in farm wind model
 
 ### Priority C: Electrical Response Detail
 - [ ] Frequency-watt response

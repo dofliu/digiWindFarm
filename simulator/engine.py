@@ -97,6 +97,12 @@ class WindFarmSimulator:
         )
         farm_wind = max(0, base_wind + turb_component)
 
+        # Advance wind field: per-turbine turbulence + event propagation
+        self._per_turbine_wind.step(
+            farm_wind, wind_direction,
+            self.wind_model.turbulence_intensity, time_step,
+        )
+
         # FaultEngine.step() advances severity progression and alarm tracking.
         # Tag offsets are no longer used — all fault effects flow through
         # _get_fault_physics() inside each TurbinePhysicsModel.
@@ -106,6 +112,7 @@ class WindFarmSimulator:
         for tid, model in self.turbines.items():
             idx = int(tid[2:]) - 1
             local_wind = self._per_turbine_wind.get_local_wind(farm_wind, idx)
+            local_direction = self._per_turbine_wind.get_local_direction(wind_direction, idx)
 
             model.active_faults = [
                 {
@@ -123,7 +130,7 @@ class WindFarmSimulator:
 
             scada_output = model.step(
                 local_wind,
-                wind_direction,
+                local_direction,
                 ambient_temp,
                 time_step,
                 grid_frequency_ref=grid_frequency,
