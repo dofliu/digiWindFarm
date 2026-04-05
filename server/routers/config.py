@@ -164,6 +164,43 @@ async def clear_grid():
 
 # ─── Turbine Specification ─────────────────────────────────────────────
 
+# ─── Storage & Session Info ───────────────────────────────────────────
+
+@router.get("/storage/stats")
+async def get_storage_stats():
+    """Get database storage statistics (row counts, size)."""
+    b = get_broker()
+    stats = b.storage.get_db_stats()
+    stats["write_interval_s"] = b.WRITE_INTERVAL_S
+    stats["raw_retention_days"] = b.RAW_RETENTION_DAYS
+    stats["agg_1m_retention_days"] = b.AGG_1M_RETENTION_DAYS
+    return stats
+
+
+@router.get("/sessions")
+async def list_sessions():
+    """List recent sessions."""
+    b = get_broker()
+    sessions = b.storage.get_sessions(limit=20)
+    active = b.storage.get_active_session()
+    return {"active_session_id": active["id"] if active else None, "sessions": sessions}
+
+
+@router.post("/storage/maintenance")
+async def run_maintenance():
+    """Manually trigger downsampling and cleanup."""
+    b = get_broker()
+    b.storage.run_downsampling()
+    cleanup = b.storage.run_cleanup(
+        raw_retention_days=b.RAW_RETENTION_DAYS,
+        agg_1m_retention_days=b.AGG_1M_RETENTION_DAYS,
+    )
+    stats = b.storage.get_db_stats()
+    return {"cleanup": cleanup, "stats": stats}
+
+
+# ─── Turbine Specification ─────────────────────────────────────────────
+
 @router.get("/turbine-spec")
 async def get_turbine_spec():
     """Get current turbine specification."""
@@ -209,7 +246,19 @@ async def set_turbine_spec(spec_dict: dict):
     for model in b.simulator.turbines.values():
         model.update_spec(new_spec)
 
-    return {"status": "ok", "spec": new_spec.to_dict()}
+    # Create a new session to separate data from different turbine models
+    if b._session_id is not None:
+        b.storage.end_session(b._session_id)
+    b._session_id = b.storage.create_session(
+        data_source="simulation",
+        turbine_count=len(b.turbine_ids),
+        rated_power_kw=new_spec.rated_power_kw,
+        rotor_diameter_m=new_spec.rotor_diameter_m,
+        model_name=preset_name or "Custom",
+        config=new_spec.to_dict(),
+    )
+
+    return {"status": "ok", "spec": new_spec.to_dict(), "session_id": b._session_id}
 
 
 @router.get("/turbine-spec/presets")

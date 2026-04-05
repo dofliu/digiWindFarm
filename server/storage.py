@@ -1,8 +1,9 @@
 import sqlite3
 import json
 import threading
-from datetime import datetime
-from typing import List, Optional
+import time as _time
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict
 from pathlib import Path
 
 
@@ -10,7 +11,15 @@ DB_PATH = Path(__file__).parent.parent / "wind_farm_data.db"
 
 
 class Storage:
-    """SQLite-based time-series storage for turbine readings and history events."""
+    """SQLite-based time-series storage for turbine readings and history events.
+
+    Data tiers:
+      - turbine_data:        10s writes (configurable), 3-day retention for raw
+      - turbine_data_1m:     1-min aggregates, 90-day retention
+      - turbine_data_10m:    10-min aggregates, permanent
+      - turbine_snapshots:   1s high-freq capture around events, permanent
+      - sessions:            tracks simulation/data source configs
+    """
 
     def __init__(self, db_path: str = str(DB_PATH)):
         self._db_path = db_path
@@ -25,11 +34,14 @@ class Storage:
 
     def _init_db(self):
         conn = sqlite3.connect(self._db_path)
+
+        # ── Main raw data table (10s interval writes) ──
         conn.execute("""
             CREATE TABLE IF NOT EXISTS turbine_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
                 turbine_id TEXT NOT NULL,
+                session_id INTEGER,
                 status TEXT,
                 tur_state INTEGER,
                 wind_speed REAL,
@@ -44,7 +56,6 @@ class Storage:
                 gearbox_temp REAL,
                 frequency REAL,
                 hydraulic_pressure REAL,
-                -- Extended SCADA fields (v2)
                 scada_json TEXT
             )
         """)
@@ -52,6 +63,90 @@ class Storage:
             CREATE INDEX IF NOT EXISTS idx_turbine_time
             ON turbine_data (turbine_id, timestamp)
         """)
+
+        # ── 1-minute aggregate table ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS turbine_data_1m (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                turbine_id TEXT NOT NULL,
+                session_id INTEGER,
+                power_output_avg REAL,
+                power_output_max REAL,
+                power_output_min REAL,
+                wind_speed_avg REAL,
+                wind_speed_max REAL,
+                rotor_speed_avg REAL,
+                temperature_avg REAL,
+                vibration_avg REAL,
+                vibration_max REAL,
+                sample_count INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_1m_turbine_time
+            ON turbine_data_1m (turbine_id, timestamp)
+        """)
+
+        # ── 10-minute aggregate table ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS turbine_data_10m (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                turbine_id TEXT NOT NULL,
+                session_id INTEGER,
+                power_output_avg REAL,
+                power_output_max REAL,
+                power_output_min REAL,
+                wind_speed_avg REAL,
+                wind_speed_max REAL,
+                rotor_speed_avg REAL,
+                temperature_avg REAL,
+                vibration_avg REAL,
+                vibration_max REAL,
+                sample_count INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_10m_turbine_time
+            ON turbine_data_10m (turbine_id, timestamp)
+        """)
+
+        # ── Event snapshots (1s high-freq around events) ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS turbine_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                turbine_id TEXT NOT NULL,
+                session_id INTEGER,
+                event_ref TEXT,
+                wind_speed REAL,
+                power_output REAL,
+                rotor_speed REAL,
+                scada_json TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_snapshots_turbine_time
+            ON turbine_snapshots (turbine_id, timestamp)
+        """)
+
+        # ── Sessions table ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                data_source TEXT NOT NULL,
+                turbine_count INTEGER,
+                rated_power_kw REAL,
+                rotor_diameter_m REAL,
+                model_name TEXT,
+                config_json TEXT
+            )
+        """)
+
+        # ── History events (existing) ──
         conn.execute("""
             CREATE TABLE IF NOT EXISTS history_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,21 +164,94 @@ class Storage:
             CREATE INDEX IF NOT EXISTS idx_history_events_turbine_time
             ON history_events (turbine_id, timestamp)
         """)
-        # Add scada_json column if upgrading from v1 schema
-        try:
-            conn.execute("SELECT scada_json FROM turbine_data LIMIT 1")
-        except sqlite3.OperationalError:
-            conn.execute("ALTER TABLE turbine_data ADD COLUMN scada_json TEXT")
-        try:
-            conn.execute("SELECT tur_state FROM turbine_data LIMIT 1")
-        except sqlite3.OperationalError:
-            conn.execute("ALTER TABLE turbine_data ADD COLUMN tur_state INTEGER")
-        try:
-            conn.execute("SELECT end_timestamp FROM history_events LIMIT 1")
-        except sqlite3.OperationalError:
-            conn.execute("ALTER TABLE history_events ADD COLUMN end_timestamp TEXT")
+
+        # ── Migrations for existing DBs ──
+        self._migrate_columns(conn, "turbine_data", [
+            ("scada_json", "TEXT"),
+            ("tur_state", "INTEGER"),
+            ("session_id", "INTEGER"),
+        ])
+        self._migrate_columns(conn, "history_events", [
+            ("end_timestamp", "TEXT"),
+        ])
+
         conn.commit()
         conn.close()
+
+    def _migrate_columns(self, conn, table: str, columns: list):
+        """Add missing columns to existing tables."""
+        for col_name, col_type in columns:
+            try:
+                conn.execute(f"SELECT {col_name} FROM {table} LIMIT 1")
+            except sqlite3.OperationalError:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Session Management
+    # ══════════════════════════════════════════════════════════════════
+
+    def create_session(self, data_source: str, turbine_count: int,
+                       rated_power_kw: float = None, rotor_diameter_m: float = None,
+                       model_name: str = None, config: dict = None) -> int:
+        """Create a new session and return its ID."""
+        conn = self._get_conn()
+        cursor = conn.execute("""
+            INSERT INTO sessions (started_at, data_source, turbine_count,
+                                  rated_power_kw, rotor_diameter_m, model_name, config_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            datetime.now().isoformat(),
+            data_source,
+            turbine_count,
+            rated_power_kw,
+            rotor_diameter_m,
+            model_name,
+            json.dumps(config) if config else None,
+        ))
+        conn.commit()
+        return cursor.lastrowid
+
+    def end_session(self, session_id: int):
+        """Mark a session as ended."""
+        conn = self._get_conn()
+        conn.execute("UPDATE sessions SET ended_at = ? WHERE id = ?",
+                     (datetime.now().isoformat(), session_id))
+        conn.commit()
+
+    def get_sessions(self, limit: int = 20) -> List[dict]:
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM sessions ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            if d.get("config_json"):
+                try:
+                    d["config"] = json.loads(d["config_json"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            result.append(d)
+        return result
+
+    def get_active_session(self) -> Optional[dict]:
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT * FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if row:
+            d = dict(row)
+            if d.get("config_json"):
+                try:
+                    d["config"] = json.loads(d["config_json"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            return d
+        return None
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Data Writing
+    # ══════════════════════════════════════════════════════════════════
 
     def record_event(
         self,
@@ -140,7 +308,7 @@ class Storage:
         conn.execute(query, params)
         conn.commit()
 
-    def store_reading(self, reading: dict):
+    def store_reading(self, reading: dict, session_id: int = None):
         """Store a single turbine reading (from simulator output dict)."""
         conn = self._get_conn()
 
@@ -150,22 +318,21 @@ class Storage:
             except (TypeError, ValueError):
                 return default
 
-        # Serialize full SCADA dict if available
         scada = reading.get('scada', {})
         scada_json = json.dumps(scada) if scada else None
-
         tur_state = int(scada.get("WTUR_TurSt", 0)) if scada else None
 
         conn.execute("""
             INSERT INTO turbine_data
-            (timestamp, turbine_id, status, tur_state, wind_speed, power_output,
+            (timestamp, turbine_id, session_id, status, tur_state, wind_speed, power_output,
              rotor_speed, blade_angle, temperature, vibration, voltage,
              current_amp, yaw_angle, gearbox_temp, frequency, hydraulic_pressure,
              scada_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             str(reading.get('timestamp', datetime.now().isoformat())),
             str(reading.get('turbine_id', '')),
+            session_id,
             str(reading.get('operational_state', 'IDLE')),
             tur_state,
             to_float(reading.get('wind_speed', 0)),
@@ -184,9 +351,163 @@ class Storage:
         ))
         conn.commit()
 
-    def store_readings(self, readings: List[dict]):
+    def store_readings(self, readings: List[dict], session_id: int = None):
         for r in readings:
-            self.store_reading(r)
+            self.store_reading(r, session_id)
+
+    def store_snapshot(self, reading: dict, event_ref: str, session_id: int = None):
+        """Store a 1s snapshot reading linked to an event."""
+        conn = self._get_conn()
+        scada = reading.get('scada', {})
+        scada_json = json.dumps(scada) if scada else None
+
+        def to_float(v, default=0.0):
+            try:
+                return float(v) if v is not None else default
+            except (TypeError, ValueError):
+                return default
+
+        conn.execute("""
+            INSERT INTO turbine_snapshots
+            (timestamp, turbine_id, session_id, event_ref, wind_speed, power_output,
+             rotor_speed, scada_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(reading.get('timestamp', datetime.now().isoformat())),
+            str(reading.get('turbine_id', '')),
+            session_id,
+            event_ref,
+            to_float(reading.get('wind_speed', 0)),
+            to_float(reading.get('total_power', 0)) / 1_000_000,
+            to_float(scada.get('WROT_RotSpd', reading.get('rotor', {}).get('rotor_speed', 0))),
+            scada_json,
+        ))
+        conn.commit()
+
+    def store_snapshots(self, readings: List[dict], event_ref: str, session_id: int = None):
+        for r in readings:
+            self.store_snapshot(r, event_ref, session_id)
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Data Retention & Downsampling
+    # ══════════════════════════════════════════════════════════════════
+
+    def run_downsampling(self):
+        """Create 1-minute and 10-minute aggregates from raw data.
+
+        Called periodically by the background maintenance task.
+        """
+        conn = self._get_conn()
+        now = datetime.now()
+
+        # ── Build 1-minute aggregates from raw data older than 5 minutes ──
+        cutoff_1m = (now - timedelta(minutes=5)).isoformat()
+        # Find the latest 1m aggregate timestamp to avoid re-processing
+        latest_1m = conn.execute(
+            "SELECT MAX(timestamp) FROM turbine_data_1m"
+        ).fetchone()[0]
+        from_ts = latest_1m or "2000-01-01T00:00:00"
+
+        rows = conn.execute("""
+            INSERT INTO turbine_data_1m
+                (timestamp, turbine_id, session_id,
+                 power_output_avg, power_output_max, power_output_min,
+                 wind_speed_avg, wind_speed_max, rotor_speed_avg,
+                 temperature_avg, vibration_avg, vibration_max, sample_count)
+            SELECT
+                MIN(timestamp),
+                turbine_id,
+                session_id,
+                AVG(power_output), MAX(power_output), MIN(power_output),
+                AVG(wind_speed), MAX(wind_speed), AVG(rotor_speed),
+                AVG(temperature), AVG(vibration), MAX(vibration),
+                COUNT(*)
+            FROM turbine_data
+            WHERE timestamp > ? AND timestamp <= ?
+            GROUP BY turbine_id,
+                     CAST(strftime('%s', timestamp) AS INTEGER) / 60
+            HAVING COUNT(*) > 0
+        """, (from_ts, cutoff_1m))
+        conn.commit()
+
+        # ── Build 10-minute aggregates from 1-min data older than 15 minutes ──
+        cutoff_10m = (now - timedelta(minutes=15)).isoformat()
+        latest_10m = conn.execute(
+            "SELECT MAX(timestamp) FROM turbine_data_10m"
+        ).fetchone()[0]
+        from_ts_10m = latest_10m or "2000-01-01T00:00:00"
+
+        conn.execute("""
+            INSERT INTO turbine_data_10m
+                (timestamp, turbine_id, session_id,
+                 power_output_avg, power_output_max, power_output_min,
+                 wind_speed_avg, wind_speed_max, rotor_speed_avg,
+                 temperature_avg, vibration_avg, vibration_max, sample_count)
+            SELECT
+                MIN(timestamp),
+                turbine_id,
+                session_id,
+                AVG(power_output_avg), MAX(power_output_max), MIN(power_output_min),
+                AVG(wind_speed_avg), MAX(wind_speed_max), AVG(rotor_speed_avg),
+                AVG(temperature_avg), AVG(vibration_avg), MAX(vibration_max),
+                SUM(sample_count)
+            FROM turbine_data_1m
+            WHERE timestamp > ? AND timestamp <= ?
+            GROUP BY turbine_id,
+                     CAST(strftime('%s', timestamp) AS INTEGER) / 600
+            HAVING COUNT(*) > 0
+        """, (from_ts_10m, cutoff_10m))
+        conn.commit()
+
+    def run_cleanup(self, raw_retention_days: int = 3, agg_1m_retention_days: int = 90):
+        """Delete old raw data and old 1-minute aggregates.
+
+        - Raw (turbine_data): keep last `raw_retention_days` days (default 3)
+        - 1-minute aggregates: keep last `agg_1m_retention_days` days (default 90)
+        - 10-minute aggregates: keep forever
+        - Snapshots: keep forever
+        """
+        conn = self._get_conn()
+        now = datetime.now()
+
+        raw_cutoff = (now - timedelta(days=raw_retention_days)).isoformat()
+        deleted_raw = conn.execute(
+            "DELETE FROM turbine_data WHERE timestamp < ?", (raw_cutoff,)
+        ).rowcount
+
+        agg_cutoff = (now - timedelta(days=agg_1m_retention_days)).isoformat()
+        deleted_1m = conn.execute(
+            "DELETE FROM turbine_data_1m WHERE timestamp < ?", (agg_cutoff,)
+        ).rowcount
+
+        conn.commit()
+
+        if deleted_raw > 0 or deleted_1m > 0:
+            print(f"[Storage] Cleanup: removed {deleted_raw} raw rows, {deleted_1m} 1m-agg rows")
+
+        return {"deleted_raw": deleted_raw, "deleted_1m": deleted_1m}
+
+    def get_db_stats(self) -> dict:
+        """Return row counts and estimated sizes for each table."""
+        conn = self._get_conn()
+        tables = ["turbine_data", "turbine_data_1m", "turbine_data_10m",
+                   "turbine_snapshots", "history_events", "sessions"]
+        stats = {}
+        for table in tables:
+            try:
+                count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                stats[table] = count
+            except sqlite3.OperationalError:
+                stats[table] = 0
+
+        # DB file size
+        db_path = Path(self._db_path)
+        stats["db_size_mb"] = round(db_path.stat().st_size / (1024 * 1024), 1) if db_path.exists() else 0
+        return stats
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Data Queries
+    # ══════════════════════════════════════════════════════════════════
 
     def query_history(self, turbine_id: str, start: Optional[str] = None,
                       end: Optional[str] = None, limit: int = 1000) -> List[dict]:
@@ -208,7 +529,6 @@ class Storage:
         result = []
         for row in rows:
             d = dict(row)
-            # Expand scada_json back to dict if available
             if d.get('scada_json'):
                 try:
                     d['scada'] = json.loads(d['scada_json'])
@@ -272,3 +592,32 @@ class Storage:
             ORDER BY t1.turbine_id
         """).fetchall()
         return [dict(row) for row in rows]
+
+    def query_snapshots(self, turbine_id: str, event_ref: Optional[str] = None,
+                        start: Optional[str] = None, end: Optional[str] = None,
+                        limit: int = 1000) -> List[dict]:
+        conn = self._get_conn()
+        query = "SELECT * FROM turbine_snapshots WHERE turbine_id = ?"
+        params: list = [turbine_id]
+        if event_ref:
+            query += " AND event_ref = ?"
+            params.append(event_ref)
+        if start:
+            query += " AND timestamp >= ?"
+            params.append(start)
+        if end:
+            query += " AND timestamp <= ?"
+            params.append(end)
+        query += " ORDER BY timestamp ASC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        result = []
+        for row in rows:
+            d = dict(row)
+            if d.get('scada_json'):
+                try:
+                    d['scada'] = json.loads(d['scada_json'])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            result.append(d)
+        return result
