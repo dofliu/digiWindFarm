@@ -1,6 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { type TurbineData } from '../types';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 
 interface FarmTrendChartProps {
   turbines: TurbineData[];
@@ -13,41 +15,109 @@ interface FarmDataPoint {
   avgWindSpeed: number;
 }
 
-const MAX_POINTS = 120; // ~4 minutes at 2s intervals
+type TimeRange = '5m' | '1h' | '12h' | '1d';
+
+const TIME_RANGES: { id: TimeRange; label_en: string; label_zh: string; refreshMs: number }[] = [
+  { id: '5m',  label_en: '5 Min',   label_zh: '5分鐘',  refreshMs: 2000 },
+  { id: '1h',  label_en: '1 Hour',  label_zh: '1小時',  refreshMs: 5000 },
+  { id: '12h', label_en: '12 Hours', label_zh: '12小時', refreshMs: 30000 },
+  { id: '1d',  label_en: '1 Day',   label_zh: '1天',    refreshMs: 60000 },
+];
+
+const MAX_LIVE_POINTS = 150;
 
 const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }) => {
-  const [data, setData] = useState<FarmDataPoint[]>([]);
-  const lastUpdate = useRef(0);
+  const [range, setRange] = useState<TimeRange>('5m');
+  const [liveData, setLiveData] = useState<FarmDataPoint[]>([]);
+  const [apiData, setApiData] = useState<FarmDataPoint[]>([]);
+  const [loading, setLoading] = useState(false);
+  const lastLiveUpdate = useRef(0);
 
+  // Live accumulation for 5m mode
   useEffect(() => {
-    if (!turbines.length) return;
+    if (range !== '5m' || !turbines.length) return;
     const now = Date.now();
-    // Throttle to ~2s intervals to match WS refresh
-    if (now - lastUpdate.current < 1800) return;
-    lastUpdate.current = now;
+    if (now - lastLiveUpdate.current < 1800) return;
+    lastLiveUpdate.current = now;
 
     const totalPower = turbines.reduce((s, t) => s + t.powerOutput, 0);
     const avgWindSpeed = turbines.reduce((s, t) => s + t.windSpeed, 0) / turbines.length;
 
-    setData(prev => {
+    setLiveData(prev => {
       const next = [...prev, { time: now, totalPower: +totalPower.toFixed(2), avgWindSpeed: +avgWindSpeed.toFixed(1) }];
-      return next.length > MAX_POINTS ? next.slice(-MAX_POINTS) : next;
+      return next.length > MAX_LIVE_POINTS ? next.slice(-MAX_LIVE_POINTS) : next;
     });
-  }, [turbines]);
+  }, [turbines, range]);
 
+  // API fetch for longer ranges
+  const fetchApiData = useCallback(() => {
+    if (range === '5m') return;
+    setLoading(true);
+    fetch(`${API_BASE}/api/turbines/farm-trend?range=${range}&points=150`)
+      .then(r => r.json())
+      .then(res => {
+        if (res.data) {
+          setApiData(res.data.map((d: any) => ({
+            time: d.timestamp ? new Date(d.timestamp).getTime() : 0,
+            totalPower: d.totalPower,
+            avgWindSpeed: d.avgWindSpeed,
+          })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [range]);
+
+  useEffect(() => {
+    if (range === '5m') return;
+    fetchApiData();
+    const refreshMs = TIME_RANGES.find(r => r.id === range)?.refreshMs || 30000;
+    const iv = setInterval(fetchApiData, refreshMs);
+    return () => clearInterval(iv);
+  }, [fetchApiData, range]);
+
+  const chartData = range === '5m' ? liveData : apiData;
   const u = (en: string, zh: string) => lang === 'zh' ? zh : en;
+
+  const formatTime = (t: number) => {
+    if (!t) return '';
+    const d = new Date(t);
+    if (range === '5m' || range === '1h') {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    return d.toLocaleTimeString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' } as any);
+  };
 
   return (
     <div className="bg-gray-800/50 rounded-lg p-4 border border-cyan-500/20">
-      <h4 className="text-sm font-semibold text-cyan-400 mb-3 uppercase tracking-wider">
-        {u('Farm Power & Wind Trend', '全風場發電量與風速趨勢')}
-      </h4>
-      <div className="bg-gray-900/50 rounded p-2">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider">
+          {u('Farm Power & Wind Trend', '全風場發電量與風速趨勢')}
+        </h4>
+        <div className="flex gap-1">
+          {TIME_RANGES.map(r => (
+            <button key={r.id} onClick={() => setRange(r.id)}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                range === r.id
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-gray-700 text-gray-400 hover:text-white'
+              }`}>
+              {lang === 'zh' ? r.label_zh : r.label_en}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="bg-gray-900/50 rounded p-2 relative">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 z-10 rounded">
+            <span className="text-xs text-cyan-400 animate-pulse">{u('Loading...', '載入中...')}</span>
+          </div>
+        )}
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <XAxis
               dataKey="time"
-              tickFormatter={(t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+              tickFormatter={formatTime}
               stroke="#6b7280"
               fontSize={10}
               axisLine={false}
@@ -74,7 +144,7 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
             />
             <Tooltip
               contentStyle={{ backgroundColor: 'rgba(17,24,39,0.95)', border: '1px solid #374151', borderRadius: '0.5rem', color: '#e5e7eb' }}
-              labelFormatter={(t) => t ? new Date(t).toLocaleTimeString() : ''}
+              labelFormatter={(t) => t ? new Date(t).toLocaleString() : ''}
               formatter={(value: number, name: string) => {
                 if (name === 'totalPower') return [`${value.toFixed(2)} MW`, u('Total Power', '總發電量')];
                 return [`${value.toFixed(1)} m/s`, u('Avg Wind Speed', '平均風速')];
