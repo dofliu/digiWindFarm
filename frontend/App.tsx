@@ -176,7 +176,7 @@ const App: React.FC = () => {
             <div className="hidden md:flex items-center space-x-6 text-sm">
               <div>
                 <span className="text-gray-400">{ui('Total Power', '總功率')}: </span>
-                <span className="font-bold font-orbitron text-white">{totalPower.toFixed(2)} MW</span>
+                <span className="font-bold font-orbitron text-white">{totalPower < 1.0 ? `${(totalPower * 1000).toFixed(0)} kW` : `${totalPower.toFixed(2)} MW`}</span>
               </div>
               <div>
                 <span className="text-gray-400">{ui('Status', '狀態')}: </span>

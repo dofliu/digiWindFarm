@@ -89,7 +89,11 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
     return () => clearInterval(iv);
   }, [fetchApiData, range]);
 
-  const chartData = range === '5m' ? liveData : apiData;
+  // Convert MW to kW for chart display
+  const chartData = (range === '5m' ? liveData : apiData).map(d => ({
+    ...d,
+    totalPowerKW: d.totalPower * 1000,
+  }));
   const u = (en: string, zh: string) => lang === 'zh' ? zh : en;
 
   const formatTime = (t: number) => {
@@ -142,8 +146,8 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
               fontSize={10}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(v) => `${v}`}
-              label={{ value: 'MW', angle: -90, position: 'insideLeft', style: { fill: '#22d3ee', fontSize: 10 } }}
+              tickFormatter={(v) => `${v >= 1000 ? (v/1000).toFixed(1) + 'M' : v.toFixed(0)}`}
+              label={{ value: 'kW', angle: -90, position: 'insideLeft', style: { fill: '#22d3ee', fontSize: 10 } }}
             />
             <YAxis
               yAxisId="wind"
@@ -159,13 +163,13 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
               contentStyle={{ backgroundColor: 'rgba(17,24,39,0.95)', border: '1px solid #374151', borderRadius: '0.5rem', color: '#e5e7eb' }}
               labelFormatter={(t) => t ? new Date(t).toLocaleString() : ''}
               formatter={(value: number, name: string) => {
-                if (name === 'totalPower') return [`${value.toFixed(2)} MW`, u('Total Power', '總發電量')];
+                if (name === 'totalPowerKW') return [`${value.toFixed(0)} kW`, u('Total Power', '總發電量')];
                 return [`${value.toFixed(1)} m/s`, u('Avg Wind Speed', '平均風速')];
               }}
             />
             <Legend
               formatter={(value) => {
-                if (value === 'totalPower') return u('Total Power (MW)', '總發電量 (MW)');
+                if (value === 'totalPowerKW') return u('Total Power (kW)', '總發電量 (kW)');
                 return u('Avg Wind Speed (m/s)', '平均風速 (m/s)');
               }}
               wrapperStyle={{ fontSize: '11px' }}
@@ -173,7 +177,7 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
             <Line
               yAxisId="power"
               type="monotone"
-              dataKey="totalPower"
+              dataKey="totalPowerKW"
               stroke="#22d3ee"
               strokeWidth={2}
               dot={false}

@@ -7,9 +7,9 @@ import numpy as np
 class GridEnvironmentModel:
     """Simple grid-side environment model for frequency and voltage events."""
 
-    def __init__(self):
-        self.base_frequency_hz = 50.0
-        self.base_voltage_v = 690.0
+    def __init__(self, frequency_hz: float = 60.0, voltage_v: float = 3500.0):
+        self.base_frequency_hz = frequency_hz
+        self.base_voltage_v = voltage_v
         self._override_frequency: Optional[float] = None
         self._override_voltage: Optional[float] = None
         self._active_profile: Optional[str] = None
@@ -29,13 +29,15 @@ class GridEnvironmentModel:
         self._profile_start_time = None
 
     def set_profile(self, profile: str):
+        nom_f = self.base_frequency_hz
+        nom_v = self.base_voltage_v
         profiles = {
-            "nominal": (50.0, 690.0),
-            "low_freq": (49.2, 690.0),
-            "high_freq": (50.8, 690.0),
-            "undervoltage": (50.0, 630.0),
-            "overvoltage": (50.0, 740.0),
-            "weak_grid": (49.6, 655.0),
+            "nominal":      (nom_f, nom_v),
+            "low_freq":     (nom_f - 0.8, nom_v),
+            "high_freq":    (nom_f + 0.8, nom_v),
+            "undervoltage": (nom_f, nom_v * 0.91),
+            "overvoltage":  (nom_f, nom_v * 1.07),
+            "weak_grid":    (nom_f - 0.4, nom_v * 0.95),
         }
         if profile == "auto":
             self.clear_override()
@@ -64,17 +66,18 @@ class GridEnvironmentModel:
     def get_frequency(self, timestamp: datetime) -> float:
         if self._active_profile == "recovery" and self._profile_start_time:
             elapsed = (timestamp - self._profile_start_time).total_seconds()
-            base = 49.0 + min(1.0, elapsed / 120.0)
+            base = (self.base_frequency_hz - 1.0) + min(1.0, elapsed / 120.0)
             return base + np.random.normal(0, 0.03)
         if self._override_frequency is not None:
             return self._override_frequency + np.random.normal(0, 0.02)
         return self.base_frequency_hz + 0.05 * np.sin(timestamp.timestamp() / 180.0) + np.random.normal(0, 0.01)
 
     def get_voltage(self, timestamp: datetime) -> float:
+        nom = self.base_voltage_v
         if self._active_profile == "recovery" and self._profile_start_time:
             elapsed = (timestamp - self._profile_start_time).total_seconds()
-            base = 620.0 + min(70.0, elapsed / 120.0 * 70.0)
-            return base + np.random.normal(0, 2.0)
+            base = nom * 0.90 + min(nom * 0.10, elapsed / 120.0 * nom * 0.10)
+            return base + np.random.normal(0, nom * 0.001)
         if self._override_voltage is not None:
-            return self._override_voltage + np.random.normal(0, 1.5)
-        return self.base_voltage_v + 5.0 * np.sin(timestamp.timestamp() / 240.0 + 0.5) + np.random.normal(0, 0.8)
+            return self._override_voltage + np.random.normal(0, nom * 0.001)
+        return nom + nom * 0.007 * np.sin(timestamp.timestamp() / 240.0 + 0.5) + np.random.normal(0, nom * 0.001)
