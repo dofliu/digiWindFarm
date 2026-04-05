@@ -529,9 +529,11 @@ class TurbinePhysicsModel:
             "MBUS_Contact2": 1.0 if self.local_control else 0.0,
         }
 
-        for tag_id, modifier in self.fault_modifiers.items():
-            if tag_id in output:
-                output[tag_id] += modifier
+        # NOTE: fault_modifiers tag-offset path has been removed.
+        # All fault effects now flow through _get_fault_physics() which
+        # modifies physical causes (heat, friction, wind, cooling, pitch)
+        # with operating-condition coupling. This ensures ML models must
+        # learn physically grounded fault signatures.
 
         return self._apply_sensor_model(output)
 
@@ -956,6 +958,13 @@ class TurbinePhysicsModel:
         return {"noise": 0.02, "drift": 0.0002, "bias_limit": 0.2, "resolution": 0.01, "stuck_prob": 0.0, "min": -1.0e9, "max": 1.0e9}
 
     def _get_fault_physics(self) -> Dict[str, object]:
+        """Compute physical effects of all active faults.
+
+        All fault effects flow through physical causes (heat, friction, wind,
+        pitch, cooling) rather than direct tag offsets. Effects scale with
+        current operating conditions so ML models must learn to separate
+        load-dependent fault signatures from normal operational variation.
+        """
         fault_physics = {
             "wind_scale": 1.0,
             "power_scale": 1.0,
@@ -981,43 +990,136 @@ class TurbinePhysicsModel:
             },
         }
 
+        # Operating condition factors for load-dependent fault coupling.
+        # Use previous-step values (available before current step computes).
+        rated_pwr = max(self.spec.rated_power_kw, 1.0)
+        power_ratio = max(0.0, min(1.0, self._generated_power_kw / rated_pwr))
+        speed_ratio = max(0.0, min(1.0, self.rotor_speed / max(self.spec.max_rotor_rpm, 1.0)))
+        load_factor = max(power_ratio, speed_ratio)  # general load indicator
+
         for fault in self.active_faults:
             severity = float(fault.get("severity", 0.0))
             scenario_id = fault.get("scenario_id")
+
+            # ── bearing_wear ─────────────────────────────────────────
+            # Bearing friction generates heat proportional to speed.
+            # Vibration increases with both speed and load.
             if scenario_id == "bearing_wear":
-                fault_physics["extra_heat"]["bearing"] += 18.0 * severity
-                fault_physics["extra_heat"]["generator"] += 6.0 * severity
-                fault_physics["vibration_x"] += 1.5 * severity
-                fault_physics["vibration_y"] += 1.2 * severity
-            elif scenario_id == "gearbox_overheat":
-                fault_physics["extra_heat"]["nacelle"] += 10.0 * severity
-                fault_physics["extra_heat"]["converter"] += 4.0 * severity
-                fault_physics["cooling_bias"]["nacelle"] *= max(0.55, 1.0 - 0.30 * severity)
-                fault_physics["vibration_x"] += 0.8 * severity
-                fault_physics["vibration_y"] += 0.7 * severity
-            elif scenario_id == "pitch_motor_fault":
-                fault_physics["blade1_pitch_bias"] += 8.0 * severity
-                fault_physics["power_scale"] *= max(0.78, 1.0 - 0.10 * severity)
-                fault_physics["vibration_x"] += 0.9 * severity
-                fault_physics["vibration_y"] += 0.5 * severity
+                speed_coupling = 0.3 + 0.7 * speed_ratio
+                load_coupling = 0.4 + 0.6 * load_factor
+                fault_physics["extra_heat"]["bearing"] += 18.0 * severity * speed_coupling
+                fault_physics["extra_heat"]["generator"] += 6.0 * severity * load_coupling
+                fault_physics["vibration_x"] += 1.5 * severity * speed_coupling
+                fault_physics["vibration_y"] += 1.2 * severity * speed_coupling
+
+            # ── generator_overspeed ──────────────────────────────────
+            # Control failure lets rotor accelerate. Worse at high wind.
+            elif scenario_id == "generator_overspeed":
+                fault_physics["rotor_speed_bias"] += 0.8 * severity
+                fault_physics["vibration_x"] += 2.2 * severity * (0.5 + 0.5 * speed_ratio)
+                fault_physics["vibration_y"] += 1.8 * severity * (0.5 + 0.5 * speed_ratio)
+                fault_physics["extra_heat"]["generator"] += 8.0 * severity * (0.4 + 0.6 * load_factor)
+
+            # ── converter_cooling_fault ──────────────────────────────
+            # Cooling degradation. Heat accumulates faster at high power.
             elif scenario_id == "converter_cooling_fault":
-                fault_physics["extra_heat"]["converter"] += 16.0 * severity
+                fault_physics["extra_heat"]["converter"] += 16.0 * severity * (0.3 + 0.7 * power_ratio)
                 fault_physics["cooling_bias"]["water"] *= max(0.25, 1.0 - 0.70 * severity)
                 fault_physics["cooling_bias"]["cabinet"] *= max(0.55, 1.0 - 0.35 * severity)
                 fault_physics["power_scale"] *= max(0.82, 1.0 - 0.08 * severity)
+
+            # ── transformer_overheat ─────────────────────────────────
+            # Transformer losses scale with power squared (I²R).
+            elif scenario_id == "transformer_overheat":
+                power_sq = power_ratio ** 2
+                fault_physics["extra_heat"]["transformer"] += 18.0 * severity * (0.2 + 0.8 * power_sq)
+                fault_physics["cooling_bias"]["transformer"] *= max(0.45, 1.0 - 0.40 * severity)
+                fault_physics["extra_heat"]["nacelle"] += 2.5 * severity * (0.3 + 0.7 * power_ratio)
+
+            # ── pitch_imbalance ──────────────────────────────────────
+            # Blade 1 calibration drift. Causes 1P vibration (speed-dependent)
+            # and aerodynamic power loss (wind-dependent).
+            elif scenario_id == "pitch_imbalance":
+                fault_physics["blade1_pitch_bias"] += 3.0 * severity
+                fault_physics["power_scale"] *= max(0.88, 1.0 - 0.04 * severity * load_factor)
+                fault_physics["vibration_x"] += 1.5 * severity * speed_ratio
+                fault_physics["vibration_y"] += 0.8 * severity * speed_ratio
+                fault_physics["extra_heat"]["bearing"] += 3.0 * severity * speed_ratio
+
+            # ── yaw_sensor_drift ─────────────────────────────────────
+            # Position sensor drifts. Power loss from misalignment is
+            # proportional to cos(yaw_error) — more loss at higher wind.
+            elif scenario_id == "yaw_sensor_drift":
+                yaw_deg = 12.0 * severity
+                fault_physics["yaw_error_bias"] += yaw_deg
+                cos_loss = math.cos(math.radians(min(30.0, abs(yaw_deg))))
+                fault_physics["wind_scale"] *= max(0.75, cos_loss)
+
+            # ── stator_winding_degradation ───────────────────────────
+            # Insulation resistance decreases. Extra I²R losses at load.
+            # Temperature-vs-power slope changes — key ML feature.
+            elif scenario_id == "stator_winding_degradation":
+                power_sq = power_ratio ** 2
+                fault_physics["extra_heat"]["generator"] += 20.0 * severity * (0.15 + 0.85 * power_sq)
+                # Slight current increase from reduced insulation efficiency
+                fault_physics["power_scale"] *= max(0.92, 1.0 - 0.03 * severity * power_ratio)
+
+            # ── hydraulic_leak ───────────────────────────────────────
+            # Slow pressure drop. Yaw slippage under high wind loads.
+            # Yaw error variance increases with load (thrust force).
+            elif scenario_id == "hydraulic_leak":
+                fault_physics["yaw_brake_bias"] -= 80.0 * severity
+                # Under load, thrust causes yaw slippage
+                slip_amplitude = 5.0 * severity * load_factor
+                fault_physics["yaw_error_bias"] += slip_amplitude * math.sin(self._sim_time * 0.08)
+
+            # ── blade_icing ──────────────────────────────────────────
+            # Aerodynamic imbalance. Power loss and asymmetric vibration.
+            # Effect is independent of load (ice doesn't care about power)
+            # but vibration couples with rotation speed.
+            elif scenario_id == "blade_icing":
+                fault_physics["power_scale"] *= max(0.60, 1.0 - 0.25 * severity)
+                fault_physics["rotor_speed_bias"] -= 1.5 * severity
+                fault_physics["vibration_x"] += 4.0 * severity * speed_ratio
+                fault_physics["vibration_y"] += 6.0 * severity * speed_ratio  # asymmetric
+                fault_physics["blade1_pitch_bias"] += 2.0 * severity
+
+            # ── grid_voltage_sag ─────────────────────────────────────
+            # Converter stress from grid fluctuations.
+            # Switching losses increase, especially at high power.
+            elif scenario_id == "grid_voltage_sag":
+                fault_physics["extra_heat"]["converter"] += 8.0 * severity * (0.3 + 0.7 * power_ratio)
+                fault_physics["power_scale"] *= max(0.80, 1.0 - 0.10 * severity * power_ratio)
+                fault_physics["cooling_bias"]["cabinet"] *= max(0.75, 1.0 - 0.15 * severity)
+
+            # ── nacelle_cooling_failure ───────────────────────────────
+            # Main ventilation failure. Multiple components heat up.
+            # Heat accumulation is proportional to power dissipation.
+            elif scenario_id == "nacelle_cooling_failure":
+                heat_scale = 0.25 + 0.75 * power_ratio
+                fault_physics["cooling_bias"]["nacelle"] *= max(0.30, 1.0 - 0.55 * severity)
+                fault_physics["cooling_bias"]["cabinet"] *= max(0.40, 1.0 - 0.45 * severity)
+                fault_physics["extra_heat"]["nacelle"] += 15.0 * severity * heat_scale
+                fault_physics["extra_heat"]["generator"] += 8.0 * severity * heat_scale
+                fault_physics["extra_heat"]["converter"] += 6.0 * severity * heat_scale
+                fault_physics["extra_heat"]["bearing"] += 4.0 * severity * heat_scale
+
+            # ── legacy aliases (from older physics path) ─────────────
+            elif scenario_id == "gearbox_overheat":
+                fault_physics["extra_heat"]["nacelle"] += 10.0 * severity * (0.3 + 0.7 * load_factor)
+                fault_physics["extra_heat"]["converter"] += 4.0 * severity * load_factor
+                fault_physics["cooling_bias"]["nacelle"] *= max(0.55, 1.0 - 0.30 * severity)
+                fault_physics["vibration_x"] += 0.8 * severity * speed_ratio
+                fault_physics["vibration_y"] += 0.7 * severity * speed_ratio
+            elif scenario_id == "pitch_motor_fault":
+                fault_physics["blade1_pitch_bias"] += 8.0 * severity
+                fault_physics["power_scale"] *= max(0.78, 1.0 - 0.10 * severity * load_factor)
+                fault_physics["vibration_x"] += 0.9 * severity * speed_ratio
+                fault_physics["vibration_y"] += 0.5 * severity * speed_ratio
             elif scenario_id == "yaw_misalignment":
                 yaw_deg = 20.0 * severity
                 fault_physics["yaw_error_bias"] += yaw_deg
                 fault_physics["wind_scale"] *= max(0.72, math.cos(math.radians(min(35.0, abs(yaw_deg)))))
                 fault_physics["yaw_brake_bias"] -= 25.0 * severity
-            elif scenario_id == "generator_overspeed":
-                fault_physics["rotor_speed_bias"] += 0.8 * severity
-                fault_physics["vibration_x"] += 2.2 * severity
-                fault_physics["vibration_y"] += 1.8 * severity
-                fault_physics["extra_heat"]["generator"] += 8.0 * severity
-            elif scenario_id == "transformer_overheat":
-                fault_physics["extra_heat"]["transformer"] += 18.0 * severity
-                fault_physics["cooling_bias"]["transformer"] *= max(0.45, 1.0 - 0.40 * severity)
-                fault_physics["extra_heat"]["nacelle"] += 2.5 * severity
 
         return fault_physics
