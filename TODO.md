@@ -48,10 +48,10 @@
 ## In Progress Quality Level
 
 These parts are implemented, but still first-generation models:
-- [ ] Aerodynamics beyond lookup power curve
-- [ ] Detailed drivetrain / gearbox-stage behavior
+- [x] Aerodynamics: Cp(λ,β) surface, thrust coefficient, dynamic stall
+- [x] Drivetrain: multi-stage gearbox, bearing separation, torsional modes, brake dynamics
+- [x] Cooling system: pump/fan state, coolant flow/pressure, fouling propagation
 - [ ] Vibration feature / frequency-band realism
-- [ ] Cooling loop detail
 - [ ] Advanced converter / electrical control detail
 - [ ] Wind-event propagation across the farm
 
