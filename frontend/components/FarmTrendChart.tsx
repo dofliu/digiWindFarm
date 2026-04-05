@@ -26,26 +26,37 @@ const TIME_RANGES: { id: TimeRange; label_en: string; label_zh: string; refreshM
 
 const MAX_LIVE_POINTS = 150;
 
+// Module-level cache to persist data across component mount/unmount cycles
+// (e.g. when switching between card/summary/table views)
+let _cachedLiveData: FarmDataPoint[] = [];
+let _cachedApiData: FarmDataPoint[] = [];
+let _cachedRange: TimeRange = '5m';
+let _lastLiveUpdateTime = 0;
+
 const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }) => {
-  const [range, setRange] = useState<TimeRange>('5m');
-  const [liveData, setLiveData] = useState<FarmDataPoint[]>([]);
-  const [apiData, setApiData] = useState<FarmDataPoint[]>([]);
+  const [range, setRange] = useState<TimeRange>(_cachedRange);
+  const [liveData, setLiveData] = useState<FarmDataPoint[]>(_cachedLiveData);
+  const [apiData, setApiData] = useState<FarmDataPoint[]>(_cachedApiData);
   const [loading, setLoading] = useState(false);
-  const lastLiveUpdate = useRef(0);
+
+  // Sync range changes to cache
+  useEffect(() => { _cachedRange = range; }, [range]);
 
   // Live accumulation for 5m mode
   useEffect(() => {
     if (range !== '5m' || !turbines.length) return;
     const now = Date.now();
-    if (now - lastLiveUpdate.current < 1800) return;
-    lastLiveUpdate.current = now;
+    if (now - _lastLiveUpdateTime < 1800) return;
+    _lastLiveUpdateTime = now;
 
     const totalPower = turbines.reduce((s, t) => s + t.powerOutput, 0);
     const avgWindSpeed = turbines.reduce((s, t) => s + t.windSpeed, 0) / turbines.length;
 
     setLiveData(prev => {
       const next = [...prev, { time: now, totalPower: +totalPower.toFixed(2), avgWindSpeed: +avgWindSpeed.toFixed(1) }];
-      return next.length > MAX_LIVE_POINTS ? next.slice(-MAX_LIVE_POINTS) : next;
+      const trimmed = next.length > MAX_LIVE_POINTS ? next.slice(-MAX_LIVE_POINTS) : next;
+      _cachedLiveData = trimmed;
+      return trimmed;
     });
   }, [turbines, range]);
 
@@ -57,11 +68,13 @@ const FarmTrendChart: React.FC<FarmTrendChartProps> = ({ turbines, lang = 'zh' }
       .then(r => r.json())
       .then(res => {
         if (res.data) {
-          setApiData(res.data.map((d: any) => ({
+          const mapped = res.data.map((d: any) => ({
             time: d.timestamp ? new Date(d.timestamp).getTime() : 0,
             totalPower: d.totalPower,
             avgWindSpeed: d.avgWindSpeed,
-          })));
+          }));
+          _cachedApiData = mapped;
+          setApiData(mapped);
         }
       })
       .catch(() => {})

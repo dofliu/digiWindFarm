@@ -70,7 +70,7 @@ async def farm_trend(
                     pw = scada.get("WTUR_TotPwrAt")
                     ws = scada.get("WMET_WSpeedNac")
                     if pw is not None:
-                        total_power += pw / 1_000_000  # W -> MW
+                        total_power += pw / 1_000  # kW -> MW
                     if ws is not None:
                         total_wind += ws
                     count += 1
