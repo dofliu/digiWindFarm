@@ -115,6 +115,78 @@ async def clear_wind():
     return {"status": "ok", "mode": "auto"}
 
 
+@router.get("/simulation/time-scale")
+async def get_time_scale():
+    """Get current simulation time scale."""
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    return {"time_scale": b.simulator.time_scale}
+
+
+@router.post("/simulation/time-scale")
+async def set_time_scale(body: dict):
+    """Set simulation time acceleration factor.
+
+    time_scale=1: real-time
+    time_scale=60: 1 minute of simulation per second
+    time_scale=3600: 1 hour of simulation per second
+    """
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+    scale = body.get("time_scale", 1.0)
+    if scale < 1.0 or scale > 86400:
+        raise HTTPException(400, "time_scale must be between 1 and 86400")
+    b.simulator.time_scale = float(scale)
+    return {"time_scale": b.simulator.time_scale}
+
+
+@router.post("/simulation/generate-bulk")
+async def generate_bulk(body: dict):
+    """Generate bulk historical data at maximum speed.
+
+    Parameters:
+      duration_hours: hours of simulated data (e.g. 720 for 30 days)
+      time_step: physics step in seconds (default 10, use 60 for faster)
+
+    The data is written to SQLite via the normal storage pipeline.
+    This runs synchronously and may take minutes for large durations.
+    """
+    b = get_broker()
+    if not b.simulator:
+        raise HTTPException(400, "Simulator not running")
+
+    duration = body.get("duration_hours", 24)
+    step = body.get("time_step", 10.0)
+    if duration > 8760:
+        raise HTTPException(400, "Max 8760 hours (1 year)")
+
+    # Use the storage callback directly for bulk writes
+    session_id = b._session_id
+
+    def store_cb(readings):
+        b.storage.store_readings(readings, session_id)
+
+    total = b.simulator.generate_bulk(
+        duration_hours=duration,
+        time_step=step,
+        callback=store_cb,
+    )
+
+    # Run downsampling after bulk generation
+    b.storage.run_downsampling()
+
+    stats = b.storage.get_db_stats()
+    return {
+        "status": "ok",
+        "duration_hours": duration,
+        "time_step": step,
+        "total_readings": total,
+        "storage_stats": stats,
+    }
+
+
 @router.get("/grid")
 async def get_grid_status():
     b = get_broker()
