@@ -232,8 +232,8 @@ class DataBroker:
         self._session_id = self.storage.create_session(
             data_source="simulation",
             turbine_count=self._sim_config.turbineCount,
-            rated_power_kw=5000,  # default 5MW
-            model_name="Simulated 5MW",
+            rated_power_kw=2000,  # Z72-2000-MV default
+            model_name="Z72-2000-MV",
             config={
                 "baseWindSpeed": self._sim_config.baseWindSpeed,
                 "turbulenceIntensity": self._sim_config.turbulenceIntensity,

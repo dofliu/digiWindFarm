@@ -12,24 +12,23 @@ import numpy as np
 from typing import List, Tuple, Optional
 
 
-# ─── Default Z72 5MW power curve (from typical 5MW offshore data) ────────
+# ─── Default Z72-2000-MV power curve (Harakosan 2MW direct-drive) ────────
 # (wind_speed_m_s, power_kw)
-# Region 1: 0 → cut-in (0 kW)
-# Region 2: cut-in → rated (cubic growth)
-# Region 3: rated → cut-out (constant at rated)
-DEFAULT_5MW_POWER_CURVE: List[Tuple[float, float]] = [
+# Based on Z72 OEM data: rated 2000kW, cut-in 3m/s, rated 13m/s, cut-out 25m/s
+# Rotor diameter 70.65m, direct-drive PMSG
+DEFAULT_Z72_POWER_CURVE: List[Tuple[float, float]] = [
     (0.0, 0), (2.0, 0), (3.0, 0),          # Below cut-in
-    (3.5, 40), (4.0, 100), (4.5, 180),      # Region 2 start
-    (5.0, 290), (5.5, 430), (6.0, 610),
-    (6.5, 830), (7.0, 1090), (7.5, 1400),
-    (8.0, 1750), (8.5, 2150), (9.0, 2600),
-    (9.5, 3050), (10.0, 3500), (10.5, 3950),
-    (11.0, 4350), (11.5, 4700), (12.0, 4950),  # Approaching rated
-    (12.5, 5000), (13.0, 5000), (14.0, 5000),  # Region 3 (constant)
-    (15.0, 5000), (16.0, 5000), (17.0, 5000),
-    (18.0, 5000), (19.0, 5000), (20.0, 5000),
-    (21.0, 5000), (22.0, 5000), (23.0, 5000),
-    (24.0, 5000), (25.0, 5000),                # Cut-out
+    (3.5, 15), (4.0, 40), (4.5, 75),       # Region 2 start
+    (5.0, 120), (5.5, 175), (6.0, 245),
+    (6.5, 330), (7.0, 435), (7.5, 555),
+    (8.0, 690), (8.5, 845), (9.0, 1010),
+    (9.5, 1185), (10.0, 1365), (10.5, 1540),
+    (11.0, 1700), (11.5, 1830), (12.0, 1930),  # Approaching rated
+    (12.5, 1980), (13.0, 2000), (14.0, 2000),  # Region 3 (constant)
+    (15.0, 2000), (16.0, 2000), (17.0, 2000),
+    (18.0, 2000), (19.0, 2000), (20.0, 2000),
+    (21.0, 2000), (22.0, 2000), (23.0, 2000),
+    (24.0, 2000), (25.0, 2000),                # Cut-out
     (25.5, 0), (26.0, 0),                       # Storm shutdown
 ]
 
@@ -55,10 +54,10 @@ class PowerCurveModel:
             self._ws = np.array([p[0] for p in power_curve])
             self._pw = np.array([p[1] for p in power_curve])
         else:
-            self._ws = np.array([p[0] for p in DEFAULT_5MW_POWER_CURVE])
-            self._pw = np.array([p[1] for p in DEFAULT_5MW_POWER_CURVE])
-            # Scale to rated power
-            scale = rated_power_kw / 5000.0
+            self._ws = np.array([p[0] for p in DEFAULT_Z72_POWER_CURVE])
+            self._pw = np.array([p[1] for p in DEFAULT_Z72_POWER_CURVE])
+            # Scale to rated power (base curve is 2000kW Z72)
+            scale = rated_power_kw / 2000.0
             self._pw = self._pw * scale
 
     def get_power(self, wind_speed: float) -> float:
