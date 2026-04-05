@@ -790,9 +790,12 @@ class TurbinePhysicsModel:
     def _get_grid_derate(self) -> float:
         freq_dev = abs(self._grid_frequency_ref - self.spec.grid_frequency_nominal)
         volt_dev = abs(self._grid_voltage_ref - self.spec.nominal_voltage)
+        nom_volt = self.spec.nominal_voltage
         sensitivity = self._individuality["grid_derate_sensitivity"]
         freq_scale = 1.0 if freq_dev < 0.15 else max(0.72, 1.0 - (freq_dev - 0.15) * 0.45 * sensitivity)
-        volt_scale = 1.0 if volt_dev < 20.0 else max(0.68, 1.0 - ((volt_dev - 20.0) / 180.0) * sensitivity)
+        # Voltage derate relative to nominal (works for both 690V and 3500V)
+        volt_pct_dev = volt_dev / nom_volt  # fraction of nominal
+        volt_scale = 1.0 if volt_pct_dev < 0.03 else max(0.68, 1.0 - (volt_pct_dev - 0.03) * 3.5 * sensitivity)
         return min(freq_scale, volt_scale)
 
     def _check_grid_trip(self) -> Optional[str]:
@@ -800,17 +803,21 @@ class TurbinePhysicsModel:
         volt = self._grid_voltage_ref
         hz_margin = self._individuality["grid_trip_margin_hz"]
         volt_margin = self._individuality["grid_trip_margin_v"]
+        nom_freq = self.spec.grid_frequency_nominal
+        nom_volt = self.spec.nominal_voltage
+
+        # Grid protection limits relative to nominal (works for 50Hz/690V and 60Hz/3500V)
         severe_limit = (
-            freq < 48.6 + hz_margin
-            or freq > 51.4 - hz_margin
-            or volt < 560.0 + volt_margin
-            or volt > 790.0 - volt_margin
+            freq < nom_freq - 1.4 + hz_margin        # e.g. 60 Hz → < 58.6 Hz
+            or freq > nom_freq + 1.4 - hz_margin      # e.g. 60 Hz → > 61.4 Hz
+            or volt < nom_volt * 0.81 + volt_margin    # e.g. 3500V → < 2835V
+            or volt > nom_volt * 1.15 - volt_margin    # e.g. 3500V → > 4025V
         )
         normal_limit = (
-            freq < 49.0 + hz_margin
-            or freq > 51.0 - hz_margin
-            or volt < 600.0 + volt_margin
-            or volt > 760.0 - volt_margin
+            freq < nom_freq - 1.0 + hz_margin
+            or freq > nom_freq + 1.0 - hz_margin
+            or volt < nom_volt * 0.87 + volt_margin
+            or volt > nom_volt * 1.10 - volt_margin
         )
 
         severe_tau = max(0.6, 1.4 / max(0.65, self._individuality["grid_ride_through_scale"]))
@@ -943,7 +950,7 @@ class TurbinePhysicsModel:
         if "Spd" in tag or "Frq" in tag:
             return {"noise": 0.04, "drift": 0.0008, "bias_limit": 0.25, "resolution": 0.01, "stuck_prob": 0.0001, "min": 0.0, "max": 5000.0}
         if "Vtg" in tag:
-            return {"noise": 1.5, "drift": 0.01, "bias_limit": 6.0, "resolution": 0.1, "stuck_prob": 0.00005, "min": 0.0, "max": 2000.0}
+            return {"noise": 1.5, "drift": 0.01, "bias_limit": 6.0, "resolution": 0.1, "stuck_prob": 0.00005, "min": 0.0, "max": 5000.0}
         if "Cur" in tag:
             return {"noise": 0.8, "drift": 0.01, "bias_limit": 3.0, "resolution": 0.1, "stuck_prob": 0.00005, "min": 0.0, "max": 10000.0}
         if "Pwr" in tag:

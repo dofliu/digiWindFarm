@@ -53,10 +53,10 @@ _TAGS: List[ScadaTag] = [
              0, 5500),
     ScadaTag("WGEN_GnSpd", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnSpd",
              "WGEN", "REAL32", "RPM", "Generator Speed", "發電機轉速",
-             0, 2000, "HldReg[274]"),
+             0, 30, "HldReg[274]"),  # Z72 direct-drive: gen speed = rotor speed
     ScadaTag("WGEN_GnVtgMs", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnVtgMs",
              "WGEN", "REAL32", "V", "Generator Voltage", "發電機電壓",
-             0, 800, "HldReg[261]"),
+             0, 4500, "HldReg[261]"),  # Z72 MV: 3.5kV nominal
     ScadaTag("WGEN_GnCurMs", "WGEN.Z72PLC__UI_Loc_WGEN_Analogue_GnCurMs",
              "WGEN", "REAL32", "A", "Generator Current", "發電機電流",
              0, 5000, "HldReg[275]"),
@@ -75,7 +75,7 @@ _TAGS: List[ScadaTag] = [
     # ══════════════════════════════════════════════════════════════════════
     ScadaTag("WROT_RotSpd", "WROT.Z72PLC__UI_Loc_WROT_Analogue_RotSpd",
              "WROT", "REAL32", "RPM", "Rotor Speed", "葉輪轉速",
-             0, 20, "HldReg[228]"),
+             0, 30, "HldReg[228]"),  # Z72: nominal 22.5, HW overspeed 28.5
     ScadaTag("WROT_PtAngValBl1", "WROT.Z72PLC__UI_Loc_WROT_Analogue_PtAngValBl1",
              "WROT", "REAL32", "deg", "Blade 1 Pitch Angle", "葉片1角度",
              -5, 95, "HldReg[230]"),
@@ -115,7 +115,7 @@ _TAGS: List[ScadaTag] = [
              -500, 5500, "HldReg[267]"),
     ScadaTag("WCNV_CnvGnFrq", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGnFrq",
              "WCNV", "REAL32", "Hz", "Converter Generator Freq", "變頻器發電機頻率",
-             0, 60, "HldReg[274]"),
+             0, 65, "HldReg[274]"),  # Z72: 60Hz grid
     ScadaTag("WCNV_CnvGnPwr", "WCNV.Z72PLC__UI_Loc_WCNV_Analogue_CnvGnPwr",
              "WCNV", "REAL32", "kW", "Converter Generator Power", "變頻器發電機功率",
              0, 5500, "HldReg[273]"),

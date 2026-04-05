@@ -48,22 +48,27 @@ class ThermalSystemConfig:
     Tuned so normal operation reaches ~60-80% of alarm thresholds.
     """
 
-    # (thermal_resistance, time_constant_s, initial_temp)
-    # Z72: direct-drive PMSG → stator thermal R lower (better cooling)
-    gen_stator: tuple = (0.035, 600, 35.0)   # Stator: alarm@140, trip@150
-    gen_air: tuple = (0.045, 450, 30.0)      # Air gap
-    gen_bearing: tuple = (0.025, 900, 30.0)  # Main bearing: alarm@85, trip@95
+    # (thermal_resistance_°C/kW, time_constant_s, initial_temp_°C)
+    # Z72-2000-MV: direct-drive PMSG, rated 2MW
+    # Heat at rated: gen_loss = 2000*(1-0.95) = 100kW, cnv = 2000*0.02 = 40kW
+    # R_th chosen so rated operation reaches ~60-75% of alarm:
+    #   Stator: R=0.65 → 100*0.65 = +65°C → ~90°C (alarm@140)
+    #   Bearing: R=0.35 → rotor heat ~33kW → +12°C → ~55°C (alarm@85)
+    #   Air gap: R=0.55 → ~80°C
+    gen_stator: tuple = (0.65, 600, 35.0)    # ~90°C at rated (alarm@140)
+    gen_air: tuple = (0.55, 450, 30.0)       # ~80°C at rated
+    gen_bearing: tuple = (0.35, 900, 30.0)   # ~55°C at rated (alarm@85)
 
-    cnv_cabinet: tuple = (0.20, 500, 28.0)
-    cnv_water: tuple = (0.17, 300, 25.0)
+    cnv_cabinet: tuple = (0.28, 500, 28.0)   # ~39°C at rated
+    cnv_water: tuple = (0.22, 300, 25.0)     # ~34°C at rated
 
-    transformer: tuple = (0.70, 1200, 30.0)
+    transformer: tuple = (0.80, 1200, 30.0)  # ~46°C at rated
 
-    nacelle: tuple = (0.08, 1800, 25.0)
-    nac_cabinet: tuple = (0.75, 300, 28.0)   # alarm@45, trip@50
+    nacelle: tuple = (0.12, 1800, 25.0)      # ~30°C
+    nac_cabinet: tuple = (0.80, 300, 28.0)   # ~34°C (alarm@45)
 
-    rotor: tuple = (0.10, 600, 25.0)
-    hub_cabinet: tuple = (0.30, 300, 28.0)   # alarm@45, trip@50
+    rotor: tuple = (0.15, 600, 25.0)         # ~30°C
+    hub_cabinet: tuple = (0.35, 300, 28.0)   # ~33°C (alarm@45)
 
 
 class ThermalSystem:
