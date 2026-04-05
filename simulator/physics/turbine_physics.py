@@ -26,28 +26,67 @@ from simulator.physics.yaw_model import YawModel
 class TurbineSpec:
     """Configurable wind turbine specifications."""
 
-    rated_power_kw: float = 5000.0
-    rotor_diameter: float = 126.0
-    hub_height: float = 90.0
+    rated_power_kw: float = 2000.0
+    rotor_diameter: float = 70.65
+    hub_height: float = 64.0
     cut_in_speed: float = 3.0
-    rated_speed: float = 12.0
+    rated_speed: float = 13.0
     cut_out_speed: float = 25.0
 
-    gear_ratio: float = 100.0
+    # Z72: direct-drive PMSG, no gearbox (gear_ratio=1)
+    gear_ratio: float = 1.0
     generator_efficiency: float = 0.95
-    generator_poles: int = 4
-    nominal_voltage: float = 690.0
+    generator_poles: int = 60
+    nominal_voltage: float = 3500.0  # Z72 MV generator: 3.5kV
     air_density: float = 1.225
 
-    max_rotor_rpm: float = 15.0
-    optimal_tsr: float = 7.5
-    cp_max: float = 0.48
+    max_rotor_rpm: float = 22.5
+    optimal_tsr: float = 7.0
+    cp_max: float = 0.45
+
+    # Z72 protection setpoints
+    overspeed_software_rpm: float = 26.5
+    overspeed_hardware_rpm: float = 28.5
+    power_limit_5s_pct: float = 1.10   # 110% of rated
+    power_limit_10m_pct: float = 1.05  # 105% of rated
+    max_restarts_per_hour: int = 3
+
+    # Z72 pitch angles (degrees)
+    pitch_vane: float = 86.0      # feathered / emergency
+    pitch_startup: float = 30.0   # startup position
+    pitch_work: float = -1.0      # optimal production
+    pitch_emergency_rate: float = 5.0  # min deg/s for emergency pitch
+
+    # Z72 temperature thresholds (°C)
+    gen_stator_alarm: float = 140.0
+    gen_stator_trip: float = 150.0
+    gen_bearing_alarm: float = 85.0
+    gen_bearing_trip: float = 95.0
+    nacelle_cab_alarm: float = 45.0
+    nacelle_cab_trip: float = 50.0
+    rotor_cab_alarm: float = 45.0
+    rotor_cab_trip: float = 50.0
+    outside_temp_low: float = -25.0
+    outside_temp_high: float = 45.0
+
+    # Z72 yaw thresholds
+    yaw_pressure_trip: float = 150.0     # bar, very low
+    yaw_pressure_alarm: float = 170.0    # bar, low
+    yaw_pressure_normal: float = 210.0   # bar, high friction
+    cable_twist_limit: float = 2.5       # turns
+
+    # Z72 grid (60Hz system)
+    grid_frequency_nominal: float = 60.0
 
     curtailment_kw: Optional[float] = None
     power_curve: Optional[List[Tuple[float, float]]] = None
 
+    rotor_diameter_m: Optional[float] = None  # alias for session tracking
+
     def to_dict(self) -> dict:
-        return {k: getattr(self, k) for k in self.__dataclass_fields__}
+        d = {k: getattr(self, k) for k in self.__dataclass_fields__}
+        d['rotor_diameter_m'] = self.rotor_diameter
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "TurbineSpec":
@@ -55,23 +94,28 @@ class TurbineSpec:
 
 
 TURBINE_PRESETS: Dict[str, TurbineSpec] = {
-    "z72_5mw": TurbineSpec(),
+    # Default: Z72-2000-MV (Harakosan, direct-drive PMSG, 60Hz)
+    "z72_2mw": TurbineSpec(),
     "vestas_v90_3mw": TurbineSpec(
         rated_power_kw=3000, rotor_diameter=90, hub_height=80,
         cut_in_speed=4.0, rated_speed=13.0, cut_out_speed=25.0,
-        gear_ratio=104.5, max_rotor_rpm=16.7, optimal_tsr=8.0,
+        gear_ratio=104.5, generator_poles=4, nominal_voltage=690.0,
+        max_rotor_rpm=16.7, optimal_tsr=8.0,
+        grid_frequency_nominal=60.0,
     ),
     "sg_8mw": TurbineSpec(
         rated_power_kw=8000, rotor_diameter=167, hub_height=92,
         cut_in_speed=3.0, rated_speed=12.0, cut_out_speed=25.0,
-        gear_ratio=1.0, generator_poles=300, max_rotor_rpm=10.6,
-        optimal_tsr=9.0, cp_max=0.49,
+        gear_ratio=1.0, generator_poles=300, nominal_voltage=690.0,
+        max_rotor_rpm=10.6, optimal_tsr=9.0, cp_max=0.49,
+        grid_frequency_nominal=50.0,
     ),
     "goldwind_2.5mw": TurbineSpec(
         rated_power_kw=2500, rotor_diameter=121, hub_height=90,
         cut_in_speed=3.0, rated_speed=10.3, cut_out_speed=22.0,
-        gear_ratio=1.0, generator_poles=96, max_rotor_rpm=11.5,
-        optimal_tsr=8.5, cp_max=0.47,
+        gear_ratio=1.0, generator_poles=96, nominal_voltage=690.0,
+        max_rotor_rpm=11.5, optimal_tsr=8.5, cp_max=0.47,
+        grid_frequency_nominal=50.0,
     ),
 }
 
@@ -145,8 +189,8 @@ class TurbinePhysicsModel:
 
         self.tur_state = 1
         self.rotor_speed = 0.0
-        self.pitch_angle = 90.0
-        self._pitch_bl = [90.0, 90.0, 90.0]
+        self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
+        self._pitch_bl = [self.spec.pitch_vane] * 3
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -164,9 +208,11 @@ class TurbinePhysicsModel:
         self._grid_phase = self._rng.uniform(0.0, math.tau)
         self._grid_local_phase = self._rng.uniform(0.0, math.tau)
         self._grid_voltage_ref = self.spec.nominal_voltage + self._individuality["grid_voltage_bias"]
-        self._grid_frequency_ref = 50.0
+        self._grid_frequency_ref = self.spec.grid_frequency_nominal
         self._grid_normal_trip_accum = 0.0
         self._grid_emergency_trip_accum = 0.0
+        # Z72: restart tracking (max restarts per hour)
+        self._restart_timestamps: List[float] = []
         self._pitch_offset_bl = [self._rng.normal(0, 0.12) for _ in range(3)]
         self._pitch_stiction = [0.0, 0.0, 0.0]
         self._sensor_bias: Dict[str, float] = {}
@@ -284,8 +330,13 @@ class TurbinePhysicsModel:
         self._calc_pitch(effective_wind_speed, is_producing, dt)
         self._pitch_bl[0] += fault_physics["blade1_pitch_bias"]
 
+        # For direct-drive PMSG, the converter outputs grid frequency regardless of rotor speed
         mechanical_freq = (gen_speed * s.generator_poles / 2) / 60.0 if (is_producing or is_starting) else 0.0
-        target_freq = self._grid_frequency_ref if is_producing else mechanical_freq if is_starting else 0.0
+        if s.gear_ratio <= 1.0:
+            # Direct-drive: converter always outputs grid frequency when producing
+            target_freq = self._grid_frequency_ref if (is_producing or is_starting) else 0.0
+        else:
+            target_freq = self._grid_frequency_ref if is_producing else mechanical_freq if is_starting else 0.0
         target_voltage = self._grid_voltage_ref if (is_producing or is_starting) else 0.0
         elec_alpha = 1.0 - math.exp(-dt / (1.0 if is_producing else 0.75))
         self._grid_frequency += (target_freq - self._grid_frequency) * elec_alpha
@@ -422,15 +473,29 @@ class TurbinePhysicsModel:
 
         return self._apply_sensor_model(output)
 
+    def _max_restarts_exceeded(self) -> bool:
+        """Z72: Check if max restarts per hour has been exceeded."""
+        cutoff = self._sim_time - 3600.0
+        self._restart_timestamps = [t for t in self._restart_timestamps if t > cutoff]
+        return len(self._restart_timestamps) >= self.spec.max_restarts_per_hour
+
     def _update_state(self, wind_speed: float, dt: float):
         s = self.spec
         st = self.tur_state
         wind_ok = s.cut_in_speed <= wind_speed <= s.cut_out_speed
         strong_wind = wind_speed >= s.cut_in_speed + 0.6
-        sync_ok = (
-            abs(self._grid_frequency_ref - ((self.rotor_speed * s.gear_ratio * s.generator_poles / 2) / 60.0 if self.rotor_speed > 0 else 0.0)) < 0.25
-            and abs(self._grid_voltage_ref - self._grid_voltage) < 25.0
-        )
+        # Z72 direct-drive: converter decouples gen freq from grid freq.
+        # For direct-drive (gear_ratio <= 1), sync is based on rotor speed threshold.
+        # For geared turbines, sync requires frequency/voltage matching.
+        if s.gear_ratio <= 1.0:
+            # Direct-drive: converter ready when rotor reaches ~6 RPM (Z72 OEM spec)
+            sync_ok = self.rotor_speed >= 6.0
+        else:
+            gen_mech_freq = (self.rotor_speed * s.gear_ratio * s.generator_poles / 2) / 60.0 if self.rotor_speed > 0 else 0.0
+            sync_ok = (
+                abs(self._grid_frequency_ref - gen_mech_freq) < 0.25
+                and abs(self._grid_voltage_ref - self._grid_voltage) < 25.0
+            )
 
         self._state_timer += dt
         self._restart_block_timer = max(0.0, self._restart_block_timer - dt)
@@ -438,6 +503,12 @@ class TurbinePhysicsModel:
             self._wind_ready_timer += dt
         else:
             self._wind_ready_timer = 0.0
+
+        # Z72: Software overspeed protection (Event 041 / 027)
+        if self.rotor_speed > s.overspeed_software_rpm and st not in (7,):
+            self._request_stop("emergency", "overspeed_software")
+        if self.rotor_speed > s.overspeed_hardware_rpm and st not in (7,):
+            self._request_stop("emergency", "overspeed_hardware")
 
         if self.operator_stop or self.service_mode:
             self._request_stop("normal", "operator")
@@ -449,18 +520,23 @@ class TurbinePhysicsModel:
             st = self.tur_state
 
         if self.operator_start_pending and st in (1, 2, 3) and wind_ok and self._restart_block_timer <= 0.0:
-            self.operator_start_pending = False
-            self._enter_state(8 if st == 3 else 4)
-            st = self.tur_state
+            if not self._max_restarts_exceeded():
+                self.operator_start_pending = False
+                self._restart_timestamps.append(self._sim_time)
+                self._enter_state(8 if st == 3 else 4)
+                st = self.tur_state
 
         if st == 1:
             self._sync_progress = 0.0
-            if wind_ok:
+            if wind_ok and not self._max_restarts_exceeded():
                 self._enter_state(2)
         elif st == 2:
             if not wind_ok:
                 self._enter_state(1)
+            elif self._max_restarts_exceeded():
+                pass  # Z72: stay in standby if max restarts exceeded
             elif not self.operator_stop and self._wind_ready_timer >= 10.0 + self._individuality["start_delay_offset"] and self._restart_block_timer <= 0.0:
+                self._restart_timestamps.append(self._sim_time)
                 self._enter_state(4)
         elif st == 3:
             self._restart_wait_timer += dt
@@ -469,18 +545,24 @@ class TurbinePhysicsModel:
                 + self._individuality["restart_delay_offset"]
                 + max(0.0, self._individuality["grid_reconnect_delay"])
             )
-            if self._restart_wait_timer >= restart_delay and wind_ok and not self.operator_stop and not self.service_mode and self._restart_block_timer <= 0.0:
+            if self._max_restarts_exceeded():
+                # Z72: max restarts exceeded → go to Shutdown (state 1)
+                self._enter_state(1)
+            elif self._restart_wait_timer >= restart_delay and wind_ok and not self.operator_stop and not self.service_mode and self._restart_block_timer <= 0.0:
                 self._enter_state(2)
         elif st == 4:
+            # Z72 Pre-Production: converter to standby, yaw to auto
             if not wind_ok:
                 self._request_stop("normal", "low_wind")
             elif self._state_timer >= 3.0:
                 self._enter_state(5)
         elif st == 5:
+            # Z72 Start Production: blades to startup (30°), then to work when rotor > 3.5 rpm
             self._sync_progress = min(1.0, self._state_timer / 7.0)
             if not wind_ok:
                 self._request_stop("normal", "low_wind")
-            elif self.rotor_speed >= max(2.5, self.rotor_model.rated_rpm * 0.35) and self._state_timer >= 7.0 and sync_ok:
+            # Z72: rotor > 3.5 rpm → blades move to work; rotor > 6.0 rpm → converter production
+            elif self.rotor_speed >= 3.5 and self._state_timer >= 7.0 and sync_ok:
                 self._enter_state(6)
         elif st == 6:
             self._sync_progress = 1.0
@@ -489,42 +571,63 @@ class TurbinePhysicsModel:
             elif wind_speed > s.cut_out_speed:
                 self._request_stop("emergency", "cut_out")
         elif st == 7:
+            # Z72 Emergency Stop: blades go to vane (86°) via emergency pitch
             if self.rotor_speed < 0.3 and self._state_timer >= 4.0:
                 self._stop_requested = False
                 self._enter_state(3)
         elif st == 8:
-            if wind_ok and self._restart_block_timer <= 0.0:
+            if wind_ok and self._restart_block_timer <= 0.0 and not self._max_restarts_exceeded():
+                self._restart_timestamps.append(self._sim_time)
                 self._enter_state(4)
             else:
                 self._enter_state(3)
         elif st == 9:
+            # Z72 Normal Stop: blades to vane via servo
             if self.rotor_speed < 0.3 and self._state_timer >= 12.0:
                 self._stop_requested = False
                 self._enter_state(1)
 
     def _calc_pitch(self, wind_speed: float, is_producing: bool, dt: float):
+        """Z72 pitch control with real setpoints from OEM manual.
+
+        Angles:  vane=86°, startup=30°, work=-1°
+        Emergency pitch: battery-driven DC motor, min 5°/s
+        Normal servo: DC servo motor per blade
+        """
         s = self.spec
         max_rate = 8.0 * self._individuality["pitch_response_scale"]
 
         if self.tur_state == 7:
-            target = 88.0
-            max_rate = 18.0
+            # Z72 Emergency: batteries drive blades to vane (86°)
+            target = s.pitch_vane
+            max_rate = max(s.pitch_emergency_rate, 18.0)  # emergency pitch speed
         elif self.tur_state == 9:
-            target = 90.0
+            # Z72 Normal Stop: servo drives blades to vane (86°)
+            target = s.pitch_vane
             max_rate = 10.0
         elif self.tur_state == 4:
-            target = 72.0
+            # Z72 Pre-Production: blades stay near vane, preparing
+            target = s.pitch_vane - 10.0  # ~76°, slight move from vane
             max_rate = 6.0
         elif self.tur_state == 5:
-            target = max(2.0, 65.0 - self._sync_progress * 60.0)
+            # Z72 Start Production: blades go to startup (30°), then to work as rotor spins up
+            if self._sync_progress < 0.4:
+                target = s.pitch_startup  # 30°
+            else:
+                # Transition from startup to work position
+                target = s.pitch_startup - self._sync_progress * (s.pitch_startup - s.pitch_work)
             max_rate = 7.5
         elif not is_producing:
-            target = 90.0
+            # Z72 Standby/Shutdown: blades at vane
+            target = s.pitch_vane
         elif wind_speed < s.rated_speed:
-            target = 0.0
+            # Z72 Region 2 (partial load): pitch at work position for max Cp
+            target = s.pitch_work  # -1°
         else:
+            # Z72 Region 3 (full load): pitch to limit power
             excess_wind = wind_speed - s.rated_speed
-            target = min(30.0, excess_wind * 2.0 + excess_wind ** 2 * 0.1)
+            target = max(s.pitch_work, s.pitch_work + excess_wind * 2.0 + excess_wind ** 2 * 0.1)
+            target = min(30.0, target)
 
         active_curtail = self.curtailment_kw if self.curtailment_kw is not None else s.curtailment_kw
         if is_producing and active_curtail is not None and active_curtail < s.rated_power_kw:
@@ -609,8 +712,8 @@ class TurbinePhysicsModel:
     def reset(self):
         self.tur_state = 1
         self.rotor_speed = 0.0
-        self.pitch_angle = 90.0
-        self._pitch_bl = [90.0, 90.0, 90.0]
+        self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
+        self._pitch_bl = [self.spec.pitch_vane] * 3
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -628,7 +731,7 @@ class TurbinePhysicsModel:
         self._grid_phase = self._rng.uniform(0.0, math.tau)
         self._grid_local_phase = self._rng.uniform(0.0, math.tau)
         self._grid_voltage_ref = self.spec.nominal_voltage
-        self._grid_frequency_ref = 50.0
+        self._grid_frequency_ref = self.spec.grid_frequency_nominal
         self._grid_normal_trip_accum = 0.0
         self._grid_emergency_trip_accum = 0.0
         self.operator_stop = False
@@ -667,7 +770,7 @@ class TurbinePhysicsModel:
                                grid_voltage_ref: Optional[float] = None):
         self._grid_phase = (self._grid_phase + dt * 0.03) % math.tau
         self._grid_local_phase = (self._grid_local_phase + dt * 0.05) % math.tau
-        freq_base = 50.0 + 0.08 * math.sin(self._grid_phase) + self._rng.normal(0.0, 0.01)
+        freq_base = self.spec.grid_frequency_nominal + 0.08 * math.sin(self._grid_phase) + self._rng.normal(0.0, 0.01)
         volt_base = self.spec.nominal_voltage + self._individuality["grid_voltage_bias"] + 6.0 * math.sin(self._grid_phase * 0.7 + 0.4) + self._rng.normal(0.0, 0.8)
         farm_freq = grid_frequency_ref if grid_frequency_ref is not None else freq_base
         farm_volt = grid_voltage_ref if grid_voltage_ref is not None else volt_base
@@ -685,7 +788,7 @@ class TurbinePhysicsModel:
         self._grid_voltage_ref = farm_volt + local_volt
 
     def _get_grid_derate(self) -> float:
-        freq_dev = abs(self._grid_frequency_ref - 50.0)
+        freq_dev = abs(self._grid_frequency_ref - self.spec.grid_frequency_nominal)
         volt_dev = abs(self._grid_voltage_ref - self.spec.nominal_voltage)
         sensitivity = self._individuality["grid_derate_sensitivity"]
         freq_scale = 1.0 if freq_dev < 0.15 else max(0.72, 1.0 - (freq_dev - 0.15) * 0.45 * sensitivity)

@@ -15,17 +15,18 @@ class YawModel:
         self.yaw_angle = 270.0
         self.cable_windup = 0.0
 
-        self.dead_band = 8.0
-        self.yaw_rate = 0.4
-        self.activation_delay = 60.0
-        self.post_hold_time = 30.0
-        self.unwind_threshold = 2.5
+        # Z72 OEM values
+        self.dead_band = 15.0             # Z72: auto yaw start outside [-15°, +15°]
+        self.yaw_rate = 0.5               # Z72: nominal yaw speed 0.5 deg/s
+        self.activation_delay = 60.0      # seconds before yaw activates
+        self.post_hold_time = 30.0        # seconds to hold after alignment within [-2°, +2°]
+        self.unwind_threshold = 2.0       # Z72: cable twist > 2 turns → unwind
 
         self._error_timer = 0.0
         self._hold_timer = 0.0
         self._is_yawing = False
         self._is_unwinding = False
-        self._brake_pressure = 160.0
+        self._brake_pressure = 210.0      # Z72: high friction = 210 bar
         self._yaw_command_filter = 0.0
 
     def step(self, wind_direction: float, is_producing: bool, dt: float) -> Dict[str, float]:
@@ -35,7 +36,7 @@ class YawModel:
             self._is_yawing = False
             self._error_timer = 0.0
             self._yaw_command_filter = 0.0
-            self._brake_pressure = min(180.0, self._brake_pressure + 3.0 * dt)
+            self._brake_pressure = min(210.0, self._brake_pressure + 3.0 * dt)  # Z72: 210 bar = brakes dropped
             return self._output(error)
 
         if abs(self.cable_windup) > self.unwind_threshold:
@@ -44,7 +45,7 @@ class YawModel:
             unwind_dir = -1.0 if self.cable_windup > 0 else 1.0
             self.yaw_angle = (self.yaw_angle + unwind_dir * self.yaw_rate * dt) % 360
             self.cable_windup += unwind_dir * self.yaw_rate * dt / 360
-            self._brake_pressure = max(80.0, self._brake_pressure - 5.0 * dt)
+            self._brake_pressure = max(20.0, self._brake_pressure - 8.0 * dt)  # Z72: 20 bar = low friction
             if abs(self.cable_windup) < 0.3:
                 self._is_unwinding = False
             return self._output(error, yawing=True)
@@ -69,10 +70,10 @@ class YawModel:
             self.yaw_angle = (self.yaw_angle + step_angle) % 360
             self.cable_windup += step_angle / 360
             self.cable_windup = max(-4.0, min(4.0, self.cable_windup))
-            self._brake_pressure = max(80.0, self._brake_pressure - 5.0 * dt)
+            self._brake_pressure = max(20.0, self._brake_pressure - 8.0 * dt)  # Z72: lifted for yaw
         else:
             self._yaw_command_filter *= max(0.0, 1.0 - dt / 2.0)
-            self._brake_pressure = min(180.0, self._brake_pressure + 3.0 * dt)
+            self._brake_pressure = min(210.0, self._brake_pressure + 3.0 * dt)  # Z72: 210 bar = dropped
 
         return self._output(error, self._is_yawing)
 

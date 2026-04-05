@@ -38,11 +38,21 @@ class ThermalElement:
 
 @dataclass
 class ThermalSystemConfig:
-    """Calibrated thermal parameters for a 5MW turbine."""
+    """Calibrated thermal parameters for Z72-2000-MV turbine.
 
-    gen_stator: tuple = (0.24, 600, 35.0)
-    gen_air: tuple = (0.32, 450, 30.0)
-    gen_bearing: tuple = (0.70, 900, 30.0)
+    Z72 OEM thresholds:
+      Gen stator: alarm 140°C, trip 150°C
+      Gen bearing: alarm 85°C, trip 95°C
+      Rotor cabinet: alarm 45°C, trip 50°C
+      Nacelle cabinet: alarm 45°C, trip 50°C
+    Tuned so normal operation reaches ~60-80% of alarm thresholds.
+    """
+
+    # (thermal_resistance, time_constant_s, initial_temp)
+    # Z72: direct-drive PMSG → stator thermal R lower (better cooling)
+    gen_stator: tuple = (0.035, 600, 35.0)   # Stator: alarm@140, trip@150
+    gen_air: tuple = (0.045, 450, 30.0)      # Air gap
+    gen_bearing: tuple = (0.025, 900, 30.0)  # Main bearing: alarm@85, trip@95
 
     cnv_cabinet: tuple = (0.20, 500, 28.0)
     cnv_water: tuple = (0.17, 300, 25.0)
@@ -50,10 +60,10 @@ class ThermalSystemConfig:
     transformer: tuple = (0.70, 1200, 30.0)
 
     nacelle: tuple = (0.08, 1800, 25.0)
-    nac_cabinet: tuple = (0.75, 300, 28.0)
+    nac_cabinet: tuple = (0.75, 300, 28.0)   # alarm@45, trip@50
 
     rotor: tuple = (0.10, 600, 25.0)
-    hub_cabinet: tuple = (0.30, 300, 28.0)
+    hub_cabinet: tuple = (0.30, 300, 28.0)   # alarm@45, trip@50
 
 
 class ThermalSystem:
