@@ -97,14 +97,16 @@ class WindFarmSimulator:
         )
         farm_wind = max(0, base_wind + turb_component)
 
-        fault_modifiers = self.fault_engine.step(dt=time_step)
+        # FaultEngine.step() advances severity progression and alarm tracking.
+        # Tag offsets are no longer used — all fault effects flow through
+        # _get_fault_physics() inside each TurbinePhysicsModel.
+        self.fault_engine.step(dt=time_step)
 
         readings = []
         for tid, model in self.turbines.items():
             idx = int(tid[2:]) - 1
             local_wind = self._per_turbine_wind.get_local_wind(farm_wind, idx)
 
-            model.fault_modifiers = fault_modifiers.get(tid, {})
             model.active_faults = [
                 {
                     "scenario_id": fault.scenario_id,
