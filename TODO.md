@@ -23,6 +23,12 @@
 - [x] Sensor noise / drift / stuck / quantization
 - [x] Grid frequency / voltage model
 - [x] Per-turbine grid derate / trip / reconnect difference
+- [x] Cp(λ,β) aerodynamic surface model with thrust coefficient and dynamic stall
+- [x] Multi-stage drivetrain: gearbox stages, bearing separation, torsional modes, brake dynamics
+- [x] Cooling system: pump/fan state, coolant flow/pressure, fouling propagation
+- [x] Wind event propagation: gust front, ramp, direction shift across farm
+- [x] Farm layout with turbine positions and direction-aware wake model
+- [x] Fault physics path unified — all 11 scenarios through physical causes with load coupling
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -44,6 +50,8 @@
 - [x] History data page
 - [x] Event markers, filters, search, details, and focus windows in History
 - [x] CSV export entry
+- [x] Dashboard default to summary view
+- [x] Turbine detail compact layout: metrics bar + side-by-side subsystem/trend
 
 ## In Progress Quality Level
 
@@ -51,9 +59,10 @@ These parts are implemented, but still first-generation models:
 - [x] Aerodynamics: Cp(λ,β) surface, thrust coefficient, dynamic stall
 - [x] Drivetrain: multi-stage gearbox, bearing separation, torsional modes, brake dynamics
 - [x] Cooling system: pump/fan state, coolant flow/pressure, fouling propagation
+- [x] Wind-event propagation across the farm
+- [x] Fault physics unified path with operating-condition coupling
 - [ ] Vibration feature / frequency-band realism
 - [ ] Advanced converter / electrical control detail
-- [ ] Wind-event propagation across the farm
 
 ## Next Priorities
 
