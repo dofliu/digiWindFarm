@@ -49,6 +49,29 @@ export interface TurbineData {
   igctWaterPres2?: number; // bar
   igctWaterTemp?: number; // °C
 
+  // ── WCNV — Electrical Response ──
+  reactivePower?: number; // kvar
+  powerFactor?: number;
+  apparentPower?: number; // kVA
+  freqWattDerate?: number;
+  inertiaPower?: number; // kW
+  converterMode?: number;
+  rideThroughBand?: number;
+
+  // ── WVIB — Vibration Spectral Bands ──
+  vibBand1pX?: number; // mm/s
+  vibBand1pY?: number;
+  vibBand3pX?: number;
+  vibBand3pY?: number;
+  vibBandGearX?: number;
+  vibBandGearY?: number;
+  vibBandHfX?: number;
+  vibBandHfY?: number;
+  vibBandBbX?: number;
+  vibBandBbY?: number;
+  vibCrestFactor?: number;
+  vibKurtosis?: number;
+
   // ── WGDC — Transformer ──
   transformerTemp?: number; // °C
 

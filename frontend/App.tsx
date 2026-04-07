@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useMockTurbineData } from './hooks/useMockTurbineData';
 import { useRealtimeData } from './hooks/useRealtimeData';
-import { useMockMaintenanceData } from './hooks/useMockMaintenanceData';
+import { useMaintenanceData } from './hooks/useMaintenanceData';
 import { useI18n } from './hooks/useI18n';
 import { type TurbineData, TurbineStatus, DataSourceType, type WorkOrder, type Technician, WorkOrderStatus } from './types';
 import FarmOverview from './components/FarmOverview';
@@ -38,7 +38,7 @@ const App: React.FC = () => {
 
   const useMock = settings.dataSource === DataSourceType.MOCK;
   const { turbines, updateTurbineStatus } = useMock ? mockData : realtimeData;
-  const maintenance = useMockMaintenanceData();
+  const maintenance = useMaintenanceData();
   const { workOrders } = maintenance;
 
   const [selectedTurbine, setSelectedTurbine] = useState<TurbineData | null>(null);

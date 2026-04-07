@@ -22,12 +22,28 @@ SCADA_CSV_COLUMNS = [
     "WROT_RotTmp", "WROT_RotCabTmp", "WROT_LckngPnPos", "WROT_RotLckd", "WROT_SrvcBrkAct",
     "WCNV_CnvCabinTmp", "WCNV_CnvDClVtg", "WCNV_CnvGdPwrAt", "WCNV_CnvGnFrq",
     "WCNV_CnvGnPwr", "WCNV_IGCTWtrCond", "WCNV_IGCTWtrPres1", "WCNV_IGCTWtrPres2", "WCNV_IGCTWtrTmp",
+    "WCNV_ReactPwr", "WCNV_PwrFactor", "WCNV_AppPwr",
+    "WCNV_FreqWattDerate", "WCNV_InertiaPwr", "WCNV_CnvMode", "WCNV_RtBand",
     "WGDC_TrfCoreTmp",
     "WMET_WSpeedNac", "WMET_WDirAbs", "WMET_TmpOutside",
     "WNAC_NacTmp", "WNAC_NacCabTmp", "WNAC_VibMsNacXDir", "WNAC_VibMsNacYDir",
     "WYAW_YwVn1AlgnAvg5s", "WYAW_YwBrkHyPrs", "WYAW_CabWup",
+    "WVIB_Band1pX", "WVIB_Band1pY", "WVIB_Band3pX", "WVIB_Band3pY",
+    "WVIB_BandGearX", "WVIB_BandGearY", "WVIB_BandHfX", "WVIB_BandHfY",
+    "WVIB_BandBbX", "WVIB_BandBbY", "WVIB_CrestFactor", "WVIB_Kurtosis",
     "WSRV_SrvOn", "MBUS_Contact2",
 ]
+
+# Event severity mapping for grouping
+EVENT_SEVERITY = {
+    "fault": "critical",
+    "fault_lifecycle": "warning",
+    "grid": "warning",
+    "operator": "info",
+    "state": "info",
+    "wind": "info",
+    "config": "info",
+}
 
 
 @router.get("/snapshot")
@@ -60,6 +76,94 @@ async def export_history(
 
     # JSON: include expanded scada dict
     return {"turbineId": turbine_id, "count": len(rows), "data": rows}
+
+
+@router.get("/events")
+async def export_events(
+    turbine_id: Optional[str] = Query(None, description="Turbine ID filter"),
+    start: Optional[str] = Query(None, description="ISO datetime start"),
+    end: Optional[str] = Query(None, description="ISO datetime end"),
+    event_type: Optional[str] = Query(None, description="Filter by event type"),
+    limit: int = Query(5000, ge=1, le=50000),
+    format: str = Query("json", description="json or csv"),
+):
+    """Export history events as JSON or CSV with severity grouping.
+
+    Supports filtering by turbine_id, time range, and event_type.
+    Each event includes a severity level derived from event_type.
+    """
+    broker = get_broker()
+    events = broker.get_history_events(turbine_id, start, end, limit)
+
+    # Apply event_type filter if specified
+    if event_type:
+        events = [e for e in events if e.get("event_type") == event_type]
+
+    # Add severity grouping to each event
+    for ev in events:
+        et = ev.get("event_type", "")
+        ev["severity"] = EVENT_SEVERITY.get(et, "info")
+        # Upgrade severity for trip events
+        if et == "fault" and ev.get("title", "").lower().startswith("automatic fault trip"):
+            ev["severity"] = "critical"
+        elif et == "fault_lifecycle":
+            payload = ev.get("payload", {})
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except (json.JSONDecodeError, TypeError):
+                    payload = {}
+            phase = payload.get("toPhase") or payload.get("phase", "")
+            if phase in ("critical", "advanced"):
+                ev["severity"] = "critical"
+            elif phase == "developing":
+                ev["severity"] = "warning"
+            else:
+                ev["severity"] = "info"
+
+    if format == "csv":
+        return _export_events_csv(events)
+
+    return {
+        "count": len(events),
+        "data": events,
+        "severity_summary": _severity_summary(events),
+    }
+
+
+def _severity_summary(events: list) -> dict:
+    """Count events by severity level."""
+    summary = {"critical": 0, "warning": 0, "info": 0}
+    for ev in events:
+        sev = ev.get("severity", "info")
+        summary[sev] = summary.get(sev, 0) + 1
+    return summary
+
+
+def _export_events_csv(events: list) -> StreamingResponse:
+    """Export events as CSV."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    cols = ["timestamp", "end_timestamp", "turbine_id", "event_type",
+            "severity", "source", "title", "detail"]
+    writer.writerow(cols)
+    for ev in events:
+        writer.writerow([
+            ev.get("timestamp", ""),
+            ev.get("end_timestamp", ""),
+            ev.get("turbine_id", ""),
+            ev.get("event_type", ""),
+            ev.get("severity", ""),
+            ev.get("source", ""),
+            ev.get("title", ""),
+            ev.get("detail", ""),
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=events_export.csv"},
+    )
 
 
 def _export_csv(turbine_id: str, rows: list) -> StreamingResponse:

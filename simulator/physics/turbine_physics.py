@@ -22,6 +22,8 @@ from simulator.physics.vibration_model import VibrationModel
 from simulator.physics.yaw_model import YawModel
 from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
 from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
+from simulator.physics.electrical_model import ElectricalModel, ElectricalSpec
+from simulator.physics.vibration_spectral import SpectralVibrationModel
 
 
 @dataclass
@@ -203,6 +205,18 @@ class TurbinePhysicsModel:
         self.cooling = CoolingSystem(
             spec=CoolingSpec(),
             individuality_scale=self._individuality["cooling_scale"],
+        )
+
+        # Electrical response model (frequency-watt, reactive power, ride-through)
+        elec_spec = ElectricalSpec(
+            apparent_power_max_mva=self.spec.rated_power_kw / 1000.0 * 1.15,
+        )
+        self.electrical = ElectricalModel(spec=elec_spec, individuality=self._individuality)
+
+        # Spectral vibration model (frequency-band decomposition)
+        self.vib_spectral = SpectralVibrationModel(
+            seed=_seed,
+            gear_ratio=self.spec.gear_ratio,
         )
 
         self.tur_state = 1
@@ -397,15 +411,41 @@ class TurbinePhysicsModel:
         gen_freq = self._grid_frequency if (is_producing or is_starting) else 0.0
         gen_voltage = self._grid_voltage if (is_producing or is_starting) else 0.0
         gen_power_kw = max(0.0, gen_power_kw - drivetrain_loss_kw)
-        gen_current = (
-            gen_power_kw * 1000 / (gen_voltage * math.sqrt(3) * 0.95)
-            if gen_voltage > 0 and gen_power_kw > 0 else 0.0
-        )
-
         cnv_gn_pwr = gen_power_kw
         converter_eff = (0.985 if is_producing else 0.95) - (self._individuality["converter_loss_scale"] - 1.0) * 0.02
         converter_eff = max(0.90, min(0.992, converter_eff))
         cnv_gd_pwr = gen_power_kw * converter_eff
+
+        # Electrical response model: frequency-watt, reactive power, ride-through
+        elec_out = self.electrical.step(
+            gen_power_kw=cnv_gd_pwr,
+            grid_frequency_hz=self._grid_frequency_ref,
+            grid_voltage_v=self._grid_voltage_ref,
+            nominal_freq_hz=s.grid_frequency_nominal,
+            nominal_voltage_v=s.nominal_voltage,
+            rated_power_kw=s.rated_power_kw,
+            dt=dt,
+            is_producing=is_producing,
+            is_starting=is_starting,
+        )
+
+        # Apply frequency-watt derate to grid-side power
+        if is_producing:
+            cnv_gd_pwr = elec_out["active_power_kw"]
+
+        # Check ride-through trip
+        elec_trip = self.electrical.should_trip()
+        if elec_trip and self.tur_state not in (7, 9, 1):
+            self.cmd_emergency_stop(cause=f"ride_through:{elec_trip}")
+
+        reactive_power_kvar = elec_out["reactive_power_kvar"]
+        power_factor = elec_out["power_factor"]
+        apparent_power_kva = elec_out["apparent_power_kva"]
+
+        gen_current = (
+            apparent_power_kva * 1000 / (gen_voltage * math.sqrt(3))
+            if gen_voltage > 0 and apparent_power_kva > 0 else 0.0
+        )
         if is_producing:
             cnv_dc_vtg = 1100.0
         elif is_starting:
@@ -468,6 +508,17 @@ class TurbinePhysicsModel:
             vib_x += 1.30 + abs(self._rng.normal(0, 0.45))
             vib_y += 1.10 + abs(self._rng.normal(0, 0.40))
 
+        # Spectral vibration bands (frequency decomposition + fault signatures)
+        vib_bands = self.vib_spectral.step(
+            rotor_speed_rpm=self.rotor_speed,
+            wind_speed=effective_wind_speed,
+            power_kw=gen_power_kw,
+            rated_power_kw=s.rated_power_kw,
+            turbulence=0.1,
+            dt=dt,
+            active_faults=self.active_faults,
+        )
+
         # IGCT water pressure now driven by cooling system pump (#29)
         water_pres = self.cooling.water_loop.pressure_bar
         if is_producing:
@@ -527,6 +578,29 @@ class TurbinePhysicsModel:
             "WYAW_CabWup": round(yaw_out["cable_windup"], 2),
             "WSRV_SrvOn": 1.0 if self.service_mode else 0.0,
             "MBUS_Contact2": 1.0 if self.local_control else 0.0,
+            # ── Electrical response tags ──
+            "WCNV_ReactPwr": round(reactive_power_kvar, 2),
+            "WCNV_PwrFactor": round(power_factor, 4),
+            "WCNV_AppPwr": round(apparent_power_kva, 2),
+            "WCNV_FreqWattDerate": round(elec_out["freq_watt_derate"], 4),
+            "WCNV_InertiaPwr": round(elec_out["inertia_power_kw"], 2),
+            "WCNV_CnvMode": float({"idle": 0, "starting": 1, "normal": 2,
+                                    "freq_response": 3, "voltage_support": 4,
+                                    "ride_through": 5}.get(elec_out["converter_mode"], 0)),
+            "WCNV_RtBand": float(elec_out["ride_through_band"]),
+            # ── Vibration spectral band tags ──
+            "WVIB_Band1pX": round(vib_bands.band_1p_x, 4),
+            "WVIB_Band1pY": round(vib_bands.band_1p_y, 4),
+            "WVIB_Band3pX": round(vib_bands.band_3p_x, 4),
+            "WVIB_Band3pY": round(vib_bands.band_3p_y, 4),
+            "WVIB_BandGearX": round(vib_bands.band_gear_x, 4),
+            "WVIB_BandGearY": round(vib_bands.band_gear_y, 4),
+            "WVIB_BandHfX": round(vib_bands.band_hf_x, 4),
+            "WVIB_BandHfY": round(vib_bands.band_hf_y, 4),
+            "WVIB_BandBbX": round(vib_bands.band_bb_x, 4),
+            "WVIB_BandBbY": round(vib_bands.band_bb_y, 4),
+            "WVIB_CrestFactor": round(vib_bands.crest_factor, 3),
+            "WVIB_Kurtosis": round(vib_bands.kurtosis, 3),
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -810,6 +884,7 @@ class TurbinePhysicsModel:
         self._sensor_last.clear()
         self.drivetrain.reset()
         self.cooling.reset()
+        self.electrical.reset()
 
     def _enter_state(self, state: int):
         self.tur_state = state
@@ -912,9 +987,13 @@ class TurbinePhysicsModel:
         return None
 
     def _apply_sensor_model(self, output: Dict[str, float]) -> Dict[str, float]:
+        # Tags that should not be filtered through the sensor model
+        _integer_tags = {"WTUR_TurSt", "WCNV_CnvMode", "WCNV_RtBand",
+                         "WROT_RotLckd", "WROT_SrvcBrkAct", "WROT_LckngPnPos",
+                         "WSRV_SrvOn", "MBUS_Contact2"}
         sensorized: Dict[str, float] = {}
         for tag, value in output.items():
-            if tag == "WTUR_TurSt":
+            if tag in _integer_tags:
                 sensorized[tag] = round(value)
                 continue
             cfg = self._get_sensor_config(tag)
@@ -941,6 +1020,14 @@ class TurbinePhysicsModel:
             return {"noise": 0.18, "drift": 0.002, "bias_limit": 1.5, "resolution": 0.1, "stuck_prob": 0.0002, "min": -40.0, "max": 180.0}
         if tag.startswith("WCNV_IGCTWtrPres"):
             return {"noise": 0.02, "drift": 0.0005, "bias_limit": 0.15, "resolution": 0.01, "stuck_prob": 0.00015, "min": 0.0, "max": 10.0}
+        # Electrical response tags — small noise, no stuck
+        if tag == "WCNV_PwrFactor":
+            return {"noise": 0.003, "drift": 0.0001, "bias_limit": 0.01, "resolution": 0.001, "stuck_prob": 0.0, "min": -1.0, "max": 1.0}
+        if tag in ("WCNV_FreqWattDerate",):
+            return {"noise": 0.002, "drift": 0.0001, "bias_limit": 0.005, "resolution": 0.001, "stuck_prob": 0.0, "min": 0.0, "max": 1.0}
+        # Vibration spectral bands — similar to main vibration
+        if tag.startswith("WVIB_Band") or tag.startswith("WVIB_Crest") or tag.startswith("WVIB_Kurt"):
+            return {"noise": 0.005, "drift": 0.0003, "bias_limit": 0.05, "resolution": 0.001, "stuck_prob": 0.0001, "min": 0.0, "max": 30.0}
         if "Tmp" in tag:
             return {"noise": 0.12, "drift": 0.0015, "bias_limit": 1.0, "resolution": 0.1, "stuck_prob": 0.00012, "min": -40.0, "max": 180.0}
         if "Spd" in tag or "Frq" in tag:

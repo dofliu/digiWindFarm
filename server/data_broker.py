@@ -147,6 +147,29 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
         yawBrakePressure=scada.get("WYAW_YwBrkHyPrs"),
         cableWindup=scada.get("WYAW_CabWup"),
 
+        # ── WCNV — Electrical Response ──
+        reactivePower=scada.get("WCNV_ReactPwr"),
+        powerFactor=scada.get("WCNV_PwrFactor"),
+        apparentPower=scada.get("WCNV_AppPwr"),
+        freqWattDerate=scada.get("WCNV_FreqWattDerate"),
+        inertiaPower=scada.get("WCNV_InertiaPwr"),
+        converterMode=int(scada.get("WCNV_CnvMode", 0)) if scada.get("WCNV_CnvMode") is not None else None,
+        rideThroughBand=int(scada.get("WCNV_RtBand", 0)) if scada.get("WCNV_RtBand") is not None else None,
+
+        # ── WVIB — Vibration Spectral Bands ──
+        vibBand1pX=scada.get("WVIB_Band1pX"),
+        vibBand1pY=scada.get("WVIB_Band1pY"),
+        vibBand3pX=scada.get("WVIB_Band3pX"),
+        vibBand3pY=scada.get("WVIB_Band3pY"),
+        vibBandGearX=scada.get("WVIB_BandGearX"),
+        vibBandGearY=scada.get("WVIB_BandGearY"),
+        vibBandHfX=scada.get("WVIB_BandHfX"),
+        vibBandHfY=scada.get("WVIB_BandHfY"),
+        vibBandBbX=scada.get("WVIB_BandBbX"),
+        vibBandBbY=scada.get("WVIB_BandBbY"),
+        vibCrestFactor=scada.get("WVIB_CrestFactor"),
+        vibKurtosis=scada.get("WVIB_Kurtosis"),
+
         # ── Fault info ──
         activeFaults=fault_info,
 
@@ -183,6 +206,10 @@ class DataBroker:
         self._last_shutdown_cause: Dict[str, Optional[str]] = {}
         self._last_fault_trip: Dict[str, bool] = {}
         self._last_fault_alarm_keys: Dict[str, set[str]] = {}
+        # Fault lifecycle tracking: {turbine_id: {scenario_id: phase}}
+        self._last_fault_phases: Dict[str, Dict[str, str]] = {}
+        # Track active fault scenario keys for lifecycle start/end
+        self._active_fault_keys: Dict[str, set] = {}  # {turbine_id: {scenario_id, ...}}
         # Session tracking
         self._session_id: Optional[int] = None
         # Write throttle state
@@ -221,6 +248,8 @@ class DataBroker:
         self._last_shutdown_cause.clear()
         self._last_fault_trip.clear()
         self._last_fault_alarm_keys.clear()
+        self._last_fault_phases.clear()
+        self._active_fault_keys.clear()
 
         self.simulator = WindFarmSimulator(
             turbine_count=self._sim_config.turbineCount,
@@ -504,6 +533,84 @@ class DataBroker:
                             },
                         )
             self._last_fault_alarm_keys[turbine_id] = current_alarm_keys
+
+            # ── Fault lifecycle: track start/end + phase transitions ──
+            current_fault_keys = set()
+            current_phases: Dict[str, str] = {}
+            for fault in active_faults:
+                sid = str(fault.get("scenario_id") or "")
+                phase = str(fault.get("phase") or "")
+                current_fault_keys.add(sid)
+                current_phases[sid] = phase
+
+            prev_keys = self._active_fault_keys.get(turbine_id, set())
+            prev_phases = self._last_fault_phases.get(turbine_id, {})
+
+            # New faults → lifecycle start event (open-ended)
+            for sid in current_fault_keys - prev_keys:
+                phase = current_phases.get(sid, "incipient")
+                sev = next((f.get("severity", 0) for f in active_faults
+                            if f.get("scenario_id") == sid), 0)
+                self.record_event(
+                    event_type="fault_lifecycle",
+                    source="simulator",
+                    title=f"Fault started: {sid}",
+                    turbine_id=turbine_id,
+                    detail=f"{sid} entered {phase} phase on {turbine_id}",
+                    payload={
+                        "turbineId": turbine_id,
+                        "scenarioId": sid,
+                        "phase": phase,
+                        "severity": sev,
+                        "lifecycle": "start",
+                    },
+                )
+
+            # Removed faults → close lifecycle event
+            for sid in prev_keys - current_fault_keys:
+                self.storage.close_open_events(
+                    event_type="fault_lifecycle",
+                    source="simulator",
+                    turbine_id=turbine_id,
+                )
+                self.record_event(
+                    event_type="fault_lifecycle",
+                    source="simulator",
+                    title=f"Fault ended: {sid}",
+                    turbine_id=turbine_id,
+                    detail=f"{sid} cleared on {turbine_id}",
+                    payload={
+                        "turbineId": turbine_id,
+                        "scenarioId": sid,
+                        "lifecycle": "end",
+                    },
+                )
+
+            # Phase transitions for ongoing faults
+            for sid in current_fault_keys & prev_keys:
+                old_phase = prev_phases.get(sid)
+                new_phase = current_phases.get(sid)
+                if old_phase and new_phase and old_phase != new_phase:
+                    sev = next((f.get("severity", 0) for f in active_faults
+                                if f.get("scenario_id") == sid), 0)
+                    self.record_event(
+                        event_type="fault_lifecycle",
+                        source="simulator",
+                        title=f"Fault phase change: {sid}",
+                        turbine_id=turbine_id,
+                        detail=f"{sid} transitioned from {old_phase} to {new_phase}",
+                        payload={
+                            "turbineId": turbine_id,
+                            "scenarioId": sid,
+                            "fromPhase": old_phase,
+                            "toPhase": new_phase,
+                            "severity": sev,
+                            "lifecycle": "phase_change",
+                        },
+                    )
+
+            self._active_fault_keys[turbine_id] = current_fault_keys
+            self._last_fault_phases[turbine_id] = current_phases
 
     def _record_state_transition_event(self, turbine_id: str, previous_state: int,
                                        current_state: int, shutdown_cause: Optional[str]):

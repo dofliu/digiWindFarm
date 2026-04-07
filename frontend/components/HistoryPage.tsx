@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { TurbineData } from '../types';
+import EventComparisonView from './EventComparisonView';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 const LINE_COLORS = ['#22d3ee', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -65,6 +66,7 @@ const toDateTimeLocal = (value: Date) => {
 };
 
 const HistoryPage: React.FC<HistoryPageProps> = ({ turbines, lang = 'zh' }) => {
+  const [historyTab, setHistoryTab] = useState<'single' | 'compare'>('single');
   const [selectedTurbineId, setSelectedTurbineId] = useState('WT001');
   const [activeTags, setActiveTags] = useState<string[]>(TAG_PRESETS.startup);
   const [limit, setLimit] = useState(300);
@@ -227,6 +229,29 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ turbines, lang = 'zh' }) => {
 
   return (
     <div className="space-y-6">
+      {/* Tab selector: Single Turbine vs Multi-Turbine Comparison */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setHistoryTab('single')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            historyTab === 'single' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          {lang === 'zh' ? '單機歷史' : 'Single Turbine'}
+        </button>
+        <button
+          onClick={() => setHistoryTab('compare')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            historyTab === 'compare' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+        >
+          {lang === 'zh' ? '多機事件比較' : 'Multi-Turbine Comparison'}
+        </button>
+      </div>
+
+      {historyTab === 'compare' ? (
+        <EventComparisonView turbines={turbines} lang={lang} />
+      ) : (<>
       <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-5">
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -465,6 +490,7 @@ const HistoryPage: React.FC<HistoryPageProps> = ({ turbines, lang = 'zh' }) => {
           </table>
         </div>
       </div>
+      </>)}
     </div>
   );
 };

@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-05
+Last updated: 2026-04-07
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -230,16 +230,33 @@ Still missing:
 - oil temperature / viscosity effects
 - detailed bearing defect frequency computation
 
-### 2.3 Vibration Feature Detail
-Current state:
-- trend-level vibration behavior is implemented
-- HSS and LSS torsional vibration now contribute separately
+### 2.3 Vibration Spectral Model
+File: `simulator/physics/vibration_spectral.py`
 
-Missing detail:
-- frequency-band features
-- bearing defect signatures
-- sideband behavior
-- fault-specific vibration fingerprints beyond amplitude changes
+Status: **upgraded** (previously trend-only, now has frequency-band decomposition)
+
+Implemented:
+- `SpectralVibrationModel` class with per-turbine permanent characteristics
+- 5 frequency bands: 1P (rotor imbalance), 3P (blade pass), gear mesh, high-frequency, broadband
+- X and Y direction separation for each band
+- crest factor (peak/RMS ratio — bearing defect indicator)
+- kurtosis (signal impulsiveness — condition indicator)
+- fault-specific vibration signatures for all 11 fault scenarios:
+  - bearing_wear → elevated HF, high crest factor and kurtosis
+  - pitch_imbalance → elevated 1P (asymmetric Y dominant)
+  - gearbox_overheat → elevated gear mesh band
+  - blade_icing → elevated 1P + 3P (mass + aero imbalance)
+  - generator_overspeed → elevated HF
+  - yaw_misalignment → elevated 3P
+  - stator_winding_degradation → elevated HF (electrical noise)
+  - hydraulic_leak → elevated broadband
+- operating-condition coupling (speed, power, load)
+- low-pass smoothing for realistic time behavior
+
+Still missing:
+- sideband behavior (modulated harmonics)
+- detailed BPFO/BPFI frequency computation from bearing geometry
+- spectral alarm threshold curves
 
 ### 2.4 Cooling System — Active Component Model
 File: `simulator/physics/cooling_model.py`
@@ -264,16 +281,28 @@ Still missing:
 - detailed radiator fin model
 - ambient humidity effect on air cooling
 
-### 2.5 Electrical / Converter Detail
-Current state:
-- voltage, current, frequency, derate, sync, and trip logic are implemented
+### 2.5 Electrical / Converter Response
+File: `simulator/physics/electrical_model.py`
 
-Missing detail:
-- reactive power
-- power factor
-- converter control modes
-- protection coordination detail
-- grid-code style ride-through curves
+Status: **upgraded** (previously inline, now dedicated model with full grid-code behavior)
+
+Implemented:
+- `ElectricalModel` class with `ElectricalSpec` configuration
+- frequency-watt (droop) response with deadband and per-turbine droop variation
+- reactive power dispatch from voltage support and PF setpoint
+- power factor computation (active/reactive/apparent power triangle)
+- apparent power limiter (converter MVA rating)
+- LVRT ride-through curves (0V/50%/80%/90% voltage bands with time limits)
+- HVRT ride-through curves (110%/120% voltage bands)
+- ride-through trip logic with band accumulation
+- synthetic inertia response (virtual H constant, df/dt → power injection)
+- converter operating mode tracking (idle/starting/normal/freq_response/voltage_support/ride_through)
+- per-turbine individuality for droop sensitivity and reactive power bias
+
+Still missing:
+- full reactive power dispatch curve by grid code
+- protection coordination relay model
+- detailed sub-transient behavior
 
 ### 2.6 Wind Event Realism
 File: `simulator/physics/wind_field.py`
@@ -301,19 +330,20 @@ Still missing:
 These are not implemented yet, or only exist as placeholders/concepts.
 
 ### 3.1 Spectral Condition Monitoring Model
-Not yet implemented:
-- FFT-like band outputs
-- 1P/3P amplitude tracking by band
-- bearing fault band signatures
-- spectral alarm features
+Status: **first version implemented** (see 2.3)
+
+Still not implemented:
+- spectral alarm threshold features
+- sideband analysis
+- detailed bearing defect frequency computation
 
 ### 3.2 Advanced Electrical Grid Interaction
-Not yet implemented:
-- reactive power dispatch
-- voltage support control
-- LVRT / HVRT curve logic by turbine type
-- frequency-watt response
-- synthetic inertia response
+Status: **first version implemented** (see 2.5)
+
+Still not implemented:
+- full reactive power dispatch curve per grid code
+- detailed sub-transient behavior
+- protection relay coordination model
 
 ### 3.3 Advanced Fatigue / Load Modeling
 Not yet implemented:
@@ -335,9 +365,7 @@ Implemented:
 - start/end duration support for grid and wind config events
 
 Still missing:
-- start/end duration for full fault lifecycle events
-- richer event export
-- stronger multi-turbine event correlation tools
+- multi-turbine event correlation / comparison view
 
 ### 3.5 Expanded SCADA Tag Set
 Not yet implemented:
@@ -395,16 +423,20 @@ Why:
 - grid-event response
 - turbine individuality
 - SCADA signal realism
-- aerodynamic Cp surface and thrust (new)
-- multi-stage drivetrain with gearbox (new)
-- active cooling system with fouling (new)
+- aerodynamic Cp surface and thrust
+- multi-stage drivetrain with gearbox
+- active cooling system with fouling
+- electrical response (frequency-watt, reactive power, ride-through)
+- spectral vibration bands with fault-specific signatures
+- 59 SCADA tags (electrical + vibration spectral)
 
 ### Still Weak
-- spectral vibration realism
-- detailed electrical control behavior
+- sideband vibration detail
+- full protection relay coordination
+- advanced fatigue / load modeling
 
 ### Recommended Immediate Direction
-1. electrical response refinement (#22)
-2. event lifecycle and multi-turbine analysis (#20)
-3. history storage and query improvements (#24)
-4. maintenance workflow backend (#25)
+1. multi-turbine event comparison view
+2. maintenance workflow backend
+3. advanced fatigue / DEL metrics
+4. spectral alarm threshold curves

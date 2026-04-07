@@ -68,6 +68,7 @@ from server.routers.faults import router as faults_router
 from server.routers.i18n import router as i18n_router
 from server.routers.modbus import router as modbus_router
 from server.routers.control import router as control_router
+from server.routers.maintenance import router as maintenance_router
 
 app.include_router(turbines_router)
 app.include_router(config_router)
@@ -76,6 +77,7 @@ app.include_router(faults_router)
 app.include_router(i18n_router)
 app.include_router(modbus_router)
 app.include_router(control_router)
+app.include_router(maintenance_router)
 
 
 @app.get("/api/health")
