@@ -165,6 +165,46 @@ class Storage:
             ON history_events (turbine_id, timestamp)
         """)
 
+        # ── Work Orders ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS work_orders (
+                id TEXT PRIMARY KEY,
+                turbine_id INTEGER NOT NULL,
+                turbine_name TEXT NOT NULL,
+                technician_id INTEGER,
+                status TEXT NOT NULL DEFAULT 'OPEN',
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                fault_description TEXT NOT NULL,
+                notes TEXT DEFAULT '',
+                photos_json TEXT DEFAULT '[]'
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_work_orders_status
+            ON work_orders (status)
+        """)
+
+        # ── Technicians ──
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS technicians (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'ON_DUTY'
+            )
+        """)
+
+        # Seed default technicians if empty
+        existing = conn.execute("SELECT COUNT(*) FROM technicians").fetchone()[0]
+        if existing == 0:
+            for name, status in [
+                ("Alice Johnson", "ON_DUTY"),
+                ("Bob Williams", "ON_DUTY"),
+                ("Charlie Brown", "ON_DUTY"),
+                ("Diana Miller", "OFF_DUTY"),
+            ]:
+                conn.execute("INSERT INTO technicians (name, status) VALUES (?, ?)", (name, status))
+
         # ── Migrations for existing DBs ──
         self._migrate_columns(conn, "turbine_data", [
             ("scada_json", "TEXT"),
@@ -621,3 +661,120 @@ class Storage:
                     pass
             result.append(d)
         return result
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Work Orders
+    # ══════════════════════════════════════════════════════════════════
+
+    def create_work_order(self, turbine_id: int, turbine_name: str,
+                          fault_description: str,
+                          technician_id: Optional[int] = None) -> dict:
+        conn = self._get_conn()
+        wo_id = f"WO-{int(_time.time() * 1000)}"
+        now = datetime.now().isoformat()
+        status = "IN_PROGRESS" if technician_id else "OPEN"
+        conn.execute("""
+            INSERT INTO work_orders
+            (id, turbine_id, turbine_name, technician_id, status, created_at,
+             fault_description, notes, photos_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, '', '[]')
+        """, (wo_id, turbine_id, turbine_name, technician_id, status, now,
+              fault_description))
+        conn.commit()
+        return self.get_work_order(wo_id)
+
+    def get_work_order(self, wo_id: str) -> Optional[dict]:
+        conn = self._get_conn()
+        row = conn.execute("SELECT * FROM work_orders WHERE id = ?", (wo_id,)).fetchone()
+        if not row:
+            return None
+        return self._wo_row_to_dict(row)
+
+    def query_work_orders(self, status: Optional[str] = None,
+                          turbine_id: Optional[int] = None,
+                          limit: int = 100) -> List[dict]:
+        conn = self._get_conn()
+        query = "SELECT * FROM work_orders WHERE 1=1"
+        params: list = []
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if turbine_id is not None:
+            query += " AND turbine_id = ?"
+            params.append(turbine_id)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return [self._wo_row_to_dict(r) for r in rows]
+
+    def update_work_order(self, wo_id: str, **kwargs) -> Optional[dict]:
+        conn = self._get_conn()
+        sets = []
+        params = []
+        if "status" in kwargs:
+            sets.append("status = ?")
+            params.append(kwargs["status"])
+            if kwargs["status"] == "COMPLETED":
+                sets.append("completed_at = ?")
+                params.append(datetime.now().isoformat())
+        if "notes" in kwargs:
+            sets.append("notes = ?")
+            params.append(kwargs["notes"])
+        if "photos" in kwargs:
+            sets.append("photos_json = ?")
+            params.append(json.dumps(kwargs["photos"]))
+        if not sets:
+            return self.get_work_order(wo_id)
+        params.append(wo_id)
+        conn.execute(f"UPDATE work_orders SET {', '.join(sets)} WHERE id = ?", params)
+        conn.commit()
+        return self.get_work_order(wo_id)
+
+    def _wo_row_to_dict(self, row) -> dict:
+        d = dict(row)
+        # Map to frontend expected format
+        photos = []
+        if d.get("photos_json"):
+            try:
+                photos = json.loads(d["photos_json"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return {
+            "id": d["id"],
+            "turbineId": d["turbine_id"],
+            "turbineName": d["turbine_name"],
+            "technicianId": d.get("technician_id"),
+            "status": d["status"],
+            "createdAt": int(datetime.fromisoformat(d["created_at"]).timestamp() * 1000)
+                if d.get("created_at") else 0,
+            "completedAt": d.get("completed_at"),
+            "faultDescription": d["fault_description"],
+            "notes": d.get("notes", ""),
+            "photos": photos,
+        }
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Technicians
+    # ══════════════════════════════════════════════════════════════════
+
+    def create_technician(self, name: str, status: str = "ON_DUTY") -> dict:
+        conn = self._get_conn()
+        cursor = conn.execute(
+            "INSERT INTO technicians (name, status) VALUES (?, ?)", (name, status)
+        )
+        conn.commit()
+        return {"id": cursor.lastrowid, "name": name, "status": status}
+
+    def query_technicians(self) -> List[dict]:
+        conn = self._get_conn()
+        rows = conn.execute("SELECT * FROM technicians ORDER BY id").fetchall()
+        return [{"id": r["id"], "name": r["name"], "status": r["status"]} for r in rows]
+
+    def update_technician(self, tech_id: int, status: str) -> Optional[dict]:
+        conn = self._get_conn()
+        conn.execute("UPDATE technicians SET status = ? WHERE id = ?", (status, tech_id))
+        conn.commit()
+        row = conn.execute("SELECT * FROM technicians WHERE id = ?", (tech_id,)).fetchone()
+        if not row:
+            return None
+        return {"id": row["id"], "name": row["name"], "status": row["status"]}

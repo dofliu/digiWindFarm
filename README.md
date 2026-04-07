@@ -137,6 +137,15 @@ Main modules:
 - `GET /api/faults/active`
 - `POST /api/faults/clear`
 
+### Maintenance
+- `GET /api/maintenance/work-orders`
+- `POST /api/maintenance/work-orders`
+- `PATCH /api/maintenance/work-orders/{id}`
+- `GET /api/maintenance/technicians`
+- `POST /api/maintenance/technicians`
+- `PATCH /api/maintenance/technicians/{id}/status`
+- `GET /api/maintenance/events/compare?turbine_ids=WT001,WT002`
+
 ### Export / Realtime
 - `GET /api/export/snapshot`
 - `GET /api/export/history?format=csv`
@@ -152,8 +161,8 @@ Main modules:
 - `MaintenanceHub`
 
 Note:
-- maintenance / work order backend is still not implemented
-- the frontend maintenance flow still uses mock-oriented behavior
+- maintenance work order backend and technician management are implemented
+- the frontend MaintenanceHub uses real API backend (SQLite-backed)
 
 ## Data Storage
 
@@ -172,7 +181,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 
 ## Known Gaps
 
-- maintenance / work order backend CRUD not implemented
+- deployment hardening (JWT, RBAC, Docker) not yet implemented
 - history retention / cleanup job not implemented
 - event export and advanced multi-turbine comparison are still limited
 - advanced aerodynamics, spectral vibration modeling, and deeper electrical control are still pending

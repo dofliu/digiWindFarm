@@ -58,6 +58,7 @@
 - [x] CSV export entry
 - [x] Dashboard default to summary view
 - [x] Turbine detail compact layout: metrics bar + side-by-side subsystem/trend
+- [x] Multi-turbine event comparison view with timeline, summary, and severity badges
 
 ## In Progress Quality Level
 
@@ -85,7 +86,7 @@ These parts are implemented, but still first-generation models:
 - [x] Add start/end duration for fault lifecycle events
 - [x] Add event export as JSON / CSV
 - [x] Add event severity grouping / alarm-level badges
-- [ ] Add multi-turbine event comparison view
+- [x] Add multi-turbine event comparison view
 
 ### Priority B: Wind Event Realism
 - [x] Gust front propagation
@@ -113,9 +114,10 @@ These parts are implemented, but still first-generation models:
 - [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
 
 ### Maintenance
-- [ ] Work order backend schema
-- [ ] Work order CRUD API
-- [ ] Connect `MaintenanceHub` to real backend instead of mock data
+- [x] Work order backend schema
+- [x] Work order CRUD API
+- [x] Technician management API
+- [x] Connect `MaintenanceHub` to real backend instead of mock data
 
 ### Deployment
 - [ ] JWT authentication
