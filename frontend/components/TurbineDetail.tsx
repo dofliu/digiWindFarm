@@ -354,6 +354,20 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('IGCT Water Temp', 'IGCT水溫')} value={`${fmt(turbine.igctWaterTemp)}°C`}
                   warn={(turbine.igctWaterTemp || 0) > 40} />
                 <DataRow label={u('IGCT Pressure', 'IGCT水壓')} value={`${fmt(turbine.igctWaterPres1)} / ${fmt(turbine.igctWaterPres2)} bar`} />
+                <div className="border-t border-purple-500/20 my-2 pt-2">
+                  <div className="text-xs text-purple-300/60 mb-2">{u('Electrical Response', '電氣響應')}</div>
+                  <DataRow label={u('Reactive Power', '無功功率')} value={`${fmt(turbine.reactivePower)} kvar`} />
+                  <DataRow label={u('Power Factor', '功率因數')} value={fmt(turbine.powerFactor, 3)} />
+                  <DataRow label={u('Apparent Power', '視在功率')} value={`${fmt(turbine.apparentPower)} kVA`} />
+                  <DataRow label={u('Freq-Watt Derate', '頻率降額')} value={fmt(turbine.freqWattDerate, 3)}
+                    warn={(turbine.freqWattDerate || 1) < 0.95} />
+                  <DataRow label={u('Inertia Power', '慣量功率')} value={`${fmt(turbine.inertiaPower)} kW`} />
+                  <DataRow label={u('Converter Mode', '變頻器模式')} value={
+                    ['Idle', 'Starting', 'Normal', 'Freq Resp', 'V Support', 'Ride-Thru'][turbine.converterMode || 0] || '--'
+                  } />
+                  <DataRow label={u('Ride-Through', '電壓穿越')} value={`${turbine.rideThroughBand || 0}`}
+                    warn={(turbine.rideThroughBand || 0) !== 0} />
+                </div>
               </SubsystemPanel>
             );
           case 'nacelle':
@@ -365,6 +379,18 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                   warn={(turbine.vibrationX || 0) > 4} alert={(turbine.vibrationX || 0) > 8} />
                 <DataRow label={u('Vibration Y', 'Y方向振動')} value={`${fmt(turbine.vibrationY, 2)} mm/s`}
                   warn={(turbine.vibrationY || 0) > 4} alert={(turbine.vibrationY || 0) > 8} />
+                <div className="border-t border-yellow-500/20 my-2 pt-2">
+                  <div className="text-xs text-yellow-300/60 mb-2">{u('Spectral Bands', '頻帶分析')}</div>
+                  <DataRow label={u('1P Band X/Y', '1P頻帶X/Y')} value={`${fmt(turbine.vibBand1pX, 3)} / ${fmt(turbine.vibBand1pY, 3)}`} />
+                  <DataRow label={u('3P Band X/Y', '3P頻帶X/Y')} value={`${fmt(turbine.vibBand3pX, 3)} / ${fmt(turbine.vibBand3pY, 3)}`} />
+                  <DataRow label={u('Gear Mesh X/Y', '齒輪嚙合X/Y')} value={`${fmt(turbine.vibBandGearX, 3)} / ${fmt(turbine.vibBandGearY, 3)}`} />
+                  <DataRow label={u('HF Band X/Y', '高頻帶X/Y')} value={`${fmt(turbine.vibBandHfX, 3)} / ${fmt(turbine.vibBandHfY, 3)}`} />
+                  <DataRow label={u('Broadband X/Y', '寬頻帶X/Y')} value={`${fmt(turbine.vibBandBbX, 3)} / ${fmt(turbine.vibBandBbY, 3)}`} />
+                  <DataRow label={u('Crest Factor', '峰值因子')} value={fmt(turbine.vibCrestFactor, 2)}
+                    warn={(turbine.vibCrestFactor || 3) > 5} alert={(turbine.vibCrestFactor || 3) > 8} />
+                  <DataRow label={u('Kurtosis', '峰度')} value={fmt(turbine.vibKurtosis, 2)}
+                    warn={(turbine.vibKurtosis || 3) > 5} alert={(turbine.vibKurtosis || 3) > 10} />
+                </div>
               </SubsystemPanel>
             );
           case 'yaw':

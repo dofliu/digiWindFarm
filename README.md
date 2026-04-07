@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 40 SCADA tags aligned to Bachmann Z72 definitions
+- 59 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -36,6 +36,10 @@ Implemented and usable today:
 - grid frequency and voltage events with per-turbine ride-through differences
 - sensor noise, drift, stuck values, and quantization
 - history page with event markers, event details, focus windows, and CSV export
+- electrical response model (frequency-watt, reactive power, power factor, ride-through)
+- spectral vibration model (1P/3P/gear/HF/broadband bands, crest factor, kurtosis)
+- fault lifecycle tracking with start/end duration events
+- event export API (JSON/CSV) with severity grouping
 
 Physics model tracking:
 - [`docs/physics_model_status.md`](./docs/physics_model_status.md)
@@ -60,6 +64,8 @@ Main modules:
   - `yaw_model.py`
   - `wind_field.py`
   - `fault_engine.py`
+  - `electrical_model.py`
+  - `vibration_spectral.py`
   - `scada_registry.py`
 - `simulator/grid_model.py`
 - `server/`
@@ -134,6 +140,7 @@ Main modules:
 ### Export / Realtime
 - `GET /api/export/snapshot`
 - `GET /api/export/history?format=csv`
+- `GET /api/export/events?format=json` (also supports `csv`, with severity grouping)
 - `ws://localhost:8000/ws/realtime`
 
 ## Frontend Pages

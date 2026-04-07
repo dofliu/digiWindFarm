@@ -55,6 +55,27 @@ interface ApiTurbineReading {
   yawError?: number;
   yawBrakePressure?: number;
   cableWindup?: number;
+  // Electrical response
+  reactivePower?: number;
+  powerFactor?: number;
+  apparentPower?: number;
+  freqWattDerate?: number;
+  inertiaPower?: number;
+  converterMode?: number;
+  rideThroughBand?: number;
+  // Vibration spectral bands
+  vibBand1pX?: number;
+  vibBand1pY?: number;
+  vibBand3pX?: number;
+  vibBand3pY?: number;
+  vibBandGearX?: number;
+  vibBandGearY?: number;
+  vibBandHfX?: number;
+  vibBandHfY?: number;
+  vibBandBbX?: number;
+  vibBandBbY?: number;
+  vibCrestFactor?: number;
+  vibKurtosis?: number;
   activeFaults?: FaultInfo[];
   scadaTags?: Record<string, number>;
 }
@@ -116,6 +137,27 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     yawError: api.yawError,
     yawBrakePressure: api.yawBrakePressure,
     cableWindup: api.cableWindup,
+    // Electrical response
+    reactivePower: api.reactivePower,
+    powerFactor: api.powerFactor,
+    apparentPower: api.apparentPower,
+    freqWattDerate: api.freqWattDerate,
+    inertiaPower: api.inertiaPower,
+    converterMode: api.converterMode,
+    rideThroughBand: api.rideThroughBand,
+    // Vibration spectral bands
+    vibBand1pX: api.vibBand1pX,
+    vibBand1pY: api.vibBand1pY,
+    vibBand3pX: api.vibBand3pX,
+    vibBand3pY: api.vibBand3pY,
+    vibBandGearX: api.vibBandGearX,
+    vibBandGearY: api.vibBandGearY,
+    vibBandHfX: api.vibBandHfX,
+    vibBandHfY: api.vibBandHfY,
+    vibBandBbX: api.vibBandBbX,
+    vibBandBbY: api.vibBandBbY,
+    vibCrestFactor: api.vibCrestFactor,
+    vibKurtosis: api.vibKurtosis,
     activeFaults: api.activeFaults,
     scadaTags: api.scadaTags,
   };

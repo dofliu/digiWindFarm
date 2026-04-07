@@ -69,6 +69,29 @@ class TurbineReading(BaseModel):
     igctWaterPres2: Optional[float] = None   # bar (WCNV_IGCTWtrPres2)
     igctWaterTemp: Optional[float] = None    # °C  (WCNV_IGCTWtrTmp)
 
+    # ── WCNV — Electrical Response ──
+    reactivePower: Optional[float] = None    # kvar (WCNV_ReactPwr)
+    powerFactor: Optional[float] = None      #      (WCNV_PwrFactor)
+    apparentPower: Optional[float] = None    # kVA  (WCNV_AppPwr)
+    freqWattDerate: Optional[float] = None   #      (WCNV_FreqWattDerate)
+    inertiaPower: Optional[float] = None     # kW   (WCNV_InertiaPwr)
+    converterMode: Optional[int] = None      #      (WCNV_CnvMode)
+    rideThroughBand: Optional[int] = None    #      (WCNV_RtBand)
+
+    # ── WVIB — Vibration Spectral Bands ──
+    vibBand1pX: Optional[float] = None       # mm/s (WVIB_Band1pX)
+    vibBand1pY: Optional[float] = None       # mm/s (WVIB_Band1pY)
+    vibBand3pX: Optional[float] = None       # mm/s (WVIB_Band3pX)
+    vibBand3pY: Optional[float] = None       # mm/s (WVIB_Band3pY)
+    vibBandGearX: Optional[float] = None     # mm/s (WVIB_BandGearX)
+    vibBandGearY: Optional[float] = None     # mm/s (WVIB_BandGearY)
+    vibBandHfX: Optional[float] = None       # mm/s (WVIB_BandHfX)
+    vibBandHfY: Optional[float] = None       # mm/s (WVIB_BandHfY)
+    vibBandBbX: Optional[float] = None       # mm/s (WVIB_BandBbX)
+    vibBandBbY: Optional[float] = None       # mm/s (WVIB_BandBbY)
+    vibCrestFactor: Optional[float] = None   #      (WVIB_CrestFactor)
+    vibKurtosis: Optional[float] = None      #      (WVIB_Kurtosis)
+
     # ── WGDC — Transformer ──
     transformerTemp: Optional[float] = None  # °C  (WGDC_TrfCoreTmp)
 

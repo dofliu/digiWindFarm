@@ -29,6 +29,9 @@
 - [x] Wind event propagation: gust front, ramp, direction shift across farm
 - [x] Farm layout with turbine positions and direction-aware wake model
 - [x] Fault physics path unified — all 11 scenarios through physical causes with load coupling
+- [x] Electrical response model: frequency-watt droop, reactive power, power factor, LVRT/HVRT ride-through, synthetic inertia, converter modes
+- [x] Spectral vibration model: 1P/3P/gear-mesh/HF/broadband bands with fault-specific signatures, crest factor, kurtosis
+- [x] 59 SCADA tags total (was 40): +7 electrical response + 12 vibration spectral bands
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -40,6 +43,9 @@
 - [x] Turbine spec presets
 - [x] Grid control API
 - [x] Control API: start / stop / reset / service / emergency stop / curtail
+- [x] Event export API (JSON/CSV) with severity grouping
+- [x] Fault lifecycle event tracking (start/end/phase transitions)
+- [x] History retention / downsampling / cleanup policy
 
 ### Frontend
 - [x] Dashboard and turbine detail views
@@ -61,8 +67,8 @@ These parts are implemented, but still first-generation models:
 - [x] Cooling system: pump/fan state, coolant flow/pressure, fouling propagation
 - [x] Wind-event propagation across the farm
 - [x] Fault physics unified path with operating-condition coupling
-- [ ] Vibration feature / frequency-band realism
-- [ ] Advanced converter / electrical control detail
+- [x] Vibration feature / frequency-band realism
+- [x] Advanced converter / electrical control detail
 
 ## Next Priorities
 
@@ -76,9 +82,9 @@ These parts are implemented, but still first-generation models:
 - [x] Add start/end duration for grid and wind config events
 
 ### Priority A.1: Event Layer Upgrade
-- [ ] Add start/end duration for fault lifecycle events
-- [ ] Add event export as JSON / CSV
-- [ ] Add event severity grouping / alarm-level badges
+- [x] Add start/end duration for fault lifecycle events
+- [x] Add event export as JSON / CSV
+- [x] Add event severity grouping / alarm-level badges
 - [ ] Add multi-turbine event comparison view
 
 ### Priority B: Wind Event Realism
@@ -88,22 +94,22 @@ These parts are implemented, but still first-generation models:
 - [x] Stronger time-space coupling in farm wind model
 
 ### Priority C: Electrical Response Detail
-- [ ] Frequency-watt response
-- [ ] Reactive power / power factor
-- [ ] Improved grid-code style ride-through behavior
-- [ ] Converter control mode detail
+- [x] Frequency-watt response
+- [x] Reactive power / power factor
+- [x] Improved grid-code style ride-through behavior
+- [x] Converter control mode detail
 
 ### Priority D: Vibration Upgrade
-- [ ] Fault-specific vibration signatures
-- [ ] Frequency-band outputs
-- [ ] Bearing defect style indicators
+- [x] Fault-specific vibration signatures
+- [x] Frequency-band outputs
+- [x] Bearing defect style indicators
 
 ## Product / Platform Gaps
 
 ### History and Storage
-- [ ] Add retention / cleanup policy for SQLite history
-- [ ] Add clearer history query filters and limits
-- [ ] Add richer event query filters on the backend
+- [x] Add retention / cleanup policy for SQLite history
+- [x] Add clearer history query filters and limits
+- [x] Add richer event query filters on the backend
 - [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
 
 ### Maintenance
