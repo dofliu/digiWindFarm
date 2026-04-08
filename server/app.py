@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,11 +27,12 @@ async def lifespan(app: FastAPI):
     # Auto-start Modbus TCP server
     if broker.simulator:
         from simulator.modbus_server import ModbusSimServer
+        modbus_port = int(os.environ.get("MODBUS_PORT", "5020"))
         broker.simulator.modbus_server = ModbusSimServer(
-            port=5020, turbine_count=len(broker.simulator.turbines)
+            port=modbus_port, turbine_count=len(broker.simulator.turbines)
         )
         broker.simulator.modbus_server.start()
-        print("[Server] Modbus TCP server started on port 5020")
+        print(f"[Server] Modbus TCP server started on port {modbus_port}")
 
     # Start WebSocket broadcast task
     task = asyncio.create_task(_ws_broadcast_loop())

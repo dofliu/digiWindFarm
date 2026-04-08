@@ -14,7 +14,7 @@ import {
 import type { TurbineData } from '../types';
 import EventComparisonView from './EventComparisonView';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 const LINE_COLORS = ['#22d3ee', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 const TAG_PRESETS: Record<string, string[]> = {

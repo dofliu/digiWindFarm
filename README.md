@@ -12,17 +12,24 @@ Wind farm monitoring and digital twin platform with:
 ## Quick Start
 
 ```bash
-# Backend + simulator + Modbus TCP
+# Backend + simulator + Modbus TCP (default port 8100)
 pip install -r requirements.txt
 python run.py
 
-# Frontend
+# Frontend (default port 3100, another terminal)
 cd frontend
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3100](http://localhost:3100).
+
+Ports are configured in `.env` (copy from `.env.example`):
+- Backend: `BACKEND_PORT=8100`
+- Frontend: `VITE_PORT=3100`
+- Modbus: `MODBUS_PORT=5020`
+
+Use `python run.py --auto-port` to auto-find an available port if the default is busy.
 In `Settings`, select `Physics Simulation (Backend)` to use backend realtime simulation data.
 
 ## Current Scope
@@ -150,7 +157,7 @@ Main modules:
 - `GET /api/export/snapshot`
 - `GET /api/export/history?format=csv`
 - `GET /api/export/events?format=json` (also supports `csv`, with severity grouping)
-- `ws://localhost:8000/ws/realtime`
+- `ws://localhost:8100/ws/realtime`
 
 ## Frontend Pages
 

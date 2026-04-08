@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { type AppSettings, DataSourceType } from '../types';
 
 const SETTINGS_KEY = 'windFarmAppSettings_v2';
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 
 const defaultSettings: AppSettings = {
     dataSource: DataSourceType.SIMULATION,

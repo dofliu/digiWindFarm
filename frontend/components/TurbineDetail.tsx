@@ -76,7 +76,7 @@ const FaultBadge: React.FC<{ fault: FaultInfo; lang: string }> = ({ fault, lang 
   );
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 
 const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ turbineId, lang }) => {
   const [controlStatus, setControlStatus] = useState<any>(null);

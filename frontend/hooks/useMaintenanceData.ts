@@ -6,7 +6,7 @@ import {
     WorkOrderStatus,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 
 /** Map backend status string to TechnicianStatus enum */
 function mapTechStatus(s: string): TechnicianStatus {
