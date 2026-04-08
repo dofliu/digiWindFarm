@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { FaultScenario } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 
 interface TestPlan {
   id: string;

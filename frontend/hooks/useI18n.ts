@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ScadaTagI18n } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
 const STORAGE_KEY = 'windFarmLang';
 
 export type Lang = 'en' | 'zh';

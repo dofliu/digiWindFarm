@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { type TurbineData, TurbineStatus, type FaultInfo } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/realtime';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8100';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8100/ws/realtime';
 
 interface ApiTurbineReading {
   turbineId: string;
