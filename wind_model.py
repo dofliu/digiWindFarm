@@ -115,7 +115,7 @@ class WindEnvironmentModel:
         self._transition_from: Optional[float] = None
         self._transition_to: Optional[float] = None
         self._transition_start: Optional[float] = None
-        self._transition_duration: float = 300.0  # 5 minutes default ramp
+        self._transition_duration: float = 30.0  # 30 seconds default ramp
         self._elapsed_real = 0.0  # real elapsed seconds
 
         # Weather system state (for deterministic long-term)
@@ -192,7 +192,7 @@ class WindEnvironmentModel:
             self._transition_from = current
             self._transition_to = 18.0 if profile == 'ramp_up' else 3.0
             self._transition_start = self._elapsed_real
-            self._transition_duration = 600.0  # 10 minute ramp
+            self._transition_duration = 120.0  # 2 minute ramp
             return
 
         if profile in profiles:
@@ -235,9 +235,9 @@ class WindEnvironmentModel:
         elif self._active_profile in ('ramp_up', 'ramp_down') and self._profile_start_time:
             elapsed = (timestamp - self._profile_start_time).total_seconds()
             if self._active_profile == 'ramp_up':
-                base = 3.0 + min(15.0, elapsed / 600.0 * 15.0)
+                base = 3.0 + min(15.0, elapsed / 120.0 * 15.0)
             else:
-                base = max(3.0, 18.0 - elapsed / 600.0 * 15.0)
+                base = max(3.0, 18.0 - elapsed / 120.0 * 15.0)
         elif self._override_wind_speed is not None:
             base = self._override_wind_speed
         else:

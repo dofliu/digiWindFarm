@@ -46,11 +46,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
     const [customGrid, setCustomGrid] = useState({ frequency: '50.0', voltage: '690' });
     const [gridMsg, setGridMsg] = useState('');
 
+    const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+
     const refreshWindStatus = () => {
-        fetch(`${API_BASE}/api/config/wind`).then(r => r.json()).then(setWindStatus).catch(() => {});
+        fetch(`${API_BASE}/api/config/wind`)
+            .then(r => { setApiConnected(true); return r.json(); })
+            .then(setWindStatus)
+            .catch(() => { setApiConnected(false); });
     };
     const refreshGridStatus = () => {
-        fetch(`${API_BASE}/api/config/grid`).then(r => r.json()).then(setGridStatus).catch(() => {});
+        fetch(`${API_BASE}/api/config/grid`)
+            .then(r => r.json()).then(setGridStatus).catch(() => {});
     };
 
     useEffect(() => {
@@ -65,28 +71,42 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
 
     const handleSetProfile = async (profile: string) => {
         setWindProfile(profile);
-        await fetch(`${API_BASE}/api/config/wind`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile }),
-        });
-        setWindMsg(lang === 'zh' ? `已切換: ${profile}` : `Switched to: ${profile}`);
+        try {
+            const res = await fetch(`${API_BASE}/api/config/wind`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setWindMsg(lang === 'zh' ? `已切換: ${profile}` : `Switched to: ${profile}`);
+            setApiConnected(true);
+        } catch (e) {
+            setWindMsg(lang === 'zh' ? `無法設定風況 (${API_BASE} 無回應)` : `Failed to set wind (${API_BASE} not responding)`);
+            setApiConnected(false);
+        }
         refreshWindStatus();
-        setTimeout(() => setWindMsg(''), 3000);
+        setTimeout(() => setWindMsg(''), 5000);
     };
 
     const handleSetCustomWind = async () => {
-        await fetch(`${API_BASE}/api/config/wind`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                windSpeed: parseFloat(customWind.speed) || null,
-                windDirection: parseFloat(customWind.direction) || null,
-                ambientTemp: parseFloat(customWind.temp) || null,
-                turbulence: parseFloat(customWind.turbulence) || null,
-            }),
-        });
-        setWindMsg(lang === 'zh' ? '已套用自訂風況' : 'Custom wind applied');
+        try {
+            const res = await fetch(`${API_BASE}/api/config/wind`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    windSpeed: parseFloat(customWind.speed) || null,
+                    windDirection: parseFloat(customWind.direction) || null,
+                    ambientTemp: parseFloat(customWind.temp) || null,
+                    turbulence: parseFloat(customWind.turbulence) || null,
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setWindMsg(lang === 'zh' ? '已套用自訂風況' : 'Custom wind applied');
+            setApiConnected(true);
+        } catch (e) {
+            setWindMsg(lang === 'zh' ? `無法設定風況 (${API_BASE} 無回應)` : `Failed to set wind (${API_BASE} not responding)`);
+            setApiConnected(false);
+        }
         refreshWindStatus();
-        setTimeout(() => setWindMsg(''), 3000);
+        setTimeout(() => setWindMsg(''), 5000);
     };
 
     const handleSetGridProfile = async (profile: string) => {
@@ -441,6 +461,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onSave, lang = 'z
                                 </button>
 
                                 {specMsg && <span className="ml-3 text-sm text-cyan-300">{specMsg}</span>}
+                            </div>
+                        )}
+
+                        {/* API Connection Warning */}
+                        {apiConnected === false && (
+                            <div className="bg-red-900/30 border border-red-500/50 rounded-md p-4 mb-4">
+                                <div className="text-red-300 font-semibold">
+                                    {lang === 'zh' ? '無法連線到後端 API' : 'Cannot connect to backend API'}
+                                </div>
+                                <div className="text-red-400/80 text-sm mt-1">
+                                    {lang === 'zh'
+                                        ? `請確認後端伺服器正在運行。目前嘗試連線: ${API_BASE}`
+                                        : `Please ensure the backend server is running. Trying: ${API_BASE}`}
+                                </div>
                             </div>
                         )}
 
