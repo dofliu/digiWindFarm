@@ -76,6 +76,23 @@ interface ApiTurbineReading {
   vibBandBbY?: number;
   vibCrestFactor?: number;
   vibKurtosis?: number;
+  // Vibration alarm thresholds
+  vibAlarm1p?: number;
+  vibAlarm3p?: number;
+  vibAlarmGear?: number;
+  vibAlarmHf?: number;
+  vibAlarmBb?: number;
+  vibAlarmOverall?: number;
+  vibThresh1pWarn?: number;
+  vibThresh1pAlrm?: number;
+  // Fatigue / load monitoring
+  twrBsMy?: number;
+  twrBsMx?: number;
+  bldRtMy?: number;
+  bldRtMx?: number;
+  delTwr?: number;
+  delBld?: number;
+  dmgAccum?: number;
   activeFaults?: FaultInfo[];
   scadaTags?: Record<string, number>;
 }
@@ -158,6 +175,23 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     vibBandBbY: api.vibBandBbY,
     vibCrestFactor: api.vibCrestFactor,
     vibKurtosis: api.vibKurtosis,
+    // Vibration alarm thresholds
+    vibAlarm1p: api.vibAlarm1p,
+    vibAlarm3p: api.vibAlarm3p,
+    vibAlarmGear: api.vibAlarmGear,
+    vibAlarmHf: api.vibAlarmHf,
+    vibAlarmBb: api.vibAlarmBb,
+    vibAlarmOverall: api.vibAlarmOverall,
+    vibThresh1pWarn: api.vibThresh1pWarn,
+    vibThresh1pAlrm: api.vibThresh1pAlrm,
+    // Fatigue / load monitoring
+    twrBsMy: api.twrBsMy,
+    twrBsMx: api.twrBsMx,
+    bldRtMy: api.bldRtMy,
+    bldRtMx: api.bldRtMx,
+    delTwr: api.delTwr,
+    delBld: api.delBld,
+    dmgAccum: api.dmgAccum,
     activeFaults: api.activeFaults,
     scadaTags: api.scadaTags,
   };

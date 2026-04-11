@@ -28,6 +28,19 @@ from typing import Dict, Optional, List
 
 
 @dataclass
+class AlarmThresholds:
+    """振動頻帶警報門檻輸出 — ISO 10816 啟發"""
+    alarm_1p: int = 0        # 0=normal, 1=warning, 2=alarm
+    alarm_3p: int = 0
+    alarm_gear: int = 0
+    alarm_hf: int = 0
+    alarm_bb: int = 0
+    alarm_overall: int = 0   # max(all bands)
+    thresh_1p_warn: float = 0.0   # mm/s — 當前 1P 警告門檻（供顯示參考）
+    thresh_1p_alrm: float = 0.0   # mm/s — 當前 1P 警報門檻
+
+
+@dataclass
 class VibrationBands:
     """Output of spectral vibration analysis."""
     band_1p_x: float = 0.0   # mm/s RMS at 1P frequency, X direction
@@ -84,6 +97,28 @@ class SpectralVibrationModel:
         # Smoothing state for each band
         self._prev = VibrationBands()
         self._peak_buffer: List[float] = []
+
+        # ── 警報門檻系統（ISO 10816 啟發）──
+        # 各頻帶基礎門檻（rated 工況下，mm/s RMS）
+        self._base_thresholds = {
+            "1p":   {"warn": 0.80, "alarm": 1.50},
+            "3p":   {"warn": 0.60, "alarm": 1.20},
+            "gear": {"warn": 0.50, "alarm": 1.00},
+            "hf":   {"warn": 0.30, "alarm": 0.60},
+            "bb":   {"warn": 0.50, "alarm": 1.00},
+        }
+        # Per-turbine 門檻差異
+        self._thresh_variation = {
+            band: 1.0 + self._rng.uniform(-0.10, 0.12)
+            for band in self._base_thresholds
+        }
+        # 警報狀態追蹤
+        self._alarm_levels = {band: 0 for band in self._base_thresholds}
+        self._alarm_timers = {band: 0.0 for band in self._base_thresholds}
+        # 遲滯比例：須降至門檻的 85% 才解除
+        self._HYST_RATIO = 0.85
+        # 最短保持時間（秒）— 避免快速切換
+        self._HYST_MIN_HOLD_S = 5.0
 
     def step(
         self,
@@ -187,6 +222,86 @@ class SpectralVibrationModel:
 
         self._prev = bands
         return bands
+
+    def compute_alarms(
+        self,
+        bands: VibrationBands,
+        rotor_speed_rpm: float,
+        power_kw: float,
+        rated_power_kw: float,
+        dt: float,
+    ) -> AlarmThresholds:
+        """計算各頻帶警報等級
+
+        門檻隨轉速調整（低轉速時門檻降低），
+        帶遲滯邏輯避免警報快速切換。
+        """
+        # 轉速因子：低速時降低門檻（靜止時約 40%）
+        speed_factor = 0.4 + 0.6 * min(1.0, rotor_speed_rpm / 22.0)
+
+        # 各頻帶量測值取 X/Y 的最大值
+        measured = {
+            "1p":   max(bands.band_1p_x, bands.band_1p_y),
+            "3p":   max(bands.band_3p_x, bands.band_3p_y),
+            "gear": max(bands.band_gear_x, bands.band_gear_y),
+            "hf":   max(bands.band_hf_x, bands.band_hf_y),
+            "bb":   max(bands.band_bb_x, bands.band_bb_y),
+        }
+
+        result_levels = {}
+        for band_name in self._base_thresholds:
+            base = self._base_thresholds[band_name]
+            var = self._thresh_variation[band_name]
+
+            warn_thresh = base["warn"] * speed_factor * var
+            alarm_thresh = base["alarm"] * speed_factor * var
+            val = measured[band_name]
+
+            current = self._alarm_levels[band_name]
+            self._alarm_timers[band_name] += dt
+
+            # 最短保持時間內不切換
+            if self._alarm_timers[band_name] < self._HYST_MIN_HOLD_S:
+                result_levels[band_name] = current
+                continue
+
+            new_level = current
+            if current == 0:
+                if val > alarm_thresh:
+                    new_level = 2
+                elif val > warn_thresh:
+                    new_level = 1
+            elif current == 1:
+                if val > alarm_thresh:
+                    new_level = 2
+                elif val < warn_thresh * self._HYST_RATIO:
+                    new_level = 0
+            elif current == 2:
+                if val < warn_thresh * self._HYST_RATIO:
+                    new_level = 0
+                elif val < alarm_thresh * self._HYST_RATIO:
+                    new_level = 1
+
+            if new_level != current:
+                self._alarm_timers[band_name] = 0.0
+            self._alarm_levels[band_name] = new_level
+            result_levels[band_name] = new_level
+
+        # 1P 門檻參考值（供前端顯示）
+        var_1p = self._thresh_variation["1p"]
+        thresh_1p_warn = self._base_thresholds["1p"]["warn"] * speed_factor * var_1p
+        thresh_1p_alrm = self._base_thresholds["1p"]["alarm"] * speed_factor * var_1p
+
+        return AlarmThresholds(
+            alarm_1p=result_levels["1p"],
+            alarm_3p=result_levels["3p"],
+            alarm_gear=result_levels["gear"],
+            alarm_hf=result_levels["hf"],
+            alarm_bb=result_levels["bb"],
+            alarm_overall=max(result_levels.values()),
+            thresh_1p_warn=round(thresh_1p_warn, 4),
+            thresh_1p_alrm=round(thresh_1p_alrm, 4),
+        )
 
     def _apply_fault_signatures(
         self, bands: VibrationBands,

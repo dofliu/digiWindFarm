@@ -32,6 +32,9 @@
 - [x] Electrical response model: frequency-watt droop, reactive power, power factor, LVRT/HVRT ride-through, synthetic inertia, converter modes
 - [x] Spectral vibration model: 1P/3P/gear-mesh/HF/broadband bands with fault-specific signatures, crest factor, kurtosis
 - [x] 59 SCADA tags total (was 40): +7 electrical response + 12 vibration spectral bands
+- [x] Vibration spectral alarm thresholds with ISO 10816-inspired zones and hysteresis
+- [x] Fatigue / DEL model: tower/blade load moments, simplified DEL, Miner's rule cumulative damage
+- [x] 74 SCADA tags total (was 59): +8 vibration alarm + 7 fatigue/load
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -111,6 +114,8 @@ These parts are implemented, but still first-generation models:
 - [x] Add retention / cleanup policy for SQLite history
 - [x] Add clearer history query filters and limits
 - [x] Add richer event query filters on the backend
+- [x] Vibration spectral alarm threshold curves
+- [x] Advanced fatigue / DEL load metrics
 - [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
 
 ### Maintenance

@@ -72,6 +72,25 @@ export interface TurbineData {
   vibCrestFactor?: number;
   vibKurtosis?: number;
 
+  // ── WVIB — Vibration Alarm Thresholds ──
+  vibAlarm1p?: number;       // 0/1/2
+  vibAlarm3p?: number;
+  vibAlarmGear?: number;
+  vibAlarmHf?: number;
+  vibAlarmBb?: number;
+  vibAlarmOverall?: number;
+  vibThresh1pWarn?: number;  // mm/s
+  vibThresh1pAlrm?: number;  // mm/s
+
+  // ── WFAT — Fatigue / Load Monitoring ──
+  twrBsMy?: number;          // kNm
+  twrBsMx?: number;          // kNm
+  bldRtMy?: number;          // kNm
+  bldRtMx?: number;          // kNm
+  delTwr?: number;           // 0-100
+  delBld?: number;           // 0-100
+  dmgAccum?: number;         // 0-1
+
   // ── WGDC — Transformer ──
   transformerTemp?: number; // °C
 

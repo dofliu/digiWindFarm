@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-07
+Last updated: 2026-04-12
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -330,10 +330,17 @@ Still missing:
 These are not implemented yet, or only exist as placeholders/concepts.
 
 ### 3.1 Spectral Condition Monitoring Model
-Status: **first version implemented** (see 2.3)
+Status: **alarm thresholds implemented** (see 2.3)
+
+Implemented:
+- ISO 10816-inspired alarm threshold curves (A/B/C/D zones)
+- Operating-point-dependent thresholds (scale with rotor speed)
+- Per-band alarm levels: 0=normal, 1=warning, 2=alarm
+- Hysteresis logic (85% clear ratio, 5s minimum hold time)
+- Per-turbine threshold variation (±10%)
+- 8 new SCADA tags: WVIB_Alarm1p/3p/Gear/Hf/Bb/Overall + Thresh1pWarn/Alrm
 
 Still not implemented:
-- spectral alarm threshold features
 - sideband analysis
 - detailed bearing defect frequency computation
 
@@ -345,12 +352,26 @@ Still not implemented:
 - detailed sub-transient behavior
 - protection relay coordination model
 
-### 3.3 Advanced Fatigue / Load Modeling
-Not yet implemented:
-- tower load
-- blade root load
-- fatigue accumulation
-- DEL-style damage metrics
+### 3.3 Fatigue / Load Modeling
+Status: **first version implemented**
+
+Implemented:
+- `FatigueModel` class in `simulator/physics/fatigue_model.py`
+- Tower base fore-aft bending moment (thrust × hub_height + gravity + turbulence)
+- Tower base side-to-side bending moment (torque reaction + 1P imbalance)
+- Blade root flapwise moment (thrust/3 × blade_length × cos(pitch))
+- Blade root edgewise moment (torque/3 + gravity 1P cycling)
+- Simplified DEL via peak-valley range counting + Wöhler curve (steel m=4, composite m=10)
+- Miner's rule cumulative damage fraction (0-1)
+- Fault coupling: blade_icing, pitch_imbalance, yaw_misalignment, bearing_wear, gearbox_overheat
+- Per-turbine individuality: material fatigue ±15%, tower damping ±10%, blade stiffness ±12%
+- Low-pass smoothing for realistic time transitions
+- 7 new SCADA tags: WFAT_TwrBsMy/Mx, WFAT_BldRtMy/Mx, WFAT_DELTwr/Bld, WFAT_DmgAccum
+
+Still missing:
+- full BEM-based blade loading distribution
+- detailed tower dynamic response (fore-aft natural frequency)
+- fatigue S-N curve from material test data
 
 ### 3.4 Event Layer for Historical Analysis
 Status: first usable version implemented
@@ -428,15 +449,18 @@ Why:
 - active cooling system with fouling
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
-- 59 SCADA tags (electrical + vibration spectral)
+- vibration alarm thresholds with ISO 10816-inspired zones
+- fatigue / load monitoring with DEL and Miner's rule
+- 74 SCADA tags (electrical + vibration spectral + alarm + fatigue)
 
 ### Still Weak
 - sideband vibration detail
 - full protection relay coordination
-- advanced fatigue / load modeling
+- detailed blade loading distribution (BEM)
+- tower dynamic natural frequency response
 
 ### Recommended Immediate Direction
-1. multi-turbine event comparison view
-2. maintenance workflow backend
-3. advanced fatigue / DEL metrics
-4. spectral alarm threshold curves
+1. deployment hardening (JWT auth, RBAC, Docker Compose)
+2. spectral sideband analysis
+3. detailed bearing defect frequency computation
+4. tower dynamic response model

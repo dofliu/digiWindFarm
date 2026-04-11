@@ -1,10 +1,10 @@
 name: Digital Wind Turbine
 name_zh: 數位孿生風機模擬器
 category: wind_energy
-progress: 80
+progress: 85
 status: active
-last_updated: "2026-04-10"
-next_milestone: "Multi-turbine fleet simulation"
+last_updated: "2026-04-12"
+next_milestone: "Deployment hardening (JWT auth, Docker Compose)"
 technologies:
   - FastAPI
   - React
@@ -13,6 +13,6 @@ technologies:
 outputs:
   - tool
   - paper
-description: "FastAPI-based physics-driven digital twin simulating wind turbine dynamics with 59 SCADA tags, fault injection and Modbus TCP interface"
-description_zh: "風力發電機物理驅動型數位孿生平台。內含完整的轉子-發電機模型、熱力系統、振動譜、電氣反應與 7 種故障場景，模擬 59 個 SCADA 信號與電網事件，支援 Modbus TCP 介面與即時儀表板監控。"
-key_metrics: "59 SCADA tags, 7 fault scenarios"
+description: "FastAPI-based physics-driven digital twin simulating wind turbine dynamics with 74 SCADA tags, fault injection, fatigue/DEL monitoring, vibration alarm thresholds, and Modbus TCP interface"
+description_zh: "風力發電機物理驅動型數位孿生平台。內含完整的轉子-發電機模型、熱力系統、振動譜與警報門檻、電氣反應、疲勞載荷與 DEL 損傷指標、7 種故障場景，模擬 74 個 SCADA 信號與電網事件，支援 Modbus TCP 介面與即時儀表板監控。"
+key_metrics: "74 SCADA tags, 7 fault scenarios, DEL fatigue monitoring"

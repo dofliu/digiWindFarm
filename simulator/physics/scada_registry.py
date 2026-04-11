@@ -247,6 +247,59 @@ _TAGS: List[ScadaTag] = [
              1, 50),
 
     # ══════════════════════════════════════════════════════════════════════
+    # WVIB — Vibration Spectral Alarm Thresholds
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WVIB_Alarm1p", "WVIB.Z72PLC__UI_Loc_WVIB_State_Alarm1p",
+             "WVIB", "SINT16", "", "1P Alarm Level", "1P警報等級",
+             0, 2),
+    ScadaTag("WVIB_Alarm3p", "WVIB.Z72PLC__UI_Loc_WVIB_State_Alarm3p",
+             "WVIB", "SINT16", "", "3P Alarm Level", "3P警報等級",
+             0, 2),
+    ScadaTag("WVIB_AlarmGear", "WVIB.Z72PLC__UI_Loc_WVIB_State_AlarmGear",
+             "WVIB", "SINT16", "", "Gear Mesh Alarm Level", "齒輪嚙合警報等級",
+             0, 2),
+    ScadaTag("WVIB_AlarmHf", "WVIB.Z72PLC__UI_Loc_WVIB_State_AlarmHf",
+             "WVIB", "SINT16", "", "HF Alarm Level", "高頻警報等級",
+             0, 2),
+    ScadaTag("WVIB_AlarmBb", "WVIB.Z72PLC__UI_Loc_WVIB_State_AlarmBb",
+             "WVIB", "SINT16", "", "Broadband Alarm Level", "寬頻警報等級",
+             0, 2),
+    ScadaTag("WVIB_AlarmOverall", "WVIB.Z72PLC__UI_Loc_WVIB_State_AlarmOverall",
+             "WVIB", "SINT16", "", "Overall Alarm Level", "整體振動警報等級",
+             0, 2),
+    ScadaTag("WVIB_Thresh1pWarn", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_Thresh1pWarn",
+             "WVIB", "REAL32", "mm/s", "1P Warning Threshold", "1P警告門檻",
+             0, 5),
+    ScadaTag("WVIB_Thresh1pAlrm", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_Thresh1pAlrm",
+             "WVIB", "REAL32", "mm/s", "1P Alarm Threshold", "1P警報門檻",
+             0, 10),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WFAT — Fatigue / Load Monitoring
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WFAT_TwrBsMy", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_TwrBsMy",
+             "WFAT", "REAL32", "kNm", "Tower Base Fore-Aft Moment", "塔基前後彎矩",
+             0, 5000),
+    ScadaTag("WFAT_TwrBsMx", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_TwrBsMx",
+             "WFAT", "REAL32", "kNm", "Tower Base Side-Side Moment", "塔基左右彎矩",
+             0, 2000),
+    ScadaTag("WFAT_BldRtMy", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_BldRtMy",
+             "WFAT", "REAL32", "kNm", "Blade Root Flapwise Moment", "葉根揮舞彎矩",
+             0, 3000),
+    ScadaTag("WFAT_BldRtMx", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_BldRtMx",
+             "WFAT", "REAL32", "kNm", "Blade Root Edgewise Moment", "葉根擺振彎矩",
+             0, 1500),
+    ScadaTag("WFAT_DELTwr", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_DELTwr",
+             "WFAT", "REAL32", "", "Tower DEL Indicator", "塔架疲勞等效載荷",
+             0, 100),
+    ScadaTag("WFAT_DELBld", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_DELBld",
+             "WFAT", "REAL32", "", "Blade DEL Indicator", "葉片疲勞等效載荷",
+             0, 100),
+    ScadaTag("WFAT_DmgAccum", "WFAT.Z72PLC__UI_Loc_WFAT_Analogue_DmgAccum",
+             "WFAT", "REAL32", "", "Cumulative Damage Fraction", "累積損傷比",
+             0, 1.0),
+
+    # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
     # ══════════════════════════════════════════════════════════════════════
     ScadaTag("WSRV_SrvOn", "WSRV.Z72PLC__UI_Srv_State_SrvOn",

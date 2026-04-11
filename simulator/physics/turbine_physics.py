@@ -24,6 +24,7 @@ from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
 from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
 from simulator.physics.electrical_model import ElectricalModel, ElectricalSpec
 from simulator.physics.vibration_spectral import SpectralVibrationModel
+from simulator.physics.fatigue_model import FatigueModel
 
 
 @dataclass
@@ -217,6 +218,14 @@ class TurbinePhysicsModel:
         self.vib_spectral = SpectralVibrationModel(
             seed=_seed,
             gear_ratio=self.spec.gear_ratio,
+        )
+
+        # Fatigue / load model (tower + blade moments, DEL, Miner's rule)
+        self.fatigue = FatigueModel(
+            seed=_seed,
+            hub_height=self.spec.hub_height,
+            rotor_diameter=self.spec.rotor_diameter,
+            rated_power_kw=self.spec.rated_power_kw,
         )
 
         self.tur_state = 1
@@ -519,6 +528,28 @@ class TurbinePhysicsModel:
             active_faults=self.active_faults,
         )
 
+        # Vibration alarm thresholds (operating-point-dependent + hysteresis)
+        vib_alarms = self.vib_spectral.compute_alarms(
+            bands=vib_bands,
+            rotor_speed_rpm=self.rotor_speed,
+            power_kw=gen_power_kw,
+            rated_power_kw=s.rated_power_kw,
+            dt=dt,
+        )
+
+        # Fatigue / load model (tower + blade moments, DEL, Miner's rule)
+        fatigue_out = self.fatigue.step(
+            thrust_kn=aero_out.thrust_kn,
+            aero_torque_knm=aero_out.aero_torque_knm,
+            aero_load_factor=aero_out.aero_load_factor,
+            rotor_speed_rpm=self.rotor_speed,
+            wind_speed=effective_wind_speed,
+            pitch_angle=self.pitch_angle,
+            power_kw=gen_power_kw,
+            dt=dt,
+            active_faults=self.active_faults,
+        )
+
         # IGCT water pressure now driven by cooling system pump (#29)
         water_pres = self.cooling.water_loop.pressure_bar
         if is_producing:
@@ -601,6 +632,23 @@ class TurbinePhysicsModel:
             "WVIB_BandBbY": round(vib_bands.band_bb_y, 4),
             "WVIB_CrestFactor": round(vib_bands.crest_factor, 3),
             "WVIB_Kurtosis": round(vib_bands.kurtosis, 3),
+            # ── Vibration alarm threshold tags ──
+            "WVIB_Alarm1p": float(vib_alarms.alarm_1p),
+            "WVIB_Alarm3p": float(vib_alarms.alarm_3p),
+            "WVIB_AlarmGear": float(vib_alarms.alarm_gear),
+            "WVIB_AlarmHf": float(vib_alarms.alarm_hf),
+            "WVIB_AlarmBb": float(vib_alarms.alarm_bb),
+            "WVIB_AlarmOverall": float(vib_alarms.alarm_overall),
+            "WVIB_Thresh1pWarn": round(vib_alarms.thresh_1p_warn, 4),
+            "WVIB_Thresh1pAlrm": round(vib_alarms.thresh_1p_alrm, 4),
+            # ── Fatigue / load tags ──
+            "WFAT_TwrBsMy": round(fatigue_out.twr_bs_my, 2),
+            "WFAT_TwrBsMx": round(fatigue_out.twr_bs_mx, 2),
+            "WFAT_BldRtMy": round(fatigue_out.bld_rt_my, 2),
+            "WFAT_BldRtMx": round(fatigue_out.bld_rt_mx, 2),
+            "WFAT_DELTwr": round(fatigue_out.del_twr, 1),
+            "WFAT_DELBld": round(fatigue_out.del_bld, 1),
+            "WFAT_DmgAccum": round(fatigue_out.dmg_accum, 6),
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -990,11 +1038,20 @@ class TurbinePhysicsModel:
         # Tags that should not be filtered through the sensor model
         _integer_tags = {"WTUR_TurSt", "WCNV_CnvMode", "WCNV_RtBand",
                          "WROT_RotLckd", "WROT_SrvcBrkAct", "WROT_LckngPnPos",
-                         "WSRV_SrvOn", "MBUS_Contact2"}
+                         "WSRV_SrvOn", "MBUS_Contact2",
+                         # 振動警報等級（離散整數）
+                         "WVIB_Alarm1p", "WVIB_Alarm3p", "WVIB_AlarmGear",
+                         "WVIB_AlarmHf", "WVIB_AlarmBb", "WVIB_AlarmOverall"}
+        # 已含物理噪訊或為計算指標，不需額外感測器雜訊
+        _passthrough_tags = {"WFAT_DELTwr", "WFAT_DELBld", "WFAT_DmgAccum",
+                             "WVIB_Thresh1pWarn", "WVIB_Thresh1pAlrm"}
         sensorized: Dict[str, float] = {}
         for tag, value in output.items():
             if tag in _integer_tags:
                 sensorized[tag] = round(value)
+                continue
+            if tag in _passthrough_tags:
+                sensorized[tag] = value
                 continue
             cfg = self._get_sensor_config(tag)
             if cfg["drift"] > 0.0:
@@ -1025,6 +1082,9 @@ class TurbinePhysicsModel:
             return {"noise": 0.003, "drift": 0.0001, "bias_limit": 0.01, "resolution": 0.001, "stuck_prob": 0.0, "min": -1.0, "max": 1.0}
         if tag in ("WCNV_FreqWattDerate",):
             return {"noise": 0.002, "drift": 0.0001, "bias_limit": 0.005, "resolution": 0.001, "stuck_prob": 0.0, "min": 0.0, "max": 1.0}
+        # Fatigue load tags — strain gauge-like noise
+        if tag.startswith("WFAT_TwrBs") or tag.startswith("WFAT_BldRt"):
+            return {"noise": 2.0, "drift": 0.05, "bias_limit": 8.0, "resolution": 0.1, "stuck_prob": 0.0001, "min": 0.0, "max": 10000.0}
         # Vibration spectral bands — similar to main vibration
         if tag.startswith("WVIB_Band") or tag.startswith("WVIB_Crest") or tag.startswith("WVIB_Kurt"):
             return {"noise": 0.005, "drift": 0.0003, "bias_limit": 0.05, "resolution": 0.001, "stuck_prob": 0.0001, "min": 0.0, "max": 30.0}

@@ -170,6 +170,25 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
         vibCrestFactor=scada.get("WVIB_CrestFactor"),
         vibKurtosis=scada.get("WVIB_Kurtosis"),
 
+        # ── WVIB — Vibration Alarm Thresholds ──
+        vibAlarm1p=int(scada.get("WVIB_Alarm1p", 0)) if scada.get("WVIB_Alarm1p") is not None else None,
+        vibAlarm3p=int(scada.get("WVIB_Alarm3p", 0)) if scada.get("WVIB_Alarm3p") is not None else None,
+        vibAlarmGear=int(scada.get("WVIB_AlarmGear", 0)) if scada.get("WVIB_AlarmGear") is not None else None,
+        vibAlarmHf=int(scada.get("WVIB_AlarmHf", 0)) if scada.get("WVIB_AlarmHf") is not None else None,
+        vibAlarmBb=int(scada.get("WVIB_AlarmBb", 0)) if scada.get("WVIB_AlarmBb") is not None else None,
+        vibAlarmOverall=int(scada.get("WVIB_AlarmOverall", 0)) if scada.get("WVIB_AlarmOverall") is not None else None,
+        vibThresh1pWarn=scada.get("WVIB_Thresh1pWarn"),
+        vibThresh1pAlrm=scada.get("WVIB_Thresh1pAlrm"),
+
+        # ── WFAT — Fatigue / Load Monitoring ──
+        twrBsMy=scada.get("WFAT_TwrBsMy"),
+        twrBsMx=scada.get("WFAT_TwrBsMx"),
+        bldRtMy=scada.get("WFAT_BldRtMy"),
+        bldRtMx=scada.get("WFAT_BldRtMx"),
+        delTwr=scada.get("WFAT_DELTwr"),
+        delBld=scada.get("WFAT_DELBld"),
+        dmgAccum=scada.get("WFAT_DmgAccum"),
+
         # ── Fault info ──
         activeFaults=fault_info,
 

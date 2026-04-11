@@ -198,7 +198,7 @@ const OperatorControlPanel: React.FC<{ turbineId: string; lang: string }> = ({ t
   );
 };
 
-type DetailTab = 'overview' | 'generator' | 'pitch' | 'converter' | 'nacelle' | 'yaw' | 'grid';
+type DetailTab = 'overview' | 'generator' | 'pitch' | 'converter' | 'nacelle' | 'yaw' | 'grid' | 'fatigue';
 
 const DETAIL_TABS: { id: DetailTab; label_en: string; label_zh: string; color: string; preset?: string }[] = [
   { id: 'overview', label_en: 'Overview', label_zh: '總覽', color: 'cyan' },
@@ -208,6 +208,7 @@ const DETAIL_TABS: { id: DetailTab; label_en: string; label_zh: string; color: s
   { id: 'nacelle', label_en: 'Nacelle', label_zh: '機艙', color: 'yellow', preset: 'vibration' },
   { id: 'yaw', label_en: 'Yaw', label_zh: '轉向系統', color: 'blue', preset: 'yaw' },
   { id: 'grid', label_en: 'Grid/Met', label_zh: '電網/氣象', color: 'orange', preset: 'temperature' },
+  { id: 'fatigue', label_en: 'Fatigue', label_zh: '疲勞', color: 'red' },
 ];
 
 const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispatch, activeWorkOrder, lang = 'zh' }) => {
@@ -380,16 +381,34 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Vibration Y', 'Y方向振動')} value={`${fmt(turbine.vibrationY, 2)} mm/s`}
                   warn={(turbine.vibrationY || 0) > 4} alert={(turbine.vibrationY || 0) > 8} />
                 <div className="border-t border-yellow-500/20 my-2 pt-2">
-                  <div className="text-xs text-yellow-300/60 mb-2">{u('Spectral Bands', '頻帶分析')}</div>
-                  <DataRow label={u('1P Band X/Y', '1P頻帶X/Y')} value={`${fmt(turbine.vibBand1pX, 3)} / ${fmt(turbine.vibBand1pY, 3)}`} />
-                  <DataRow label={u('3P Band X/Y', '3P頻帶X/Y')} value={`${fmt(turbine.vibBand3pX, 3)} / ${fmt(turbine.vibBand3pY, 3)}`} />
-                  <DataRow label={u('Gear Mesh X/Y', '齒輪嚙合X/Y')} value={`${fmt(turbine.vibBandGearX, 3)} / ${fmt(turbine.vibBandGearY, 3)}`} />
-                  <DataRow label={u('HF Band X/Y', '高頻帶X/Y')} value={`${fmt(turbine.vibBandHfX, 3)} / ${fmt(turbine.vibBandHfY, 3)}`} />
-                  <DataRow label={u('Broadband X/Y', '寬頻帶X/Y')} value={`${fmt(turbine.vibBandBbX, 3)} / ${fmt(turbine.vibBandBbY, 3)}`} />
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs text-yellow-300/60">{u('Spectral Bands', '頻帶分析')}</span>
+                    {turbine.vibAlarmOverall != null && (
+                      <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
+                        turbine.vibAlarmOverall === 2 ? 'bg-red-500/30 text-red-300' :
+                        turbine.vibAlarmOverall === 1 ? 'bg-yellow-500/30 text-yellow-300' :
+                        'bg-green-500/20 text-green-400'
+                      }`}>{turbine.vibAlarmOverall === 2 ? 'ALARM' : turbine.vibAlarmOverall === 1 ? 'WARN' : 'OK'}</span>
+                    )}
+                  </div>
+                  <DataRow label={u('1P Band X/Y', '1P頻帶X/Y')} value={`${fmt(turbine.vibBand1pX, 3)} / ${fmt(turbine.vibBand1pY, 3)}`}
+                    warn={turbine.vibAlarm1p === 1} alert={turbine.vibAlarm1p === 2} />
+                  <DataRow label={u('3P Band X/Y', '3P頻帶X/Y')} value={`${fmt(turbine.vibBand3pX, 3)} / ${fmt(turbine.vibBand3pY, 3)}`}
+                    warn={turbine.vibAlarm3p === 1} alert={turbine.vibAlarm3p === 2} />
+                  <DataRow label={u('Gear Mesh X/Y', '齒輪嚙合X/Y')} value={`${fmt(turbine.vibBandGearX, 3)} / ${fmt(turbine.vibBandGearY, 3)}`}
+                    warn={turbine.vibAlarmGear === 1} alert={turbine.vibAlarmGear === 2} />
+                  <DataRow label={u('HF Band X/Y', '高頻帶X/Y')} value={`${fmt(turbine.vibBandHfX, 3)} / ${fmt(turbine.vibBandHfY, 3)}`}
+                    warn={turbine.vibAlarmHf === 1} alert={turbine.vibAlarmHf === 2} />
+                  <DataRow label={u('Broadband X/Y', '寬頻帶X/Y')} value={`${fmt(turbine.vibBandBbX, 3)} / ${fmt(turbine.vibBandBbY, 3)}`}
+                    warn={turbine.vibAlarmBb === 1} alert={turbine.vibAlarmBb === 2} />
                   <DataRow label={u('Crest Factor', '峰值因子')} value={fmt(turbine.vibCrestFactor, 2)}
                     warn={(turbine.vibCrestFactor || 3) > 5} alert={(turbine.vibCrestFactor || 3) > 8} />
                   <DataRow label={u('Kurtosis', '峰度')} value={fmt(turbine.vibKurtosis, 2)}
                     warn={(turbine.vibKurtosis || 3) > 5} alert={(turbine.vibKurtosis || 3) > 10} />
+                  {turbine.vibThresh1pWarn != null && (
+                    <DataRow label={u('1P Threshold W/A', '1P門檻 警告/警報')}
+                      value={`${fmt(turbine.vibThresh1pWarn, 3)} / ${fmt(turbine.vibThresh1pAlrm, 3)} mm/s`} />
+                  )}
                 </div>
               </SubsystemPanel>
             );
@@ -411,6 +430,28 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
                 <DataRow label={u('Wind Speed', '風速')} value={`${fmt(turbine.windSpeed)} m/s`} />
                 <DataRow label={u('Wind Dir', '風向')} value={`${fmt(turbine.windDirection, 0)}°`} />
                 <DataRow label={u('Outside Temp', '室外溫度')} value={`${fmt(turbine.outsideTemp)}°C`} />
+              </SubsystemPanel>
+            );
+          case 'fatigue':
+            return (
+              <SubsystemPanel title={u('WFAT Fatigue / DEL', 'WFAT 疲勞/損傷')} color="red">
+                <div className="text-xs text-red-300/60 mb-2">{u('Tower Base Moments', '塔基彎矩')}</div>
+                <DataRow label={u('Fore-Aft My', '前後彎矩 My')} value={`${fmt(turbine.twrBsMy, 1)} kNm`} />
+                <DataRow label={u('Side-Side Mx', '左右彎矩 Mx')} value={`${fmt(turbine.twrBsMx, 1)} kNm`} />
+                <div className="border-t border-red-500/20 my-2 pt-2">
+                  <div className="text-xs text-red-300/60 mb-2">{u('Blade Root Moments', '葉根彎矩')}</div>
+                  <DataRow label={u('Flapwise My', '揮舞彎矩 My')} value={`${fmt(turbine.bldRtMy, 1)} kNm`} />
+                  <DataRow label={u('Edgewise Mx', '擺振彎矩 Mx')} value={`${fmt(turbine.bldRtMx, 1)} kNm`} />
+                </div>
+                <div className="border-t border-red-500/20 my-2 pt-2">
+                  <div className="text-xs text-red-300/60 mb-2">{u('DEL Indicators', 'DEL 疲勞指標')}</div>
+                  <DataRow label={u('Tower DEL', '塔架 DEL')} value={fmt(turbine.delTwr, 1)}
+                    warn={(turbine.delTwr || 0) > 60} alert={(turbine.delTwr || 0) > 80} />
+                  <DataRow label={u('Blade DEL', '葉片 DEL')} value={fmt(turbine.delBld, 1)}
+                    warn={(turbine.delBld || 0) > 60} alert={(turbine.delBld || 0) > 80} />
+                  <DataRow label={u('Damage Accum', '累積損傷比')} value={`${fmt((turbine.dmgAccum || 0) * 100, 4)}%`}
+                    warn={(turbine.dmgAccum || 0) > 0.5} alert={(turbine.dmgAccum || 0) > 0.8} />
+                </div>
               </SubsystemPanel>
             );
           default:
@@ -483,6 +524,7 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
             yellow: 'bg-yellow-600/30 text-yellow-300 border-yellow-500/50',
             blue:   'bg-blue-600/30 text-blue-300 border-blue-500/50',
             orange: 'bg-orange-600/30 text-orange-300 border-orange-500/50',
+            red:    'bg-red-600/30 text-red-300 border-red-500/50',
           };
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
