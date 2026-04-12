@@ -1,0 +1,105 @@
+======================================================================
+SCADA 資料品質分析報告
+Data: 36000 rows, 5 turbines
+Time span: 2.0 hours
+======================================================================
+
+## 1. 功率曲線 (Power vs Wind)
+  Wind (m/s)      Mean kW      Std kW       Count    CV%     
+  -------------------------------------------------------
+  3-5            71.9         31.4         4288     43.7    
+  5-7            272.4        85.5         3236     31.4    
+  7-9            582.7        140.1        9023     24.0    
+  9-11           1003.7       189.0        2044     18.8    
+  11-13           1769.4       173.4        1448     9.8     
+  13-15           1938.7       45.6         3189     2.4     
+  15-20           1957.0       17.0         2384     0.9     
+  20-25           1953.6       14.7         63       0.8     
+
+  Region 2 slope: 215.8 kW/(m/s)
+  Region 3 slope: 7.2 kW/(m/s)
+  ⚠ Wind 15-20: CV=0.9% 太低，信號可能過於平滑
+  ⚠ Wind 20-25: CV=0.8% 太低，信號可能過於平滑
+
+## 2. 溫度響應
+  WGEN_GnStaTmp1            range=22.7~62.7°C  mean=40.7  std=12.3
+  WGEN_GnBrgTmp1            range=22.0~42.4°C  mean=33.3  std=5.8
+  WNAC_NacTmp               range=22.5~29.0°C  mean=26.0  std=1.6
+  WCNV_CnvCabinTmp          range=22.2~43.9°C  mean=31.5  std=6.1
+
+  Stator temp ~ Power correlation: 0.584
+  ✓ 溫度-功率相關性合理（有熱慣性效應）
+
+  WT001 Stator temp change rate: max=1.100°C/step  mean=0.2071°C/step
+  ✓ 溫度變化平滑，熱慣性模型正常
+
+## 3. 振動頻譜
+  WVIB_Band1pX         range=0.0000~0.4300  mean=0.2308  std=0.0850
+  WVIB_Band3pX         range=0.0000~0.3290  mean=0.2022  std=0.0637
+  WVIB_BandGearX       range=0.0000~0.0400  mean=0.0053  std=0.0079
+  WVIB_BandHfX         range=0.0100~0.4720  mean=0.0922  std=0.0381
+  WVIB_BandBbX         range=0.0000~0.2140  mean=0.1308  std=0.0345
+
+  1P band ~ RPM correlation: 0.857
+  ✓ 1P 頻帶隨轉速變化，物理合理
+  Stopped-state 1P mean: 0.00386 mm/s
+  ✓ 停機時振動很低，合理
+
+## 4. 載荷 (Fatigue / DEL)
+  WFAT_TwrBsMy         range=51.2~10000.0  mean=5716.9  std=3081.0
+  WFAT_TwrBsMx         range=0.0~252.5  mean=69.1  std=42.9
+  WFAT_BldRtMy         range=0.0~2610.1  mean=1122.1  std=654.1
+  WFAT_BldRtMx         range=26.0~604.9  mean=177.7  std=77.6
+
+  Tower My ~ Wind^2 correlation: 0.881
+  ✓ 塔基彎矩與風速平方高度相關（推力驅動），物理合理
+  Tower My ~ Power correlation: 0.970
+  Stopped-state Tower My mean: 65.2 kNm
+  ✓ 停機載荷合理（重力+微風）
+
+## 5. 故障前後信號變化
+
+  [converter_cooling_fault] on WT003 (3600 fault samples)
+    WTUR_TotPwrAt          normal=   1151.49  fault=     25.24  change=  -97.8% ▼
+    WGEN_GnStaTmp1         normal=     46.16  fault=     34.57  change=  -25.1% ▼
+    WVIB_BandHfX           normal=      0.10  fault=      0.00  change=  -95.7% ▼
+    WVIB_Band1pX           normal=      0.26  fault=      0.02  change=  -92.5% ▼
+    WFAT_TwrBsMy           normal=   6982.85  fault=    264.05  change=  -96.2% ▼
+    WFAT_BldRtMy           normal=   1422.92  fault=     51.16  change=  -96.4% ▼
+
+## 6. Tag 間物理相關性
+
+  應高度相關的 tag 組合：
+    風速 ↔ 功率                   r=+0.965  ✓
+    風速 ↔ 轉速                   r=+0.947  ✓
+    功率 ↔ 轉速                   r=+0.956  ✓
+    1P振動 ↔ 轉速                 r=+0.857  ✓
+    塔基載荷 ↔ 風速                 r=+0.947  ✓
+
+  不應高度相關的 tag 組合：
+    HF振動 ↔ 風速（除非故障）                     r=+0.591  ✓ 合理
+
+## 7. 風機個體差異
+  各風機平均功率: min=736.3  max=1049.3  std=124.2 kW
+  Spread: 36.8%
+  ⚠ 風機間差異太大 (>30%)，可能有異常值
+
+## 8. 數值品質
+  ✓ 無 NaN 值
+  ✓ WTUR_TotPwrAt: 全部在合理範圍內
+  ✓ WROT_RotSpd: 全部在合理範圍內
+  ✓ WGEN_GnStaTmp1: 全部在合理範圍內
+  ✓ WFAT_TwrBsMy: 全部在合理範圍內
+  ✓ WVIB_Band1pX: 全部在合理範圍內
+
+======================================================================
+問題彙整與優先順序
+======================================================================
+
+通過項目：18 項
+待改善項目：3 項
+
+待改善列表：
+  1. ⚠ Wind 15-20: CV=0.9% 太低，信號可能過於平滑
+  2. ⚠ Wind 20-25: CV=0.8% 太低，信號可能過於平滑
+  3. ⚠ 風機間差異太大 (>30%)，可能有異常值

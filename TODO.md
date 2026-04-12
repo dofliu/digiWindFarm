@@ -116,7 +116,6 @@ These parts are implemented, but still first-generation models:
 - [x] Add richer event query filters on the backend
 - [x] Vibration spectral alarm threshold curves
 - [x] Advanced fatigue / DEL load metrics
-- [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
 
 ### Maintenance
 - [x] Work order backend schema
@@ -124,14 +123,37 @@ These parts are implemented, but still first-generation models:
 - [x] Technician management API
 - [x] Connect `MaintenanceHub` to real backend instead of mock data
 
-### Deployment
+### Documentation / External Access
+- [x] API Guide for students/researchers (`docs/API_GUIDE.md`)
+- [x] Python example scripts (`examples/fetch_scada_data.py`)
+- [x] Data quality analysis script (`examples/data_quality_analysis.py`)
+
+### Data Quality Validation (2026-04-12)
+- [x] 2-hour multi-scenario simulation with fault injection + wind variation
+- [x] Automated analysis: power curve, temperature, vibration, load, correlation
+- [x] Report: 18/21 checks passed
+
+## Known Issues / Next Improvements
+
+### Physics Realism (from data quality analysis)
+- [ ] Region 3 power CV too low (0.8-0.9%): pitch controller needs response delay and wind turbulence coupling to produce realistic 3-5% variation at rated power
+- [ ] Spectral sideband analysis (modulated harmonics around gear mesh)
+- [ ] Bearing defect frequency computation (BPFO/BPFI from geometry)
+- [ ] Tower fore-aft dynamic response (natural frequency oscillation)
+
+### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
 - [ ] Basic RBAC
 - [ ] `.env` cleanup
 - [ ] Docker Compose
 - [ ] Reverse proxy / HTTPS
 
+### Storage
+- [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
+
 ## Notes
 
 - `README.md` and this roadmap now reflect the actual implemented state.
 - Physics-specific status should be maintained in `docs/physics_model_status.md`.
+- Data quality report available at `examples/data_quality_report.txt`.
+- API reference for external users at `docs/API_GUIDE.md`.
