@@ -38,6 +38,11 @@ const TAG_PRESETS: Record<string, { label_en: string; label_zh: string; tags: st
     label_zh: '轉向系統',
     tags: ['WYAW_YwVn1AlgnAvg5s', 'WYAW_YwBrkHyPrs', 'WYAW_CabWup'],
   },
+  fatigue: {
+    label_en: 'Load & Fatigue',
+    label_zh: '載荷與疲勞',
+    tags: ['WLOD_TwrFaMom', 'WLOD_BldFlapMom', 'WLOD_DelTwrFa', 'WLOD_DelBldFlap'],
+  },
 };
 
 interface TrendChartPanelProps {

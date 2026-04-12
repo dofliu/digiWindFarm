@@ -24,6 +24,7 @@ from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
 from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
 from simulator.physics.electrical_model import ElectricalModel, ElectricalSpec
 from simulator.physics.vibration_spectral import SpectralVibrationModel
+from simulator.physics.fatigue_model import FatigueModel, FatigueSpec
 
 
 @dataclass
@@ -217,6 +218,15 @@ class TurbinePhysicsModel:
         self.vib_spectral = SpectralVibrationModel(
             seed=_seed,
             gear_ratio=self.spec.gear_ratio,
+        )
+
+        # Fatigue / structural load model
+        self.fatigue = FatigueModel(
+            spec=FatigueSpec(),
+            seed=_seed,
+            rated_power_kw=self.spec.rated_power_kw,
+            rotor_diameter=self.spec.rotor_diameter,
+            hub_height=self.spec.hub_height,
         )
 
         self.tur_state = 1
@@ -519,6 +529,21 @@ class TurbinePhysicsModel:
             active_faults=self.active_faults,
         )
 
+        # Fatigue / structural load tracking
+        fatigue_out = self.fatigue.step(
+            dt=dt,
+            wind_speed=effective_wind_speed,
+            rotor_speed_rpm=self.rotor_speed,
+            power_kw=gen_power_kw,
+            pitch_angle_deg=self._pitch_bl[0],
+            yaw_error_deg=yaw_out["yaw_error"],
+            thrust_kn=aero_out.thrust_kn,
+            turbulence_intensity=0.1,
+            is_producing=is_producing,
+            is_starting=is_starting,
+            is_emergency_stop=is_emergency_stop,
+        )
+
         # IGCT water pressure now driven by cooling system pump (#29)
         water_pres = self.cooling.water_loop.pressure_bar
         if is_producing:
@@ -601,6 +626,20 @@ class TurbinePhysicsModel:
             "WVIB_BandBbY": round(vib_bands.band_bb_y, 4),
             "WVIB_CrestFactor": round(vib_bands.crest_factor, 3),
             "WVIB_Kurtosis": round(vib_bands.kurtosis, 3),
+            # ── Fatigue / structural load tags ──
+            "WLOD_TwrFaMom": fatigue_out["tower_fa_moment_knm"],
+            "WLOD_TwrSsMom": fatigue_out["tower_ss_moment_knm"],
+            "WLOD_BldFlapMom": fatigue_out["blade_flap_moment_knm"],
+            "WLOD_BldEdgeMom": fatigue_out["blade_edge_moment_knm"],
+            "WLOD_DelTwrFa": fatigue_out["del_tower_fa_knm"],
+            "WLOD_DelTwrSs": fatigue_out["del_tower_ss_knm"],
+            "WLOD_DelBldFlap": fatigue_out["del_blade_flap_knm"],
+            "WLOD_DelBldEdge": fatigue_out["del_blade_edge_knm"],
+            "WLOD_DmgTwrFa": fatigue_out["damage_tower_fa"],
+            "WLOD_DmgTwrSs": fatigue_out["damage_tower_ss"],
+            "WLOD_DmgBldFlap": fatigue_out["damage_blade_flap"],
+            "WLOD_DmgBldEdge": fatigue_out["damage_blade_edge"],
+            "WLOD_ProdHours": fatigue_out["production_hours"],
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -991,10 +1030,18 @@ class TurbinePhysicsModel:
         _integer_tags = {"WTUR_TurSt", "WCNV_CnvMode", "WCNV_RtBand",
                          "WROT_RotLckd", "WROT_SrvcBrkAct", "WROT_LckngPnPos",
                          "WSRV_SrvOn", "MBUS_Contact2"}
+        # Computed metrics — pass through without sensor noise
+        _passthrough_tags = {"WLOD_DmgTwrFa", "WLOD_DmgTwrSs", "WLOD_DmgBldFlap",
+                             "WLOD_DmgBldEdge", "WLOD_ProdHours",
+                             "WLOD_DelTwrFa", "WLOD_DelTwrSs",
+                             "WLOD_DelBldFlap", "WLOD_DelBldEdge"}
         sensorized: Dict[str, float] = {}
         for tag, value in output.items():
             if tag in _integer_tags:
                 sensorized[tag] = round(value)
+                continue
+            if tag in _passthrough_tags:
+                sensorized[tag] = value
                 continue
             cfg = self._get_sensor_config(tag)
             if cfg["drift"] > 0.0:
@@ -1025,6 +1072,9 @@ class TurbinePhysicsModel:
             return {"noise": 0.003, "drift": 0.0001, "bias_limit": 0.01, "resolution": 0.001, "stuck_prob": 0.0, "min": -1.0, "max": 1.0}
         if tag in ("WCNV_FreqWattDerate",):
             return {"noise": 0.002, "drift": 0.0001, "bias_limit": 0.005, "resolution": 0.001, "stuck_prob": 0.0, "min": 0.0, "max": 1.0}
+        # Structural load moment tags — small noise, clamped to 0
+        if tag.startswith("WLOD_Twr") or tag.startswith("WLOD_Bld"):
+            return {"noise": 5.0, "drift": 0.05, "bias_limit": 15.0, "resolution": 0.1, "stuck_prob": 0.00005, "min": 0.0, "max": 50000.0}
         # Vibration spectral bands — similar to main vibration
         if tag.startswith("WVIB_Band") or tag.startswith("WVIB_Crest") or tag.startswith("WVIB_Kurt"):
             return {"noise": 0.005, "drift": 0.0003, "bias_limit": 0.05, "resolution": 0.001, "stuck_prob": 0.0001, "min": 0.0, "max": 30.0}

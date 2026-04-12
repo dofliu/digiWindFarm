@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-07
+Last updated: 2026-04-12
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -345,12 +345,27 @@ Still not implemented:
 - detailed sub-transient behavior
 - protection relay coordination model
 
-### 3.3 Advanced Fatigue / Load Modeling
-Not yet implemented:
-- tower load
-- blade root load
-- fatigue accumulation
-- DEL-style damage metrics
+### 3.3 Fatigue / Load Modeling
+Status: **first version implemented**
+
+Implemented:
+- `FatigueModel` class with `FatigueSpec` configuration
+- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic)
+- tower base side-to-side bending moment (lateral thrust + rotor imbalance)
+- blade root flapwise bending moment (thrust distribution + wind shear + pitch)
+- blade root edgewise bending moment (gravity 1P cyclic + aero torque)
+- rainflow cycle counting (online 3-point method with rolling buffer)
+- Damage Equivalent Load (DEL) computation (10-min rolling window)
+- cumulative fatigue damage via Miner's rule (S-N curve based)
+- per-turbine individuality (stiffness scale offsets)
+- emergency stop transient load amplification (1.8× tower FA)
+- 13 new SCADA tags (WLOD_ prefix)
+- frontend Load/Fatigue tab with instantaneous loads, DEL, and damage
+
+Still missing:
+- full aeroelastic tower/blade FEM coupling
+- fatigue-based alarm thresholds
+- DEL-based remaining useful life estimation
 
 ### 3.4 Event Layer for Historical Analysis
 Status: first usable version implemented
@@ -428,15 +443,17 @@ Why:
 - active cooling system with fouling
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
-- 59 SCADA tags (electrical + vibration spectral)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage)
+- 72 SCADA tags (electrical + vibration + structural load)
 
 ### Still Weak
 - sideband vibration detail
 - full protection relay coordination
-- advanced fatigue / load modeling
+- aeroelastic coupling
+- fatigue-based alarm thresholds
 
 ### Recommended Immediate Direction
-1. multi-turbine event comparison view
-2. maintenance workflow backend
-3. advanced fatigue / DEL metrics
-4. spectral alarm threshold curves
+1. spectral alarm threshold curves
+2. fatigue-based remaining useful life estimation
+3. protection relay coordination model
+4. sideband vibration analysis
