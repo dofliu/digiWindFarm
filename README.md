@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 59 SCADA tags aligned to Bachmann Z72 definitions
+- 72 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -10,6 +10,8 @@ Wind farm monitoring and digital twin platform with:
 - React frontend for dashboard, detail, history, and settings
 
 ## Quick Start
+
+### Local Development
 
 ```bash
 # Backend + simulator + Modbus TCP (default port 8100)
@@ -23,6 +25,14 @@ npm run dev
 ```
 
 Open [http://localhost:3100](http://localhost:3100).
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:3100](http://localhost:3100). Backend runs on port 8100, Modbus TCP on 5020.
 
 Ports are configured in `.env` (copy from `.env.example`):
 - Backend: `BACKEND_PORT=8100`
@@ -45,8 +55,10 @@ Implemented and usable today:
 - history page with event markers, event details, focus windows, and CSV export
 - electrical response model (frequency-watt, reactive power, power factor, ride-through)
 - spectral vibration model (1P/3P/gear/HF/broadband bands, crest factor, kurtosis)
+- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage)
 - fault lifecycle tracking with start/end duration events
 - event export API (JSON/CSV) with severity grouping
+- Docker Compose deployment (backend + frontend with nginx reverse proxy)
 
 Physics model tracking:
 - [`docs/physics_model_status.md`](./docs/physics_model_status.md)
@@ -73,6 +85,7 @@ Main modules:
   - `fault_engine.py`
   - `electrical_model.py`
   - `vibration_spectral.py`
+  - `fatigue_model.py`
   - `scada_registry.py`
 - `simulator/grid_model.py`
 - `server/`
@@ -188,8 +201,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 
 ## Known Gaps
 
-- deployment hardening (JWT, RBAC, Docker) not yet implemented
-- history retention / cleanup job not implemented
-- event export and advanced multi-turbine comparison are still limited
-- advanced aerodynamics, spectral vibration modeling, and deeper electrical control are still pending
+- deployment hardening: JWT, RBAC not yet implemented (Docker Compose is available)
+- sideband vibration analysis and protection relay coordination pending
+- fatigue-based alarm thresholds and remaining useful life estimation pending
 - use the status and roadmap docs as the source of truth for current implementation state
