@@ -169,6 +169,21 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
         vibCrestFactor=scada.get("WVIB_CrestFactor"),
         vibKurtosis=scada.get("WVIB_Kurtosis"),
 
+        # ── WLOD — Structural Load & Fatigue ──
+        towerFaMoment=scada.get("WLOD_TwrFaMom"),
+        towerSsMoment=scada.get("WLOD_TwrSsMom"),
+        bladeFlapMoment=scada.get("WLOD_BldFlapMom"),
+        bladeEdgeMoment=scada.get("WLOD_BldEdgeMom"),
+        delTowerFa=scada.get("WLOD_DelTwrFa"),
+        delTowerSs=scada.get("WLOD_DelTwrSs"),
+        delBladeFlap=scada.get("WLOD_DelBldFlap"),
+        delBladeEdge=scada.get("WLOD_DelBldEdge"),
+        damageTowerFa=scada.get("WLOD_DmgTwrFa"),
+        damageTowerSs=scada.get("WLOD_DmgTwrSs"),
+        damageBladeFlap=scada.get("WLOD_DmgBldFlap"),
+        damageBladeEdge=scada.get("WLOD_DmgBldEdge"),
+        productionHours=scada.get("WLOD_ProdHours"),
+
         # ── Fault info ──
         activeFaults=fault_info,
 

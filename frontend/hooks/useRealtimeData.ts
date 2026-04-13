@@ -76,6 +76,20 @@ interface ApiTurbineReading {
   vibBandBbY?: number;
   vibCrestFactor?: number;
   vibKurtosis?: number;
+  // Structural load & fatigue
+  towerFaMoment?: number;
+  towerSsMoment?: number;
+  bladeFlapMoment?: number;
+  bladeEdgeMoment?: number;
+  delTowerFa?: number;
+  delTowerSs?: number;
+  delBladeFlap?: number;
+  delBladeEdge?: number;
+  damageTowerFa?: number;
+  damageTowerSs?: number;
+  damageBladeFlap?: number;
+  damageBladeEdge?: number;
+  productionHours?: number;
   activeFaults?: FaultInfo[];
   scadaTags?: Record<string, number>;
 }
@@ -158,6 +172,20 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     vibBandBbY: api.vibBandBbY,
     vibCrestFactor: api.vibCrestFactor,
     vibKurtosis: api.vibKurtosis,
+    // Structural load & fatigue
+    towerFaMoment: api.towerFaMoment,
+    towerSsMoment: api.towerSsMoment,
+    bladeFlapMoment: api.bladeFlapMoment,
+    bladeEdgeMoment: api.bladeEdgeMoment,
+    delTowerFa: api.delTowerFa,
+    delTowerSs: api.delTowerSs,
+    delBladeFlap: api.delBladeFlap,
+    delBladeEdge: api.delBladeEdge,
+    damageTowerFa: api.damageTowerFa,
+    damageTowerSs: api.damageTowerSs,
+    damageBladeFlap: api.damageBladeFlap,
+    damageBladeEdge: api.damageBladeEdge,
+    productionHours: api.productionHours,
     activeFaults: api.activeFaults,
     scadaTags: api.scadaTags,
   };

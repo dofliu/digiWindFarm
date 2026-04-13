@@ -31,6 +31,10 @@ SCADA_CSV_COLUMNS = [
     "WVIB_Band1pX", "WVIB_Band1pY", "WVIB_Band3pX", "WVIB_Band3pY",
     "WVIB_BandGearX", "WVIB_BandGearY", "WVIB_BandHfX", "WVIB_BandHfY",
     "WVIB_BandBbX", "WVIB_BandBbY", "WVIB_CrestFactor", "WVIB_Kurtosis",
+    "WLOD_TwrFaMom", "WLOD_TwrSsMom", "WLOD_BldFlapMom", "WLOD_BldEdgeMom",
+    "WLOD_DelTwrFa", "WLOD_DelTwrSs", "WLOD_DelBldFlap", "WLOD_DelBldEdge",
+    "WLOD_DmgTwrFa", "WLOD_DmgTwrSs", "WLOD_DmgBldFlap", "WLOD_DmgBldEdge",
+    "WLOD_ProdHours",
     "WSRV_SrvOn", "MBUS_Contact2",
 ]
 

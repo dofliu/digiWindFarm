@@ -7,7 +7,8 @@ from typing import List, Optional
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).parent.parent / "wind_farm_data.db"
+import os as _os
+DB_PATH = Path(_os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "wind_farm_data.db")))
 
 
 class Storage:
