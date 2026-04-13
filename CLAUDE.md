@@ -32,12 +32,11 @@ Secondary focus:
 ## Current Gaps
 
 Still pending or incomplete:
-- deployment hardening (JWT, RBAC, HTTPS)
-- Docker Compose deployment (in progress, see #42)
-- fatigue / DEL load modeling (in progress, see #41)
+- deployment hardening (JWT, RBAC, HTTPS) — see #26
 - sideband vibration detail and spectral alarm thresholds
 - full protection relay coordination
-- SQLite vs time-series DB architecture decision
+- SQLite vs time-series DB architecture decision — see #24
+- dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 
 ## Source of Truth
 

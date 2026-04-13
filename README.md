@@ -229,11 +229,9 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 
 ## Known Gaps
 
-- deployment hardening (JWT, RBAC, HTTPS) not yet implemented (Docker Compose in progress, see #42)
-- advanced fatigue / DEL metrics in progress (see #41)
+- deployment hardening: JWT, RBAC, HTTPS not yet implemented (Docker Compose is available)
 - sideband vibration detail and spectral alarm thresholds not yet implemented
 - full protection relay coordination not yet implemented
-- deployment hardening: JWT, RBAC not yet implemented (Docker Compose is available)
-- sideband vibration analysis and protection relay coordination pending
 - fatigue-based alarm thresholds and remaining useful life estimation pending
+- dependency security vulnerabilities pending upgrade (see #48)
 - use the status and roadmap docs as the source of truth for current implementation state
