@@ -420,7 +420,6 @@ class PerTurbineWind:
 
                 # Wake deficit: stronger when directly aligned, weaker at distance
                 # Jensen/Park-like simple model
-                wake_width = 0.1 * dist  # wake expands ~10% per distance
                 alignment = max(0.0, (cos_angle - 0.3) / 0.7)
                 wake_deficit = 0.08 * alignment * (200.0 / max(dist, 200.0)) ** 0.5
                 self._wake_factors[i] *= (1.0 - wake_deficit)

@@ -245,7 +245,6 @@ class ElectricalModel:
 
     def _update_ride_through(self, grid_v: float, nominal_v: float, dt: float):
         """Evaluate LVRT/HVRT ride-through status."""
-        s = self.spec
         rt = self._ride_through
 
         if nominal_v <= 0:

@@ -62,15 +62,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register routers
-from server.routers.turbines import router as turbines_router
-from server.routers.config import router as config_router
-from server.routers.export import router as export_router
-from server.routers.faults import router as faults_router
-from server.routers.i18n import router as i18n_router
-from server.routers.modbus import router as modbus_router
-from server.routers.control import router as control_router
-from server.routers.maintenance import router as maintenance_router
+# Register routers (after app creation to avoid circular imports)
+from server.routers.turbines import router as turbines_router  # noqa: E402
+from server.routers.config import router as config_router  # noqa: E402
+from server.routers.export import router as export_router  # noqa: E402
+from server.routers.faults import router as faults_router  # noqa: E402
+from server.routers.i18n import router as i18n_router  # noqa: E402
+from server.routers.modbus import router as modbus_router  # noqa: E402
+from server.routers.control import router as control_router  # noqa: E402
+from server.routers.maintenance import router as maintenance_router  # noqa: E402
 
 app.include_router(turbines_router)
 app.include_router(config_router)

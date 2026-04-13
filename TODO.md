@@ -136,6 +136,12 @@ These parts are implemented, but still first-generation models:
 - [x] Docker Compose (backend + frontend + nginx reverse proxy)
 - [ ] Reverse proxy / HTTPS (standalone, Docker uses nginx internally)
 
+### Security
+- [ ] Upgrade `cryptography` (41.0.7 → ≥46.0.6, 7 CVEs) — see #48
+- [ ] Upgrade `pyjwt` (2.7.0 → ≥2.12.0, 1 CVE) — see #48
+- [ ] Upgrade `setuptools` (68.1.2 → ≥78.1.1, 3 CVEs) — see #48
+- [ ] Add `pip-audit` to CI / development workflow
+
 ## Notes
 
 - `README.md` and this roadmap now reflect the actual implemented state.

@@ -449,7 +449,7 @@ class Storage:
         ).fetchone()[0]
         from_ts = latest_1m or "2000-01-01T00:00:00"
 
-        rows = conn.execute("""
+        conn.execute("""
             INSERT INTO turbine_data_1m
                 (timestamp, turbine_id, session_id,
                  power_output_avg, power_output_max, power_output_min,

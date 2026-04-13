@@ -121,7 +121,6 @@ class SpectralVibrationModel:
             self._prev = bands
             return bands
 
-        rot_freq = rotor_speed_rpm / 60.0  # Hz
         speed_ratio = min(1.0, rotor_speed_rpm / 22.0)
         power_ratio = min(1.0, power_kw / max(rated_power_kw, 1.0))
         load_factor = max(power_ratio, speed_ratio)
