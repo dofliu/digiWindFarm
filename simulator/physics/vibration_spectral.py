@@ -21,7 +21,6 @@ Fault signatures:
   - stator_winding_degradation: elevated band_hf (electrical noise)
 """
 
-import math
 import numpy as np
 from dataclasses import dataclass
 from typing import Dict, Optional, List

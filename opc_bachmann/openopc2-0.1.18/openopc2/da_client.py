@@ -8,7 +8,6 @@
 #
 ###########################################################################
 
-import logging
 import os
 import re
 import socket
@@ -20,7 +19,6 @@ from multiprocessing import Queue
 
 import Pyro5.core
 
-from openopc2 import system_health
 from openopc2.config import OpenOpcConfig
 from openopc2.exceptions import OPCError
 from openopc2.da_com import OpcCom
@@ -219,7 +217,7 @@ class OpcDaClient:
             valid_values = []
             client_handles = []
 
-            if not sub_group in self._group_handles_tag:
+            if sub_group not in self._group_handles_tag:
                 self._group_handles_tag[sub_group] = {}
                 n = 0
             elif len(self._group_handles_tag[sub_group]) > 0:
@@ -249,7 +247,7 @@ class OpcDaClient:
 
             try:
                 server_handles, errors = opc_items.AddItems(len(client_handles) - 1, valid_tags, client_handles)
-            except Exception as e:
+            except Exception:
                 log.exception("Error adding items to Group", exc_info=True)
                 pass
 
@@ -257,7 +255,7 @@ class OpcDaClient:
             server_handles_tmp = []
             valid_tags.pop(0)
 
-            if not sub_group in self._group_server_handles:
+            if sub_group not in self._group_server_handles:
                 self._group_server_handles[sub_group] = {}
 
             for i, tag in enumerate(valid_tags):
@@ -942,7 +940,7 @@ class OpcDaClient:
                         if include_type:
                             matches = [(x, node_type) for x in matches]
                         for node in matches:
-                            if not node in nodes:
+                            if node not in nodes:
                                 yield node
                             nodes[node] = True
 

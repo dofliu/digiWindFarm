@@ -3,7 +3,7 @@ import json
 import threading
 import time as _time
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import List, Optional
 from pathlib import Path
 
 

@@ -16,7 +16,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel, AeroOutput
+from simulator.physics.power_curve import PowerCurveModel, RotorSpeedModel
 from simulator.physics.thermal_model import ThermalSystem
 from simulator.physics.vibration_model import VibrationModel
 from simulator.physics.yaw_model import YawModel

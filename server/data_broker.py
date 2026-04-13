@@ -4,7 +4,6 @@ import threading
 import time as _time
 from datetime import datetime
 from typing import List, Optional, Dict
-from collections import deque
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 

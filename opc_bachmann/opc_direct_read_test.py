@@ -235,7 +235,7 @@ def timeout_read_test(timeout_seconds=15):
         except Exception as e:
             result_container["error"] = e
 
-    print(f"\n啟動讀取執行緒...")
+    print("\n啟動讀取執行緒...")
     thread = threading.Thread(target=read_task, daemon=True)
     thread.start()
 

@@ -19,7 +19,7 @@ Supports:
 import math
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional
 
 
 # ─── Seasonal wind parameters (typical coastal/onshore site) ─────────

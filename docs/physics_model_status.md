@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -368,7 +368,7 @@ Still missing:
 - DEL-based remaining useful life estimation
 
 ### 3.4 Event Layer for Historical Analysis
-Status: first usable version implemented
+Status: **implemented**
 
 Implemented:
 - explicit history event storage in SQLite
@@ -378,9 +378,9 @@ Implemented:
 - chart markers on the history page
 - event search, filtering, detail panel, and focus windows
 - start/end duration support for grid and wind config events
-
-Still missing:
-- multi-turbine event correlation / comparison view
+- fault lifecycle tracking with start/end duration events
+- event export API (JSON/CSV) with severity grouping
+- multi-turbine event comparison view with timeline, summary, and severity badges
 
 ### 3.5 Expanded SCADA Tag Set
 Not yet implemented:
@@ -414,21 +414,23 @@ Implemented:
 - farm layout model with direction-aware wake
 
 ### Priority C: Electrical Response Detail
-Recommended next:
-- frequency-watt response
-- reactive power / power factor
-- more detailed sync / ride-through logic
+Status: **done**
 
-Why:
-- the grid model already exists, so this is a natural extension.
+Implemented:
+- frequency-watt droop response with deadband
+- reactive power / power factor / apparent power
+- LVRT/HVRT ride-through curves with band accumulation
+- synthetic inertia response
+- converter operating mode tracking
 
 ### Priority D: Vibration Feature Upgrade
-Recommended next:
-- fault-specific signatures
-- basic frequency-band outputs
+Status: **done**
 
-Why:
-- this would make diagnostics and AI explanation features significantly stronger.
+Implemented:
+- fault-specific vibration signatures for all 11 fault scenarios
+- 5 frequency-band outputs (1P/3P/gear-mesh/HF/broadband)
+- crest factor and kurtosis condition indicators
+- X and Y direction separation
 
 ## 5. Quick Summary
 
@@ -453,7 +455,7 @@ Why:
 - fatigue-based alarm thresholds
 
 ### Recommended Immediate Direction
-1. spectral alarm threshold curves
-2. fatigue-based remaining useful life estimation
-3. protection relay coordination model
-4. sideband vibration analysis
+1. advanced fatigue / DEL metrics (in progress, see #41)
+2. spectral alarm threshold curves
+3. sideband vibration analysis
+4. protection relay coordination model

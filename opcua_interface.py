@@ -2,7 +2,6 @@
 
 from opcua import Server, ua
 from threading import Thread
-import time
 from typing import Dict
 
 class OPCUAServer:

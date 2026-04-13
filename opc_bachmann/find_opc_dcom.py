@@ -130,9 +130,9 @@ try:
             print(f"   CLSID: {obj['clsid']}")
             if obj['is_dcom']:
                 print(f"   AppID: {obj['appid']}")
-                print(f"   ✓ 這是 DCOM 物件（應該出現在 dcomcnfg 中）")
+                print("   ✓ 這是 DCOM 物件（應該出現在 dcomcnfg 中）")
             else:
-                print(f"   ✗ 不是 DCOM 物件（不會出現在 dcomcnfg 中）")
+                print("   ✗ 不是 DCOM 物件（不會出現在 dcomcnfg 中）")
     else:
         print("\n未找到任何 OPC 相關物件")
 
@@ -189,7 +189,7 @@ try:
         for idx, obj in enumerate(dcom_objects, 1):
             print(f"\n{idx}. {obj['name']}")
             print(f"   AppID: {obj['appid']}")
-            print(f"   ✓ 這個名稱應該出現在 dcomcnfg → DCOM Config 中")
+            print("   ✓ 這個名稱應該出現在 dcomcnfg → DCOM Config 中")
     else:
         print("\n未找到任何 OPC 相關 DCOM 物件")
         print("\n這可能表示：")
