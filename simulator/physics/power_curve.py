@@ -15,7 +15,7 @@ Can be replaced independently for different turbine types.
 
 import math
 import numpy as np
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional
 
 
 # ─── Default Z72-2000-MV power curve (Harakosan 2MW direct-drive) ────────

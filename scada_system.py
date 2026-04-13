@@ -1,7 +1,7 @@
 # wind_turbine_simulator/scada_system.py
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 from opcua import Client
 import threading

@@ -16,8 +16,8 @@ Separate from wind_model.py (which handles profiles/overrides).
 
 import math
 import numpy as np
-from typing import Optional, List, Tuple, Dict
-from dataclasses import dataclass, field
+from typing import Optional, List, Tuple
+from dataclasses import dataclass
 
 
 class TurbulenceGenerator:

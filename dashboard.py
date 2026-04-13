@@ -3,7 +3,6 @@
 import dash
 from dash import dcc, html, Input, Output
 import plotly.graph_objs as go
-import pandas as pd
 from datetime import datetime, timedelta
 
 from scada_system import TimeSeriesDatabase

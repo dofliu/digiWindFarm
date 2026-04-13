@@ -32,12 +32,12 @@ Secondary focus:
 ## Current Gaps
 
 Still pending or incomplete:
-- maintenance work order backend
-- history retention / cleanup
-- advanced aerodynamics
-- spectral vibration modeling
-- deeper electrical control behavior
-- historical event visualization expansion
+- deployment hardening (JWT, RBAC, HTTPS)
+- Docker Compose deployment (in progress, see #42)
+- fatigue / DEL load modeling (in progress, see #41)
+- sideband vibration detail and spectral alarm thresholds
+- full protection relay coordination
+- SQLite vs time-series DB architecture decision
 
 ## Source of Truth
 

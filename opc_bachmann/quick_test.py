@@ -45,7 +45,7 @@ except Exception as e:
 print("\n[測試 3] 連接到伺服器...")
 try:
     opc.Connect(OPC_SERVER, OPC_HOST)
-    print(f"✓ 連接成功")
+    print("✓ 連接成功")
     print(f"  ServerName: {opc.ServerName}")
     print(f"  ServerState: {opc.ServerState}")
 except Exception as e:
@@ -153,7 +153,7 @@ try:
 
     if result[0]:
         values, read_errors, qualities, timestamps, elapsed = result[0]
-        print(f"\n✓✓✓ SyncRead 成功！✓✓✓")
+        print("\n✓✓✓ SyncRead 成功！✓✓✓")
         print(f"\n耗時: {elapsed:.2f} 秒")
 
         # 顯示結果
@@ -165,7 +165,7 @@ try:
         quality_status = (quality >> 6) & 3
         quality_text = ["Bad", "Uncertain", "Unknown", "Good"][quality_status]
 
-        print(f"\n讀取結果：")
+        print("\n讀取結果：")
         print(f"  標籤: {TEST_TAG}")
         print(f"  值: {value}")
         print(f"  品質: {quality_text}")

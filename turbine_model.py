@@ -1,10 +1,7 @@
 # wind_turbine_simulator/turbine_model.py
 
-import numpy as np
-from dataclasses import dataclass
 from typing import Dict, Optional
 from datetime import datetime
-import math
 
 from common_types import TurbineParameters
 

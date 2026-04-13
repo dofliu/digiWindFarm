@@ -12,7 +12,7 @@ Based on: docs/1040610-Z72_PLC_OPC_TAG_1040510.xlsx
 Sheet: "簡化-每部風力機頁面顯示" + "Modbus標籤對應(from Bachmann)"
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Dict, List
 
 

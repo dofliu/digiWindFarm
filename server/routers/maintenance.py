@@ -7,7 +7,6 @@ Replaces the frontend mock data with real persistent storage.
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
 

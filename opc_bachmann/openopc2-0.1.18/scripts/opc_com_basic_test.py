@@ -1,6 +1,4 @@
 
-import pythoncom
-import pywintypes
 import win32com.client
 import win32com.server.util
 

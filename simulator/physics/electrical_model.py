@@ -13,8 +13,8 @@ producing realistic converter-side electrical behavior.
 """
 
 import math
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Tuple
+from dataclasses import dataclass
+from typing import Optional, Dict
 
 
 @dataclass

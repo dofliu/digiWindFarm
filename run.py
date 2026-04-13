@@ -80,7 +80,7 @@ def main():
             print(f"[run] Port {old_port} is busy, using {port} instead")
         else:
             print(f"[run] WARNING: Port {port} appears to be in use.")
-            print(f"[run]   Use --auto-port to auto-select, or --port <N> to specify another.")
+            print("[run]   Use --auto-port to auto-select, or --port <N> to specify another.")
 
     # Export actual port so other code can reference it
     os.environ["BACKEND_PORT"] = str(port)

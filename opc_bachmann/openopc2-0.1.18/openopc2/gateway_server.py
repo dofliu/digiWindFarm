@@ -55,7 +55,7 @@ class OpenOpcGatewayServer:
 
     def create_client(self, open_opc_config: OpenOpcConfig = OpenOpcConfig().OPC_CLASS):
         """Create a new OpenOPC instance in the Pyro server"""
-        print(f"-" * 80)
+        print("-" * 80)
 
         opc_da_client = OpcDaClient(open_opc_config)
 

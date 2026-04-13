@@ -16,7 +16,6 @@ sys.path.insert(0, str(repo_root / "openopc2-0.1.18"))
 
 import pythoncom
 import win32com.client
-import pytz
 
 # ==================== 配置部分 ====================
 OPC_SERVER = "BACHMANN.OPCEnterpriseServer.2"
@@ -123,7 +122,7 @@ class DirectOpcClient:
             print("\n[3] 連接到 OPC 伺服器...")
             self.opc_client.Connect(OPC_SERVER, OPC_HOST)
             self.connected = True
-            print(f"    ✓ 連接成功")
+            print("    ✓ 連接成功")
             print(f"    ServerName: {self.opc_client.ServerName}")
             print(f"    ServerState: {self.opc_client.ServerState}")
 

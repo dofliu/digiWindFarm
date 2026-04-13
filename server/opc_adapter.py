@@ -9,7 +9,7 @@ Requires: OpenOPC2 + Graybox.OPC.DAWrapper (Windows only, 32-bit Python)
 
 import time
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional, Callable
 
 from server.models import DataSourceConfig

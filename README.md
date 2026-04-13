@@ -116,22 +116,36 @@ Main modules:
 
 ## Core APIs
 
+### Health
+- `GET /api/health`
+
 ### Turbines
 - `GET /api/turbines`
 - `GET /api/turbines/{id}`
 - `GET /api/turbines/{id}/history`
 - `GET /api/turbines/{id}/trend`
 - `GET /api/turbines/farm-status`
+- `GET /api/turbines/farm-trend`
 
 ### Config
 - `GET /api/config`
+- `POST /api/config/datasource`
+- `POST /api/config/simulation`
+- `GET /api/config/wind`
 - `POST /api/config/wind`
 - `POST /api/config/wind/clear`
-- `GET /api/config/turbine-spec`
-- `POST /api/config/turbine-spec`
+- `GET /api/config/simulation/time-scale`
+- `POST /api/config/simulation/time-scale`
+- `POST /api/config/simulation/generate-bulk`
 - `GET /api/config/grid`
 - `POST /api/config/grid`
 - `POST /api/config/grid/clear`
+- `GET /api/config/storage/stats`
+- `GET /api/config/sessions`
+- `POST /api/config/storage/maintenance`
+- `GET /api/config/turbine-spec`
+- `POST /api/config/turbine-spec`
+- `GET /api/config/turbine-spec/presets`
 
 ### Control
 - `POST /api/control/command`
@@ -143,15 +157,29 @@ Main modules:
 - `POST /api/faults/inject`
 - `GET /api/faults/active`
 - `POST /api/faults/clear`
+- `GET /api/faults/test-plans`
+- `POST /api/faults/test-plans/{plan_id}/run`
 
 ### Maintenance
 - `GET /api/maintenance/work-orders`
 - `POST /api/maintenance/work-orders`
+- `GET /api/maintenance/work-orders/{id}`
 - `PATCH /api/maintenance/work-orders/{id}`
 - `GET /api/maintenance/technicians`
 - `POST /api/maintenance/technicians`
 - `PATCH /api/maintenance/technicians/{id}/status`
 - `GET /api/maintenance/events/compare?turbine_ids=WT001,WT002`
+
+### i18n (Tag Translation)
+- `GET /api/i18n/tags`
+- `GET /api/i18n/tags/all`
+- `GET /api/i18n/tags/registry`
+
+### Modbus TCP
+- `GET /api/modbus/status`
+- `POST /api/modbus/start`
+- `POST /api/modbus/stop`
+- `GET /api/modbus/registers`
 
 ### Export / Realtime
 - `GET /api/export/snapshot`
@@ -188,8 +216,8 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 
 ## Known Gaps
 
-- deployment hardening (JWT, RBAC, Docker) not yet implemented
-- history retention / cleanup job not implemented
-- event export and advanced multi-turbine comparison are still limited
-- advanced aerodynamics, spectral vibration modeling, and deeper electrical control are still pending
+- deployment hardening (JWT, RBAC, HTTPS) not yet implemented (Docker Compose in progress, see #42)
+- advanced fatigue / DEL metrics in progress (see #41)
+- sideband vibration detail and spectral alarm thresholds not yet implemented
+- full protection relay coordination not yet implemented
 - use the status and roadmap docs as the source of truth for current implementation state
