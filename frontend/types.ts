@@ -109,6 +109,21 @@ export interface TurbineData {
   yawBrakePressure?: number; // bar
   cableWindup?: number; // turns
 
+  // ── WLOD — Structural Load & Fatigue ──
+  towerFaMoment?: number; // kNm
+  towerSsMoment?: number; // kNm
+  bladeFlapMoment?: number; // kNm
+  bladeEdgeMoment?: number; // kNm
+  delTowerFa?: number; // kNm
+  delTowerSs?: number; // kNm
+  delBladeFlap?: number; // kNm
+  delBladeEdge?: number; // kNm
+  damageTowerFa?: number;
+  damageTowerSs?: number;
+  damageBladeFlap?: number;
+  damageBladeEdge?: number;
+  productionHours?: number; // h
+
   // ── Fault info ──
   activeFaults?: FaultInfo[];
 

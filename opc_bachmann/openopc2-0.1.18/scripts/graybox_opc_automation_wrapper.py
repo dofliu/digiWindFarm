@@ -7,7 +7,8 @@
 makepy_version = '0.5.01'
 python_version = 0x30806f0
 
-import win32com.client.CLSIDToClass, pythoncom, pywintypes
+import win32com.client.CLSIDToClass
+import pythoncom
 import win32com.client.util
 from pywintypes import IID
 from win32com.client import Dispatch

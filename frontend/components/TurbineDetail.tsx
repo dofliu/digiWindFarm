@@ -208,7 +208,7 @@ const DETAIL_TABS: { id: DetailTab; label_en: string; label_zh: string; color: s
   { id: 'nacelle', label_en: 'Nacelle', label_zh: '機艙', color: 'yellow', preset: 'vibration' },
   { id: 'yaw', label_en: 'Yaw', label_zh: '轉向系統', color: 'blue', preset: 'yaw' },
   { id: 'grid', label_en: 'Grid/Met', label_zh: '電網/氣象', color: 'orange', preset: 'temperature' },
-  { id: 'fatigue', label_en: 'Fatigue', label_zh: '疲勞', color: 'red' },
+  { id: 'fatigue', label_en: 'Load/Fatigue', label_zh: '載荷/疲勞', color: 'red', preset: 'fatigue' },
 ];
 
 const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispatch, activeWorkOrder, lang = 'zh' }) => {
@@ -434,23 +434,35 @@ const TurbineDetail: React.FC<TurbineDetailProps> = ({ turbine, onBack, onDispat
             );
           case 'fatigue':
             return (
-              <SubsystemPanel title={u('WFAT Fatigue / DEL', 'WFAT 疲勞/損傷')} color="red">
-                <div className="text-xs text-red-300/60 mb-2">{u('Tower Base Moments', '塔基彎矩')}</div>
-                <DataRow label={u('Fore-Aft My', '前後彎矩 My')} value={`${fmt(turbine.twrBsMy, 1)} kNm`} />
-                <DataRow label={u('Side-Side Mx', '左右彎矩 Mx')} value={`${fmt(turbine.twrBsMx, 1)} kNm`} />
+              <SubsystemPanel title={u('WLOD Structural Load & Fatigue', 'WLOD 結構載荷與疲勞')} color="red">
+                <div className="text-xs text-red-300/60 mb-2">{u('Tower Moments', '塔架彎矩')}</div>
+                <DataRow label={u('Fore-Aft FA', '前後彎矩 FA')} value={`${fmt(turbine.towerFaMoment, 1)} kNm`} />
+                <DataRow label={u('Side-Side SS', '側面彎矩 SS')} value={`${fmt(turbine.towerSsMoment, 1)} kNm`} />
+                
                 <div className="border-t border-red-500/20 my-2 pt-2">
-                  <div className="text-xs text-red-300/60 mb-2">{u('Blade Root Moments', '葉根彎矩')}</div>
-                  <DataRow label={u('Flapwise My', '揮舞彎矩 My')} value={`${fmt(turbine.bldRtMy, 1)} kNm`} />
-                  <DataRow label={u('Edgewise Mx', '擺振彎矩 Mx')} value={`${fmt(turbine.bldRtMx, 1)} kNm`} />
+                  <div className="text-xs text-red-300/60 mb-2">{u('Blade Moments', '葉片彎矩')}</div>
+                  <DataRow label={u('Flapwise My', '揮舞彎矩 Flap')} value={`${fmt(turbine.bladeFlapMoment, 1)} kNm`} />
+                  <DataRow label={u('Edgewise Mx', '擺振彎矩 Edge')} value={`${fmt(turbine.bladeEdgeMoment, 1)} kNm`} />
                 </div>
+
                 <div className="border-t border-red-500/20 my-2 pt-2">
-                  <div className="text-xs text-red-300/60 mb-2">{u('DEL Indicators', 'DEL 疲勞指標')}</div>
-                  <DataRow label={u('Tower DEL', '塔架 DEL')} value={fmt(turbine.delTwr, 1)}
-                    warn={(turbine.delTwr || 0) > 60} alert={(turbine.delTwr || 0) > 80} />
-                  <DataRow label={u('Blade DEL', '葉片 DEL')} value={fmt(turbine.delBld, 1)}
-                    warn={(turbine.delBld || 0) > 60} alert={(turbine.delBld || 0) > 80} />
-                  <DataRow label={u('Damage Accum', '累積損傷比')} value={`${fmt((turbine.dmgAccum || 0) * 100, 4)}%`}
-                    warn={(turbine.dmgAccum || 0) > 0.5} alert={(turbine.dmgAccum || 0) > 0.8} />
+                  <div className="text-xs text-red-300/60 mb-2">{u('DEL Indicators (kNm)', 'DEL 等效疲勞指標')}</div>
+                  <DataRow label={u('Tower FA', '塔架前後')} value={fmt(turbine.delTowerFa, 1)}
+                    warn={(turbine.delTowerFa || 0) > 4000} alert={(turbine.delTowerFa || 0) > 6000} />
+                  <DataRow label={u('Blade Flap', '葉片揮舞')} value={fmt(turbine.delBladeFlap, 1)}
+                    warn={(turbine.delBladeFlap || 0) > 2000} alert={(turbine.delBladeFlap || 0) > 3000} />
+                </div>
+
+                <div className="border-t border-red-500/20 my-2 pt-2">
+                  <div className="text-xs text-red-300/60 mb-2">{u('Cumulative Damage', '累積損傷')}</div>
+                  <DataRow label={u('Tower FA', '塔架前後')} value={`${((turbine.damageTowerFa || 0) * 100).toFixed(6)}%`}
+                    warn={(turbine.damageTowerFa || 0) > 0.5} alert={(turbine.damageTowerFa || 0) > 0.8} />
+                  <DataRow label={u('Blade Flap', '葉片揮舞')} value={`${((turbine.damageBladeFlap || 0) * 100).toFixed(6)}%`}
+                    warn={(turbine.damageBladeFlap || 0) > 0.5} alert={(turbine.damageBladeFlap || 0) > 0.8} />
+                </div>
+
+                <div className="border-t border-red-500/20 my-2 pt-2">
+                  <DataRow label={u('Production Hours', '發電時數')} value={`${fmt(turbine.productionHours, 1)} h`} />
                 </div>
               </SubsystemPanel>
             );

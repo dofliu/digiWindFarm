@@ -76,7 +76,7 @@ interface ApiTurbineReading {
   vibBandBbY?: number;
   vibCrestFactor?: number;
   vibKurtosis?: number;
-  // Vibration alarm thresholds
+  // Vibration alarm thresholds (Operating point dependent)
   vibAlarm1p?: number;
   vibAlarm3p?: number;
   vibAlarmGear?: number;
@@ -85,7 +85,7 @@ interface ApiTurbineReading {
   vibAlarmOverall?: number;
   vibThresh1pWarn?: number;
   vibThresh1pAlrm?: number;
-  // Fatigue / load monitoring
+  // Fatigue / load monitoring (Legacy Standard)
   twrBsMy?: number;
   twrBsMx?: number;
   bldRtMy?: number;
@@ -93,6 +93,20 @@ interface ApiTurbineReading {
   delTwr?: number;
   delBld?: number;
   dmgAccum?: number;
+  // Structural load & fatigue (New Cloud Standard)
+  towerFaMoment?: number;
+  towerSsMoment?: number;
+  bladeFlapMoment?: number;
+  bladeEdgeMoment?: number;
+  delTowerFa?: number;
+  delTowerSs?: number;
+  delBladeFlap?: number;
+  delBladeEdge?: number;
+  damageTowerFa?: number;
+  damageTowerSs?: number;
+  damageBladeFlap?: number;
+  damageBladeEdge?: number;
+  productionHours?: number;
   activeFaults?: FaultInfo[];
   scadaTags?: Record<string, number>;
 }
@@ -184,7 +198,7 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     vibAlarmOverall: api.vibAlarmOverall,
     vibThresh1pWarn: api.vibThresh1pWarn,
     vibThresh1pAlrm: api.vibThresh1pAlrm,
-    // Fatigue / load monitoring
+    // Fatigue / load monitoring (Legacy)
     twrBsMy: api.twrBsMy,
     twrBsMx: api.twrBsMx,
     bldRtMy: api.bldRtMy,
@@ -192,6 +206,20 @@ function apiToTurbineData(api: ApiTurbineReading, index: number): TurbineData {
     delTwr: api.delTwr,
     delBld: api.delBld,
     dmgAccum: api.dmgAccum,
+    // Structural load & fatigue (New Standard)
+    towerFaMoment: api.towerFaMoment,
+    towerSsMoment: api.towerSsMoment,
+    bladeFlapMoment: api.bladeFlapMoment,
+    bladeEdgeMoment: api.bladeEdgeMoment,
+    delTowerFa: api.delTowerFa,
+    delTowerSs: api.delTowerSs,
+    delBladeFlap: api.delBladeFlap,
+    delBladeEdge: api.delBladeEdge,
+    damageTowerFa: api.damageTowerFa,
+    damageTowerSs: api.damageTowerSs,
+    damageBladeFlap: api.damageBladeFlap,
+    damageBladeEdge: api.damageBladeEdge,
+    productionHours: api.productionHours,
     activeFaults: api.activeFaults,
     scadaTags: api.scadaTags,
   };

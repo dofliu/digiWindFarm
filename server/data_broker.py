@@ -4,7 +4,6 @@ import threading
 import time as _time
 from datetime import datetime
 from typing import List, Optional, Dict
-from collections import deque
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -180,7 +179,7 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
         vibThresh1pWarn=scada.get("WVIB_Thresh1pWarn"),
         vibThresh1pAlrm=scada.get("WVIB_Thresh1pAlrm"),
 
-        # ── WFAT — Fatigue / Load Monitoring ──
+        # ── WFAT — Fatigue / Load Monitoring (Legacy) ──
         twrBsMy=scada.get("WFAT_TwrBsMy"),
         twrBsMx=scada.get("WFAT_TwrBsMx"),
         bldRtMy=scada.get("WFAT_BldRtMy"),
@@ -188,6 +187,21 @@ def _sim_output_to_reading(output: Dict, history_points: Optional[List[Dict]] = 
         delTwr=scada.get("WFAT_DELTwr"),
         delBld=scada.get("WFAT_DELBld"),
         dmgAccum=scada.get("WFAT_DmgAccum"),
+
+        # ── WLOD — Structural Load & Fatigue (New Standard) ──
+        towerFaMoment=scada.get("WLOD_TwrFaMom"),
+        towerSsMoment=scada.get("WLOD_TwrSsMom"),
+        bladeFlapMoment=scada.get("WLOD_BldFlapMom"),
+        bladeEdgeMoment=scada.get("WLOD_BldEdgeMom"),
+        delTowerFa=scada.get("WLOD_DelTwrFa"),
+        delTowerSs=scada.get("WLOD_DelTwrSs"),
+        delBladeFlap=scada.get("WLOD_DelBldFlap"),
+        delBladeEdge=scada.get("WLOD_DelBldEdge"),
+        damageTowerFa=scada.get("WLOD_DmgTwrFa"),
+        damageTowerSs=scada.get("WLOD_DmgTwrSs"),
+        damageBladeFlap=scada.get("WLOD_DmgBldFlap"),
+        damageBladeEdge=scada.get("WLOD_DmgBldEdge"),
+        productionHours=scada.get("WLOD_ProdHours"),
 
         # ── Fault info ──
         activeFaults=fault_info,

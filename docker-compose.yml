@@ -1,0 +1,46 @@
+# ── digiWindFarm Docker Compose ──
+# Usage:
+#   docker compose up --build        # Start all services
+#   docker compose up -d             # Start in background
+#   docker compose down              # Stop all services
+#   docker compose logs -f backend   # Follow backend logs
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: digiwindfarm-backend
+    ports:
+      - "${BACKEND_PORT:-8100}:8100"
+      - "${MODBUS_PORT:-5020}:5020"
+    environment:
+      - BACKEND_PORT=8100
+      - BACKEND_HOST=0.0.0.0
+      - MODBUS_PORT=5020
+      - DB_PATH=/app/data/wind_farm_data.db
+    volumes:
+      - db-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: digiwindfarm-frontend
+    ports:
+      - "${FRONTEND_PORT:-3100}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
+    driver: local

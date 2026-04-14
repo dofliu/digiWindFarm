@@ -11,6 +11,7 @@
 #     ├── ElectricalModel     (electrical_model.py)
 #     ├── VibrationModel      (vibration_model.py)
 #     ├── SpectralVibrationModel (vibration_spectral.py)
+#     ├── FatigueModel        (fatigue_model.py)
 #     ├── YawModel            (yaw_model.py)
 #     └── ScadaRegistry       (scada_registry.py)
 #
@@ -34,6 +35,7 @@ from simulator.physics.drivetrain_model import DrivetrainModel, DrivetrainSpec
 from simulator.physics.cooling_model import CoolingSystem, CoolingSpec
 from simulator.physics.electrical_model import ElectricalModel, ElectricalSpec
 from simulator.physics.vibration_spectral import SpectralVibrationModel
+from simulator.physics.fatigue_model import FatigueModel, FatigueSpec
 
 __all__ = [
     "SCADA_REGISTRY", "ScadaTag",
@@ -45,6 +47,7 @@ __all__ = [
     "CoolingSystem", "CoolingSpec",
     "ElectricalModel", "ElectricalSpec",
     "SpectralVibrationModel",
+    "FatigueModel", "FatigueSpec",
     "VibrationModel", "YawModel",
     "TurbulenceGenerator", "WindDirectionModel", "PerTurbineWind",
     "WindEventPropagation", "WindEvent", "TurbinePosition", "default_farm_layout",

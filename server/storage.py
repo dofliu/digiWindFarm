@@ -3,11 +3,12 @@ import json
 import threading
 import time as _time
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import List, Optional
 from pathlib import Path
 
 
-DB_PATH = Path(__file__).parent.parent / "wind_farm_data.db"
+import os as _os
+DB_PATH = Path(_os.environ.get("DB_PATH", str(Path(__file__).parent.parent / "wind_farm_data.db")))
 
 
 class Storage:
@@ -448,7 +449,7 @@ class Storage:
         ).fetchone()[0]
         from_ts = latest_1m or "2000-01-01T00:00:00"
 
-        rows = conn.execute("""
+        conn.execute("""
             INSERT INTO turbine_data_1m
                 (timestamp, turbine_id, session_id,
                  power_output_avg, power_output_max, power_output_min,

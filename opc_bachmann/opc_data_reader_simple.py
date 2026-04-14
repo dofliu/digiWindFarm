@@ -5,7 +5,6 @@ OPC 資料持續擷取程式 - 簡化版
 基於可運作的 CKVOBOPCGetandPass 程式，使用簡化的 read() 參數
 """
 
-import argparse
 import time
 import re
 import sys
@@ -15,9 +14,7 @@ repo_root = Path(__file__).resolve().parent
 sys.path.insert(0, str(repo_root / "openopc2-0.1.18"))
 
 from datetime import datetime, timedelta
-from typing import List
 import pytz
-from openopc2.da_client import OpcDaClient
 from openopc2.config import OpenOpcConfig
 from openopc2.utils import get_opc_da_client
 

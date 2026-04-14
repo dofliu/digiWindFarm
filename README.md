@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 59 SCADA tags aligned to Bachmann Z72 definitions
+- 72 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -10,6 +10,8 @@ Wind farm monitoring and digital twin platform with:
 - React frontend for dashboard, detail, history, and settings
 
 ## Quick Start
+
+### Local Development
 
 ```bash
 # Backend + simulator + Modbus TCP (default port 8100)
@@ -23,6 +25,14 @@ npm run dev
 ```
 
 Open [http://localhost:3100](http://localhost:3100).
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:3100](http://localhost:3100). Backend runs on port 8100, Modbus TCP on 5020.
 
 Ports are configured in `.env` (copy from `.env.example`):
 - Backend: `BACKEND_PORT=8100`
@@ -45,8 +55,10 @@ Implemented and usable today:
 - history page with event markers, event details, focus windows, and CSV export
 - electrical response model (frequency-watt, reactive power, power factor, ride-through)
 - spectral vibration model (1P/3P/gear/HF/broadband bands, crest factor, kurtosis)
+- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage)
 - fault lifecycle tracking with start/end duration events
 - event export API (JSON/CSV) with severity grouping
+- Docker Compose deployment (backend + frontend with nginx reverse proxy)
 
 Physics model tracking:
 - [`docs/physics_model_status.md`](./docs/physics_model_status.md)
@@ -73,6 +85,7 @@ Main modules:
   - `fault_engine.py`
   - `electrical_model.py`
   - `vibration_spectral.py`
+  - `fatigue_model.py`
   - `scada_registry.py`
 - `simulator/grid_model.py`
 - `server/`
@@ -116,22 +129,36 @@ Main modules:
 
 ## Core APIs
 
+### Health
+- `GET /api/health`
+
 ### Turbines
 - `GET /api/turbines`
 - `GET /api/turbines/{id}`
 - `GET /api/turbines/{id}/history`
 - `GET /api/turbines/{id}/trend`
 - `GET /api/turbines/farm-status`
+- `GET /api/turbines/farm-trend`
 
 ### Config
 - `GET /api/config`
+- `POST /api/config/datasource`
+- `POST /api/config/simulation`
+- `GET /api/config/wind`
 - `POST /api/config/wind`
 - `POST /api/config/wind/clear`
-- `GET /api/config/turbine-spec`
-- `POST /api/config/turbine-spec`
+- `GET /api/config/simulation/time-scale`
+- `POST /api/config/simulation/time-scale`
+- `POST /api/config/simulation/generate-bulk`
 - `GET /api/config/grid`
 - `POST /api/config/grid`
 - `POST /api/config/grid/clear`
+- `GET /api/config/storage/stats`
+- `GET /api/config/sessions`
+- `POST /api/config/storage/maintenance`
+- `GET /api/config/turbine-spec`
+- `POST /api/config/turbine-spec`
+- `GET /api/config/turbine-spec/presets`
 
 ### Control
 - `POST /api/control/command`
@@ -143,15 +170,29 @@ Main modules:
 - `POST /api/faults/inject`
 - `GET /api/faults/active`
 - `POST /api/faults/clear`
+- `GET /api/faults/test-plans`
+- `POST /api/faults/test-plans/{plan_id}/run`
 
 ### Maintenance
 - `GET /api/maintenance/work-orders`
 - `POST /api/maintenance/work-orders`
+- `GET /api/maintenance/work-orders/{id}`
 - `PATCH /api/maintenance/work-orders/{id}`
 - `GET /api/maintenance/technicians`
 - `POST /api/maintenance/technicians`
 - `PATCH /api/maintenance/technicians/{id}/status`
 - `GET /api/maintenance/events/compare?turbine_ids=WT001,WT002`
+
+### i18n (Tag Translation)
+- `GET /api/i18n/tags`
+- `GET /api/i18n/tags/all`
+- `GET /api/i18n/tags/registry`
+
+### Modbus TCP
+- `GET /api/modbus/status`
+- `POST /api/modbus/start`
+- `POST /api/modbus/stop`
+- `GET /api/modbus/registers`
 
 ### Export / Realtime
 - `GET /api/export/snapshot`
@@ -188,8 +229,9 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 
 ## Known Gaps
 
-- deployment hardening (JWT, RBAC, Docker) not yet implemented
-- history retention / cleanup job not implemented
-- event export and advanced multi-turbine comparison are still limited
-- advanced aerodynamics, spectral vibration modeling, and deeper electrical control are still pending
+- deployment hardening: JWT, RBAC, HTTPS not yet implemented (Docker Compose is available)
+- sideband vibration detail and spectral alarm thresholds not yet implemented
+- full protection relay coordination not yet implemented
+- fatigue-based alarm thresholds and remaining useful life estimation pending
+- dependency security vulnerabilities pending upgrade (see #48)
 - use the status and roadmap docs as the source of truth for current implementation state

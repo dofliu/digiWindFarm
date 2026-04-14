@@ -33,8 +33,8 @@
 - [x] Spectral vibration model: 1P/3P/gear-mesh/HF/broadband bands with fault-specific signatures, crest factor, kurtosis
 - [x] 59 SCADA tags total (was 40): +7 electrical response + 12 vibration spectral bands
 - [x] Vibration spectral alarm thresholds with ISO 10816-inspired zones and hysteresis
-- [x] Fatigue / DEL model: tower/blade load moments, simplified DEL, Miner's rule cumulative damage
-- [x] 74 SCADA tags total (was 59): +8 vibration alarm + 7 fatigue/load
+- [x] Fatigue/load model: tower/blade bending moments, rainflow cycle counting, DEL, Miner's damage
+- [x] 80 SCADA tags total (was 59): +8 vibration alarm + 13 structural load/fatigue
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -108,6 +108,15 @@ These parts are implemented, but still first-generation models:
 - [x] Frequency-band outputs
 - [x] Bearing defect style indicators
 
+### Priority E: Fatigue / Load Modeling
+- [x] Tower base bending moments (fore-aft, side-to-side)
+- [x] Blade root bending moments (flapwise, edgewise)
+- [x] Rainflow cycle counting
+- [x] Damage Equivalent Load (DEL) computation
+- [x] Cumulative fatigue damage (Miner's rule)
+- [x] Frontend load/fatigue tab
+- [x] History trend chart preset for load data
+
 ## Product / Platform Gaps
 
 ### History and Storage
@@ -144,9 +153,15 @@ These parts are implemented, but still first-generation models:
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
 - [ ] Basic RBAC
-- [ ] `.env` cleanup
-- [ ] Docker Compose
-- [ ] Reverse proxy / HTTPS
+- [x] `.env` cleanup (configurable DB_PATH, Docker env vars)
+- [x] Docker Compose (backend + frontend + nginx reverse proxy)
+- [ ] Reverse proxy / HTTPS (standalone, Docker uses nginx internally)
+
+### Security
+- [ ] Upgrade `cryptography` (41.0.7 → ≥46.0.6, 7 CVEs) — see #48
+- [ ] Upgrade `pyjwt` (2.7.0 → ≥2.12.0, 1 CVE) — see #48
+- [ ] Upgrade `setuptools` (68.1.2 → ≥78.1.1, 3 CVEs) — see #48
+- [ ] Add `pip-audit` to CI / development workflow
 
 ### Storage
 - [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB

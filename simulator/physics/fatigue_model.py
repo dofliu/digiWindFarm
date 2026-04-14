@@ -1,298 +1,433 @@
 """
-疲勞與載荷模型 — 塔架/葉片載荷計算與 DEL 損傷指標
+Fatigue and structural load model for wind turbine simulation.
 
-計算：
-  - 塔基前後/左右彎矩 (Tower base fore-aft / side-to-side moment)
-  - 葉根揮舞/擺振彎矩 (Blade root flapwise / edgewise moment)
-  - 簡化 DEL (Damage Equivalent Load) — peak-valley range counting + Wöhler curve
-  - 累積損傷比 (Miner's rule cumulative damage fraction)
+Provides:
+  - Tower base bending moment (fore-aft, side-to-side)
+  - Blade root bending moment (flapwise, edgewise)
+  - Simplified rainflow cycle counting
+  - Damage Equivalent Load (DEL) computation
+  - Cumulative fatigue damage via Miner's rule
 
-載荷來源：
-  - 氣動推力 (thrust) → 塔基前後彎矩主成分
-  - 氣動扭矩 (aero torque) → 葉根擺振主成分
-  - 重力 1P 循環 → 葉根擺振週期性成分
-  - 風擾動 → 塔基隨機載荷
-  - 故障耦合 → 結冰/旋角不平衡/偏航偏差加劇特定載荷
+Reference:
+  - IEC 61400-1 Ed.4 for load definitions
+  - Miner's rule for linear damage accumulation
+  - Simplified DEL from 1-Hz equivalent load range
+
+No dependency on FastAPI, frontend, or storage; only numpy.
 """
 
 import math
 import numpy as np
-from collections import deque
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 
 @dataclass
-class FatigueOutput:
-    """疲勞模型單步輸出"""
-    twr_bs_my: float = 0.0   # kNm — 塔基前後彎矩
-    twr_bs_mx: float = 0.0   # kNm — 塔基左右彎矩
-    bld_rt_my: float = 0.0   # kNm — 葉根揮舞彎矩
-    bld_rt_mx: float = 0.0   # kNm — 葉根擺振彎矩
-    del_twr: float = 0.0     # 0-100 — 塔架 DEL 指標
-    del_bld: float = 0.0     # 0-100 — 葉片 DEL 指標
-    dmg_accum: float = 0.0   # 0-1 — 累積損傷比 (Miner's rule)
+class FatigueSpec:
+    """Configuration for fatigue tracking."""
+
+    # S-N curve exponent (Wöhler exponent m)
+    # Steel (tower, shaft): m ≈ 4
+    # Composite (blade): m ≈ 10
+    sn_exp_tower: float = 4.0
+    sn_exp_blade: float = 10.0
+
+    # Reference cycles to failure at reference load (S-N anchor)
+    n_ref_tower: float = 1e7
+    n_ref_blade: float = 1e7
+
+    # Reference load ranges (kNm) for S-N curve normalization
+    load_ref_tower_fa: float = 3000.0   # tower fore-aft
+    load_ref_tower_ss: float = 2000.0   # tower side-to-side
+    load_ref_blade_flap: float = 1200.0  # blade flapwise
+    load_ref_blade_edge: float = 800.0   # blade edgewise
+
+    # DEL time basis (seconds) — 1-Hz equivalent
+    del_time_basis: float = 600.0  # 10-minute basis for DEL
+
+    # Cycle buffer length for rainflow counting
+    rainflow_buffer_len: int = 600  # ~10 min at 1 Hz
+
+
+class RainflowCounter:
+    """Simplified online rainflow cycle counter.
+
+    Uses a peak-valley extraction + 3-point rainflow method.
+    Maintains a rolling buffer to compute cycle ranges.
+    """
+
+    def __init__(self, buffer_len: int = 600):
+        self._buffer_len = buffer_len
+        self._peaks: List[float] = []
+        self._last_value: Optional[float] = None
+        self._last_direction: Optional[int] = None  # +1 rising, -1 falling
+        self._cycle_ranges: List[float] = []
+
+    def add_sample(self, value: float):
+        """Add a new load sample and extract peaks/valleys."""
+        if self._last_value is None:
+            self._last_value = value
+            return
+
+        diff = value - self._last_value
+        if abs(diff) < 1e-6:
+            return
+
+        direction = 1 if diff > 0 else -1
+
+        if self._last_direction is not None and direction != self._last_direction:
+            # Reversal detected — record peak/valley
+            self._peaks.append(self._last_value)
+            if len(self._peaks) > self._buffer_len:
+                self._peaks = self._peaks[-self._buffer_len:]
+            self._extract_cycles()
+
+        self._last_value = value
+        self._last_direction = direction
+
+    def _extract_cycles(self):
+        """3-point rainflow extraction from peak/valley sequence."""
+        i = 0
+        while i < len(self._peaks) - 2:
+            s0 = self._peaks[i]
+            s1 = self._peaks[i + 1]
+            s2 = self._peaks[i + 2]
+
+            r1 = abs(s1 - s0)
+            r2 = abs(s2 - s1)
+
+            if r2 >= r1:
+                # Full cycle extracted
+                self._cycle_ranges.append(r1)
+                self._peaks.pop(i + 1)
+                self._peaks.pop(i)
+                if i > 0:
+                    i -= 1
+            else:
+                i += 1
+
+    def get_cycle_ranges(self) -> List[float]:
+        """Return extracted cycle ranges and clear buffer."""
+        ranges = self._cycle_ranges
+        self._cycle_ranges = []
+        return ranges
+
+    @property
+    def peak_count(self) -> int:
+        return len(self._peaks)
 
 
 class FatigueModel:
-    """塔架/葉片載荷與疲勞損傷模型
+    """Structural load and fatigue tracking for a single wind turbine.
 
-    基於物理因果：推力→塔基彎矩、扭矩→葉根彎矩、重力→1P循環。
-    DEL 使用簡化的 peak-valley range counting 搭配 Wöhler 曲線。
+    Computes instantaneous structural loads from operating conditions,
+    tracks cycle history via rainflow counting, and accumulates fatigue
+    damage using Miner's rule.
     """
 
-    # Wöhler 指數：鋼材 m=4, 複合材料 m=10
-    _M_TOWER = 4
-    _M_BLADE = 10
-
-    # 設計基準 DEL (kNm)，用於正規化至 0-100
-    _DESIGN_DEL_TWR = 800.0
-    _DESIGN_DEL_BLD = 400.0
-
-    # 設計壽命（秒）— 20 年
-    _DESIGN_LIFE_S = 20 * 365.25 * 24 * 3600
-
-    # DEL 更新頻率（每 N 步更新一次，減少計算量）
-    _DEL_UPDATE_INTERVAL = 60
-
-    def __init__(
-        self,
-        seed: int = 0,
-        hub_height: float = 64.0,
-        rotor_diameter: float = 70.65,
-        rated_power_kw: float = 2000.0,
-    ):
+    def __init__(self, spec: Optional[FatigueSpec] = None,
+                 seed: Optional[int] = None,
+                 rated_power_kw: float = 2000.0,
+                 rotor_diameter: float = 70.65,
+                 hub_height: float = 64.0):
+        self.spec = spec or FatigueSpec()
         self._rng = np.random.RandomState(seed)
-        self._hub_height = hub_height
-        self._blade_length = rotor_diameter / 2.0
         self._rated_power_kw = rated_power_kw
+        self._rotor_diameter = rotor_diameter
+        self._hub_height = hub_height
+        self._rotor_area = math.pi * (rotor_diameter / 2) ** 2
 
-        # 轉子重量估算（Z72 約 50 kN）
-        self._rotor_weight_kn = 45.0 + self._rng.uniform(-5.0, 8.0)
+        # Per-turbine individuality (small persistent offsets)
+        self._tower_stiffness_scale = 1.0 + self._rng.uniform(-0.06, 0.06)
+        self._blade_stiffness_scale = 1.0 + self._rng.uniform(-0.08, 0.08)
 
-        # Per-turbine 永久差異：材料疲勞特性
-        self._material_fatigue_scale = 1.0 + self._rng.uniform(-0.15, 0.15)
-        self._tower_damping_scale = 1.0 + self._rng.uniform(-0.10, 0.10)
-        self._blade_stiffness_scale = 1.0 + self._rng.uniform(-0.12, 0.12)
+        # Rainflow counters for each load channel
+        buf_len = self.spec.rainflow_buffer_len
+        self._rf_tower_fa = RainflowCounter(buf_len)
+        self._rf_tower_ss = RainflowCounter(buf_len)
+        self._rf_blade_flap = RainflowCounter(buf_len)
+        self._rf_blade_edge = RainflowCounter(buf_len)
 
-        # 1P 相位追蹤（模擬葉片重力循環）
-        self._rotor_phase = self._rng.uniform(0, 2 * math.pi)
+        # Cumulative damage (Miner's sum, 0→1)
+        self.damage_tower_fa: float = 0.0
+        self.damage_tower_ss: float = 0.0
+        self.damage_blade_flap: float = 0.0
+        self.damage_blade_edge: float = 0.0
 
-        # Ring buffers — 儲存彎矩歷史供 DEL 計算
-        self._twr_my_buf: deque = deque(maxlen=120)
-        self._bld_my_buf: deque = deque(maxlen=120)
+        # Running DEL accumulators (for 10-min rolling window)
+        self._del_cycle_buf_tower_fa: List[float] = []
+        self._del_cycle_buf_tower_ss: List[float] = []
+        self._del_cycle_buf_blade_flap: List[float] = []
+        self._del_cycle_buf_blade_edge: List[float] = []
+        self._del_time_accum: float = 0.0
 
-        # 狀態
-        self._prev = FatigueOutput()
-        self._dmg_accum = 0.0
-        self._del_counter = 0
-        self._cached_del_twr = 0.0
-        self._cached_del_bld = 0.0
-        # Warm-up：啟動暫態期間不計算 DEL（避免 0→rated 的巨大範圍）
-        self._warmup_steps = 0
-        self._WARMUP_THRESHOLD = 180  # 前 3 分鐘不計算 DEL
+        # Latest computed DEL values
+        self.del_tower_fa: float = 0.0
+        self.del_tower_ss: float = 0.0
+        self.del_blade_flap: float = 0.0
+        self.del_blade_edge: float = 0.0
 
-    def step(
-        self,
-        thrust_kn: float,
-        aero_torque_knm: float,
-        aero_load_factor: float,
-        rotor_speed_rpm: float,
-        wind_speed: float,
-        pitch_angle: float,
-        power_kw: float,
-        dt: float,
-        active_faults: Optional[List[Dict]] = None,
-    ) -> FatigueOutput:
-        """計算單步載荷與疲勞指標
+        # Latest instantaneous loads
+        self.load_tower_fa: float = 0.0
+        self.load_tower_ss: float = 0.0
+        self.load_blade_flap: float = 0.0
+        self.load_blade_edge: float = 0.0
 
-        所有載荷源自物理因果而非直接偏移輸出標籤。
+        # Lifetime counters
+        self._total_sim_time: float = 0.0
+        self._total_production_time: float = 0.0
+
+    def step(self, dt: float,
+             wind_speed: float,
+             rotor_speed_rpm: float,
+             power_kw: float,
+             pitch_angle_deg: float,
+             yaw_error_deg: float,
+             thrust_kn: float,
+             turbulence_intensity: float,
+             is_producing: bool,
+             is_starting: bool,
+             is_emergency_stop: bool) -> Dict[str, float]:
+        """Advance fatigue model by one timestep.
+
+        Args:
+            dt: timestep in seconds
+            wind_speed: effective wind speed (m/s)
+            rotor_speed_rpm: current rotor speed
+            power_kw: current power output
+            pitch_angle_deg: current blade pitch angle
+            yaw_error_deg: current yaw misalignment
+            thrust_kn: aerodynamic thrust force
+            turbulence_intensity: current TI
+            is_producing: turbine in production state
+            is_starting: turbine in startup state
+            is_emergency_stop: turbine in emergency stop
+
+        Returns:
+            Dict of fatigue-related SCADA tag values
         """
-        out = FatigueOutput()
+        self._total_sim_time += dt
+        if is_producing:
+            self._total_production_time += dt
 
-        # 更新轉子相位（1P 重力循環）
-        if rotor_speed_rpm > 0.5:
-            rot_freq = rotor_speed_rpm / 60.0
-            self._rotor_phase += 2 * math.pi * rot_freq * dt
-            self._rotor_phase %= 2 * math.pi
+        # ── Compute instantaneous structural loads ──
+        loads = self._compute_loads(
+            wind_speed, rotor_speed_rpm, power_kw,
+            pitch_angle_deg, yaw_error_deg, thrust_kn,
+            turbulence_intensity, is_producing, is_starting,
+            is_emergency_stop, dt,
+        )
 
-        pitch_rad = math.radians(max(0.0, min(90.0, pitch_angle)))
+        self.load_tower_fa = loads["tower_fa"]
+        self.load_tower_ss = loads["tower_ss"]
+        self.load_blade_flap = loads["blade_flap"]
+        self.load_blade_edge = loads["blade_edge"]
 
-        # ── 塔基前後彎矩 (Tower base fore-aft) ──
-        # 主成分：推力 × 輪轂高度
-        twr_my_thrust = thrust_kn * self._hub_height
-        # 風擾動造成的隨機載荷
-        twr_my_turb = wind_speed * abs(self._rng.normal(0, 0.02)) * self._hub_height
-        # 轉子重量偏心
-        twr_my_grav = self._rotor_weight_kn * 1.2
-        out.twr_bs_my = (twr_my_thrust + twr_my_turb + twr_my_grav) * self._tower_damping_scale
+        # ── Feed into rainflow counters ──
+        self._rf_tower_fa.add_sample(self.load_tower_fa)
+        self._rf_tower_ss.add_sample(self.load_tower_ss)
+        self._rf_blade_flap.add_sample(self.load_blade_flap)
+        self._rf_blade_edge.add_sample(self.load_blade_edge)
 
-        # ── 塔基左右彎矩 (Tower base side-to-side) ──
-        # 扭矩反作用力 + 1P 不平衡效應
-        twr_mx_torque = aero_torque_knm * 0.15
-        twr_mx_1p = thrust_kn * 0.05 * math.sin(self._rotor_phase)
-        twr_mx_noise = abs(self._rng.normal(0, 0.01)) * self._hub_height * wind_speed * 0.3
-        out.twr_bs_mx = abs(twr_mx_torque + twr_mx_1p + twr_mx_noise) * self._tower_damping_scale
+        # ── Extract cycles and accumulate damage ──
+        cycles_tfa = self._rf_tower_fa.get_cycle_ranges()
+        cycles_tss = self._rf_tower_ss.get_cycle_ranges()
+        cycles_bfl = self._rf_blade_flap.get_cycle_ranges()
+        cycles_bed = self._rf_blade_edge.get_cycle_ranges()
 
-        # ── 葉根揮舞彎矩 (Blade root flapwise) ──
-        # 推力分配至三片葉片，受旋角影響
-        cos_pitch = math.cos(pitch_rad)
-        bld_my_thrust = (thrust_kn / 3.0) * self._blade_length * cos_pitch
-        # 風剪應力貢獻
-        bld_my_shear = wind_speed * 0.08 * self._blade_length * 0.3
-        bld_my_noise = abs(self._rng.normal(0, 0.008)) * self._blade_length * wind_speed
-        out.bld_rt_my = (bld_my_thrust + bld_my_shear + bld_my_noise) * self._blade_stiffness_scale
+        self.damage_tower_fa += self._miner_damage(
+            cycles_tfa, self.spec.sn_exp_tower,
+            self.spec.load_ref_tower_fa, self.spec.n_ref_tower)
+        self.damage_tower_ss += self._miner_damage(
+            cycles_tss, self.spec.sn_exp_tower,
+            self.spec.load_ref_tower_ss, self.spec.n_ref_tower)
+        self.damage_blade_flap += self._miner_damage(
+            cycles_bfl, self.spec.sn_exp_blade,
+            self.spec.load_ref_blade_flap, self.spec.n_ref_blade)
+        self.damage_blade_edge += self._miner_damage(
+            cycles_bed, self.spec.sn_exp_blade,
+            self.spec.load_ref_blade_edge, self.spec.n_ref_blade)
 
-        # ── 葉根擺振彎矩 (Blade root edgewise) ──
-        # 扭矩分配 + 重力 1P 循環（物理關鍵特徵）
-        bld_mx_torque = aero_torque_knm / 3.0
-        # 重力在擺振方向的 1P 循環：mg × r × sin(θ)
-        bld_mx_grav = (self._rotor_weight_kn / 3.0) * self._blade_length * 0.3 * math.sin(self._rotor_phase)
-        bld_mx_noise = abs(self._rng.normal(0, 0.005)) * self._blade_length
-        out.bld_rt_mx = abs(bld_mx_torque + bld_mx_grav + bld_mx_noise) * self._blade_stiffness_scale
+        # ── Rolling DEL accumulation (10-min window) ──
+        self._del_cycle_buf_tower_fa.extend(cycles_tfa)
+        self._del_cycle_buf_tower_ss.extend(cycles_tss)
+        self._del_cycle_buf_blade_flap.extend(cycles_bfl)
+        self._del_cycle_buf_blade_edge.extend(cycles_bed)
+        self._del_time_accum += dt
 
-        # ── 故障耦合 ──
-        if active_faults:
-            self._apply_fault_effects(out, active_faults, rotor_speed_rpm, wind_speed)
+        if self._del_time_accum >= self.spec.del_time_basis:
+            self.del_tower_fa = self._compute_del(
+                self._del_cycle_buf_tower_fa, self.spec.sn_exp_tower,
+                self._del_time_accum)
+            self.del_tower_ss = self._compute_del(
+                self._del_cycle_buf_tower_ss, self.spec.sn_exp_tower,
+                self._del_time_accum)
+            self.del_blade_flap = self._compute_del(
+                self._del_cycle_buf_blade_flap, self.spec.sn_exp_blade,
+                self._del_time_accum)
+            self.del_blade_edge = self._compute_del(
+                self._del_cycle_buf_blade_edge, self.spec.sn_exp_blade,
+                self._del_time_accum)
+            # Reset accumulators
+            self._del_cycle_buf_tower_fa.clear()
+            self._del_cycle_buf_tower_ss.clear()
+            self._del_cycle_buf_blade_flap.clear()
+            self._del_cycle_buf_blade_edge.clear()
+            self._del_time_accum = 0.0
 
-        # ── Low-pass smoothing（避免瞬間跳變）──
-        alpha = min(1.0, dt / 3.0)
-        out.twr_bs_my = self._smooth(self._prev.twr_bs_my, out.twr_bs_my, alpha)
-        out.twr_bs_mx = self._smooth(self._prev.twr_bs_mx, out.twr_bs_mx, alpha)
-        out.bld_rt_my = self._smooth(self._prev.bld_rt_my, out.bld_rt_my, alpha)
-        out.bld_rt_mx = self._smooth(self._prev.bld_rt_mx, out.bld_rt_mx, alpha)
+        # Clamp damage to [0, 1]
+        self.damage_tower_fa = min(1.0, self.damage_tower_fa)
+        self.damage_tower_ss = min(1.0, self.damage_tower_ss)
+        self.damage_blade_flap = min(1.0, self.damage_blade_flap)
+        self.damage_blade_edge = min(1.0, self.damage_blade_edge)
 
-        # 確保非負
-        out.twr_bs_my = max(0.0, out.twr_bs_my)
-        out.twr_bs_mx = max(0.0, out.twr_bs_mx)
-        out.bld_rt_my = max(0.0, out.bld_rt_my)
-        out.bld_rt_mx = max(0.0, out.bld_rt_mx)
+        return {
+            "tower_fa_moment_knm": round(self.load_tower_fa, 1),
+            "tower_ss_moment_knm": round(self.load_tower_ss, 1),
+            "blade_flap_moment_knm": round(self.load_blade_flap, 1),
+            "blade_edge_moment_knm": round(self.load_blade_edge, 1),
+            "del_tower_fa_knm": round(self.del_tower_fa, 1),
+            "del_tower_ss_knm": round(self.del_tower_ss, 1),
+            "del_blade_flap_knm": round(self.del_blade_flap, 1),
+            "del_blade_edge_knm": round(self.del_blade_edge, 1),
+            "damage_tower_fa": round(self.damage_tower_fa, 8),
+            "damage_tower_ss": round(self.damage_tower_ss, 8),
+            "damage_blade_flap": round(self.damage_blade_flap, 8),
+            "damage_blade_edge": round(self.damage_blade_edge, 8),
+            "production_hours": round(self._total_production_time / 3600.0, 2),
+        }
 
-        # ── 更新 ring buffer ──
-        self._twr_my_buf.append(out.twr_bs_my)
-        self._bld_my_buf.append(out.bld_rt_my)
+    def _compute_loads(self, wind_speed: float, rotor_speed_rpm: float,
+                       power_kw: float, pitch_deg: float,
+                       yaw_error_deg: float, thrust_kn: float,
+                       ti: float, is_producing: bool,
+                       is_starting: bool, is_estop: bool,
+                       dt: float) -> Dict[str, float]:
+        """Compute instantaneous structural loads (kNm)."""
+        rho = 1.225  # air density
+        R = self._rotor_diameter / 2
+        H = self._hub_height
 
-        # ── DEL 計算（每 N 步更新，減少運算量）──
-        # Warm-up 期間不計算，避免啟動暫態（0→rated）的巨大範圍汙染 DEL
-        self._warmup_steps += 1
-        self._del_counter += 1
-        if (self._warmup_steps > self._WARMUP_THRESHOLD
-                and self._del_counter >= self._DEL_UPDATE_INTERVAL
-                and len(self._twr_my_buf) >= 10):
-            self._del_counter = 0
-            self._cached_del_twr = self._compute_del(
-                list(self._twr_my_buf), self._M_TOWER, self._DESIGN_DEL_TWR
-            )
-            self._cached_del_bld = self._compute_del(
-                list(self._bld_my_buf), self._M_BLADE, self._DESIGN_DEL_BLD
-            )
+        # ── Tower fore-aft bending moment ──
+        # M_FA ≈ thrust × hub_height + gravity × mass_offset + turbulence_dynamic
+        if thrust_kn > 0:
+            thrust_moment = thrust_kn * H * self._tower_stiffness_scale
+        else:
+            # Parked/idle: wind drag on tower (simplified)
+            drag_force = 0.5 * rho * 1.2 * (self._rotor_diameter * 0.05) * wind_speed ** 2 / 1000.0
+            thrust_moment = drag_force * H * 0.5
 
-        out.del_twr = self._cached_del_twr
-        out.del_bld = self._cached_del_bld
+        # Turbulence-induced dynamic load
+        turb_dynamic = ti * wind_speed * 0.5 * rho * self._rotor_area / 1000.0 * H
+        turb_noise = self._rng.normal(0, max(0.01, turb_dynamic * 0.15))
 
-        # ── Miner's rule 累積損傷 ──
-        if rotor_speed_rpm > 0.5 and out.twr_bs_my > 0:
-            # 簡化：使用當前載荷水準估算每秒損傷增量
-            load_ratio_twr = out.twr_bs_my / (self._DESIGN_DEL_TWR * 15.0)
-            load_ratio_bld = out.bld_rt_my / (self._DESIGN_DEL_BLD * 15.0)
-            dmg_rate = (
-                (load_ratio_twr ** self._M_TOWER + load_ratio_bld ** self._M_BLADE)
-                * self._material_fatigue_scale
-            )
-            self._dmg_accum += dmg_rate * dt / self._DESIGN_LIFE_S
-            self._dmg_accum = min(1.0, self._dmg_accum)
+        tower_fa = thrust_moment + turb_dynamic * 0.3 + turb_noise
 
-        out.dmg_accum = self._dmg_accum
+        # Emergency stop: transient load spike
+        if is_estop:
+            tower_fa *= 1.8 + self._rng.uniform(0, 0.3)
 
-        self._prev = out
-        return out
+        # Starting: moderate loads
+        if is_starting:
+            tower_fa *= 0.4 + self._rng.uniform(0, 0.1)
 
-    def _apply_fault_effects(
-        self, out: FatigueOutput,
-        faults: List[Dict],
-        rotor_speed_rpm: float,
-        wind_speed: float,
-    ):
-        """故障耦合：透過物理因果加劇載荷"""
-        speed_ratio = min(1.0, rotor_speed_rpm / 22.0)
+        # ── Tower side-to-side bending moment ──
+        # Driven by yaw error, rotor imbalance, and lateral turbulence
+        yaw_rad = math.radians(yaw_error_deg)
+        lateral_thrust = thrust_kn * abs(math.sin(yaw_rad)) if thrust_kn > 0 else 0.0
+        rotor_imbalance = rotor_speed_rpm * 0.15 * self._rng.normal(1, 0.2) if rotor_speed_rpm > 1 else 0.0
 
-        for fault in faults:
-            sev = float(fault.get("severity", 0.0))
-            sid = fault.get("scenario_id", "")
+        tower_ss = (lateral_thrust * H * 0.3 + rotor_imbalance +
+                    abs(self._rng.normal(0, turb_dynamic * 0.08)))
 
-            if sid == "blade_icing":
-                # 結冰造成質量不平衡 → 葉根彎矩大幅增加
-                out.bld_rt_my *= 1.0 + 0.70 * sev
-                out.bld_rt_mx *= 1.0 + 0.50 * sev
-                # 不對稱推力 → 塔基也受影響
-                out.twr_bs_my *= 1.0 + 0.20 * sev
+        # ── Blade flapwise bending moment ──
+        # Driven by thrust distribution along blade, pitch, and wind shear
+        if is_producing and rotor_speed_rpm > 1:
+            # Simplified: thrust per blade × 2/3 R (center of pressure)
+            blade_thrust = thrust_kn / 3.0 if thrust_kn > 0 else 0.0
+            blade_flap = blade_thrust * R * 0.667 * self._blade_stiffness_scale
 
-            elif sid in ("pitch_imbalance", "pitch_motor_fault"):
-                # 旋角不平衡 → 1P 擺振彎矩加劇
-                out.bld_rt_mx *= 1.0 + 0.50 * sev * speed_ratio
-                out.bld_rt_my *= 1.0 + 0.20 * sev * speed_ratio
+            # Wind shear contribution (top vs bottom of rotor)
+            shear_exp = 0.2  # power law exponent
+            shear_load = (0.5 * rho * self._rotor_area / 3.0 *
+                          wind_speed ** 2 * shear_exp * 0.1 * R / 1000.0)
+            blade_flap += shear_load
 
-            elif sid in ("yaw_misalignment", "yaw_sensor_drift"):
-                # 偏航偏差 → 不對稱風載 → 塔基左右彎矩加劇
-                out.twr_bs_mx *= 1.0 + 0.40 * sev
-                out.twr_bs_my *= 1.0 + 0.10 * sev
+            # Pitch effect: higher pitch → lower flap load
+            pitch_factor = max(0.3, 1.0 - abs(pitch_deg) * 0.008)
+            blade_flap *= pitch_factor
 
-            elif sid == "bearing_wear":
-                # 軸承磨損 → 摩擦增加 → 疲勞加速（但載荷變化較小）
-                out.twr_bs_my *= 1.0 + 0.05 * sev
-                out.bld_rt_mx *= 1.0 + 0.08 * sev
+            # Turbulence
+            blade_flap += abs(self._rng.normal(0, blade_flap * 0.1 * ti))
+        else:
+            # Parked: gravity + wind drag
+            blade_flap = 0.5 * rho * 0.3 * R * 0.5 * wind_speed ** 2 / 1000.0 * R * 0.5
 
-            elif sid == "gearbox_overheat":
-                # 齒輪箱問題 → 扭轉振盪 → 擺振彎矩增加
-                out.bld_rt_mx *= 1.0 + 0.15 * sev
+        if is_estop:
+            blade_flap *= 1.5
 
-    def _compute_del(self, buf: List[float], m: int, design_del: float) -> float:
-        """簡化 DEL：peak-valley range counting + Wöhler 正規化
+        # ── Blade edgewise bending moment ──
+        # Gravity-driven (1P cyclic) + aerodynamic torque
+        if is_producing and rotor_speed_rpm > 1:
+            # Gravity component (blade mass × R/3 × g × sin(azimuth))
+            # We simulate the cycle envelope, not individual azimuth
+            blade_mass_kg = 4000.0 * (R / 35.0) ** 2.5  # rough scaling
+            gravity_moment = blade_mass_kg * 9.81 * R / 3.0 / 1000.0  # kNm
 
-        從歷史 buffer 提取峰谷對，計算等效載荷範圍。
-        """
-        if len(buf) < 4:
-            return 0.0
+            # Aero torque contribution
+            aero_torque_blade = power_kw / max(1.0, rotor_speed_rpm * math.pi / 30.0) / 3.0
 
-        # 提取峰谷點
-        peaks_valleys = self._extract_peaks_valleys(buf)
-        if len(peaks_valleys) < 3:
-            return 0.0
+            # 1P cyclic oscillation
+            omega = rotor_speed_rpm * math.pi / 30.0
+            phase = (self._total_sim_time * omega) % (2.0 * math.pi)
+            cyclic = gravity_moment * math.sin(phase)
 
-        # 計算相鄰峰谷差的載荷範圍
-        ranges = []
-        for i in range(1, len(peaks_valleys)):
-            r = abs(peaks_valleys[i] - peaks_valleys[i - 1])
-            if r > 0.1:  # 過濾極小波動
-                ranges.append(r)
+            blade_edge = abs(cyclic) + aero_torque_blade * 0.1 * self._blade_stiffness_scale
+            blade_edge += abs(self._rng.normal(0, blade_edge * 0.05))
+        else:
+            blade_edge = 2.0 + abs(self._rng.normal(0, 0.5))  # parked gravity
 
-        if not ranges:
-            return 0.0
-
-        # DEL = (Σ range^m / N)^(1/m)
-        n = len(ranges)
-        sum_rm = sum(r ** m for r in ranges)
-        del_val = (sum_rm / n) ** (1.0 / m)
-
-        # 正規化至 0-100
-        normalized = min(100.0, (del_val / design_del) * 100.0)
-        return round(normalized, 1)
+        return {
+            "tower_fa": max(0.0, tower_fa),
+            "tower_ss": max(0.0, tower_ss),
+            "blade_flap": max(0.0, blade_flap),
+            "blade_edge": max(0.0, blade_edge),
+        }
 
     @staticmethod
-    def _extract_peaks_valleys(buf: List[float]) -> List[float]:
-        """從時間序列提取局部峰值和谷值"""
-        if len(buf) < 3:
-            return list(buf)
+    def _miner_damage(cycle_ranges: List[float], m: float,
+                      s_ref: float, n_ref: float) -> float:
+        """Compute incremental Miner's damage from a list of cycle ranges.
 
-        result = [buf[0]]
-        for i in range(1, len(buf) - 1):
-            prev_val, curr, next_val = buf[i - 1], buf[i], buf[i + 1]
-            # 局部極大或極小
-            if (curr >= prev_val and curr >= next_val) or (curr <= prev_val and curr <= next_val):
-                result.append(curr)
-        result.append(buf[-1])
-        return result
+        D = Σ (1 / N_i) where N_i = N_ref × (S_ref / S_i)^m
+        """
+        if not cycle_ranges or s_ref <= 0:
+            return 0.0
+
+        damage = 0.0
+        for s_range in cycle_ranges:
+            if s_range <= 0:
+                continue
+            n_i = n_ref * (s_ref / s_range) ** m
+            damage += 1.0 / max(1.0, n_i)
+
+        return damage
 
     @staticmethod
-    def _smooth(prev: float, target: float, alpha: float) -> float:
-        return prev + (target - prev) * alpha
+    def _compute_del(cycle_ranges: List[float], m: float,
+                     time_span: float) -> float:
+        """Compute Damage Equivalent Load for the given cycle ranges.
+
+        DEL = (Σ S_i^m / n_eq)^(1/m)
+        where n_eq = equivalent number of cycles at 1 Hz over time_span.
+        """
+        if not cycle_ranges or time_span <= 0:
+            return 0.0
+
+        n_eq = time_span  # 1 Hz equivalent
+        sum_sm = sum(s ** m for s in cycle_ranges if s > 0)
+
+        if sum_sm <= 0:
+            return 0.0
+
+        return (sum_sm / n_eq) ** (1.0 / m)

@@ -143,11 +143,11 @@ class ModbusSimServer:
         self.turbine_count = turbine_count
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._server: Optional[ModbusTcpServer] = None
+        self._server: Optional[object] = None
         self._server_context: Optional[ModbusServerContext] = None
 
         # Build device contexts (one per turbine = one slave ID)
-        slaves: Dict[int, ModbusDeviceContext] = {}
+        slaves: Dict[int, _SlaveContext] = {}
         for i in range(1, turbine_count + 1):
             hr = ModbusSequentialDataBlock(0, [0] * (_MAX_REG + 1))
             slaves[i] = _SlaveContext(

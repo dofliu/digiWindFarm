@@ -53,6 +53,15 @@ Report: `examples/data_quality_report.txt`
 - No authentication (lab-internal use only)
 - CORS open, host binding 0.0.0.0
 
+## Pending Improvements
+
+Still pending or incomplete:
+- deployment hardening (JWT, RBAC, HTTPS) — see #26
+- sideband vibration detail (harmonics/fault signatures)
+- full protection relay coordination (LVRT/OVRT)
+- SQLite vs time-series DB architecture decision — see #24
+- dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
+
 ## Source of Truth
 
 Use these files for planning:

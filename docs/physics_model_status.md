@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-12
+Last updated: 2026-04-14
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -357,24 +357,26 @@ Status: **first version implemented**
 
 Implemented:
 - `FatigueModel` class in `simulator/physics/fatigue_model.py`
-- Tower base fore-aft bending moment (thrust × hub_height + gravity + turbulence)
-- Tower base side-to-side bending moment (torque reaction + 1P imbalance)
-- Blade root flapwise moment (thrust/3 × blade_length × cos(pitch))
-- Blade root edgewise moment (torque/3 + gravity 1P cycling)
-- Simplified DEL via peak-valley range counting + Wöhler curve (steel m=4, composite m=10)
-- Miner's rule cumulative damage fraction (0-1)
-- Fault coupling: blade_icing, pitch_imbalance, yaw_misalignment, bearing_wear, gearbox_overheat
-- Per-turbine individuality: material fatigue ±15%, tower damping ±10%, blade stiffness ±12%
-- Low-pass smoothing for realistic time transitions
-- 7 new SCADA tags: WFAT_TwrBsMy/Mx, WFAT_BldRtMy/Mx, WFAT_DELTwr/Bld, WFAT_DmgAccum
+- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic)
+- tower base side-to-side bending moment (lateral thrust + rotor imbalance)
+- blade root flapwise bending moment (thrust distribution + wind shear + pitch)
+- blade root edgewise bending moment (gravity 1P cyclic + aero torque)
+- rainflow cycle counting (online 3-point method with rolling buffer)
+- Damage Equivalent Load (DEL) computation (10-min rolling window)
+- cumulative fatigue damage via Miner's rule (S-N curve based)
+- per-turbine individuality (stiffness scale offsets and material fatigue ±15%)
+- emergency stop transient load amplification (1.8× tower FA)
+- 13 new SCADA tags (WLOD_ prefix)
+- frontend Load/Fatigue tab with instantaneous loads, DEL, and damage
+- fault coupling: blade_icing, pitch_imbalance, yaw_misalignment, bearing_wear, gearbox_overheat
 
 Still missing:
-- full BEM-based blade loading distribution
-- detailed tower dynamic response (fore-aft natural frequency)
-- fatigue S-N curve from material test data
+- full aeroelastic tower/blade FEM coupling
+- fatigue-based alarm thresholds
+- DEL-based remaining useful life estimation
 
 ### 3.4 Event Layer for Historical Analysis
-Status: first usable version implemented
+Status: **implemented**
 
 Implemented:
 - explicit history event storage in SQLite
@@ -384,9 +386,9 @@ Implemented:
 - chart markers on the history page
 - event search, filtering, detail panel, and focus windows
 - start/end duration support for grid and wind config events
-
-Still missing:
-- multi-turbine event correlation / comparison view
+- fault lifecycle tracking with start/end duration events
+- event export API (JSON/CSV) with severity grouping
+- multi-turbine event comparison view with timeline, summary, and severity badges
 
 ### 3.5 Expanded SCADA Tag Set
 Not yet implemented:
@@ -420,21 +422,23 @@ Implemented:
 - farm layout model with direction-aware wake
 
 ### Priority C: Electrical Response Detail
-Recommended next:
-- frequency-watt response
-- reactive power / power factor
-- more detailed sync / ride-through logic
+Status: **done**
 
-Why:
-- the grid model already exists, so this is a natural extension.
+Implemented:
+- frequency-watt droop response with deadband
+- reactive power / power factor / apparent power
+- LVRT/HVRT ride-through curves with band accumulation
+- synthetic inertia response
+- converter operating mode tracking
 
 ### Priority D: Vibration Feature Upgrade
-Recommended next:
-- fault-specific signatures
-- basic frequency-band outputs
+Status: **done**
 
-Why:
-- this would make diagnostics and AI explanation features significantly stronger.
+Implemented:
+- fault-specific vibration signatures for all 11 fault scenarios
+- 5 frequency-band outputs (1P/3P/gear-mesh/HF/broadband)
+- crest factor and kurtosis condition indicators
+- X and Y direction separation
 
 ## 5. Quick Summary
 
@@ -450,17 +454,16 @@ Why:
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
-- fatigue / load monitoring with DEL and Miner's rule
-- 74 SCADA tags (electrical + vibration spectral + alarm + fatigue)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage)
+- 80 SCADA tags (electrical + vibration + structural load + diagnostics)
 
 ### Still Weak
 - sideband vibration detail
-- full protection relay coordination
-- detailed blade loading distribution (BEM)
-- tower dynamic natural frequency response
+- full protection relay coordination (LVRT/OVRT)
+- aeroelastic coupling (BEM + natural frequency response)
 
 ### Recommended Immediate Direction
 1. deployment hardening (JWT auth, RBAC, Docker Compose)
-2. spectral sideband analysis
-3. detailed bearing defect frequency computation
-4. tower dynamic response model
+2. spectral sideband analysis (harmonics/fault signatures)
+3. detailed bearing defect frequency computation (BPFO/BPFI)
+4. tower dynamic natural frequency response

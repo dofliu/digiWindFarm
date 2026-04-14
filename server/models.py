@@ -129,6 +129,21 @@ class TurbineReading(BaseModel):
     yawBrakePressure: Optional[float] = None # bar  (WYAW_YwBrkHyPrs)
     cableWindup: Optional[float] = None      # turns (WYAW_CabWup)
 
+    # ── WLOD — Structural Load & Fatigue ──
+    towerFaMoment: Optional[float] = None     # kNm (WLOD_TwrFaMom)
+    towerSsMoment: Optional[float] = None     # kNm (WLOD_TwrSsMom)
+    bladeFlapMoment: Optional[float] = None   # kNm (WLOD_BldFlapMom)
+    bladeEdgeMoment: Optional[float] = None   # kNm (WLOD_BldEdgeMom)
+    delTowerFa: Optional[float] = None        # kNm (WLOD_DelTwrFa)
+    delTowerSs: Optional[float] = None        # kNm (WLOD_DelTwrSs)
+    delBladeFlap: Optional[float] = None      # kNm (WLOD_DelBldFlap)
+    delBladeEdge: Optional[float] = None      # kNm (WLOD_DelBldEdge)
+    damageTowerFa: Optional[float] = None     #     (WLOD_DmgTwrFa)
+    damageTowerSs: Optional[float] = None     #     (WLOD_DmgTwrSs)
+    damageBladeFlap: Optional[float] = None   #     (WLOD_DmgBldFlap)
+    damageBladeEdge: Optional[float] = None   #     (WLOD_DmgBldEdge)
+    productionHours: Optional[float] = None   # h   (WLOD_ProdHours)
+
     # ── Fault info (from FaultEngine) ──
     activeFaults: Optional[List[dict]] = None
 

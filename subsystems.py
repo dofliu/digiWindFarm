@@ -2,7 +2,6 @@
 
 import numpy as np
 from typing import Dict
-import math
 from common_types import TurbineParameters
 
 class RotorSystem:

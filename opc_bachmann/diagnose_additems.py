@@ -293,8 +293,8 @@ try:
     values, read_errors, qualities, timestamps = syncread_result[0]
     print("  ✓ SyncRead 成功！")
 
-    print(f"\n✓✓✓ 完全成功！✓✓✓")
-    print(f"\n讀取結果：")
+    print("\n✓✓✓ 完全成功！✓✓✓")
+    print("\n讀取結果：")
     print(f"  標籤: {TEST_TAG}")
     print(f"  值: {values[0]}")
     print(f"  品質: {qualities[0]}")
