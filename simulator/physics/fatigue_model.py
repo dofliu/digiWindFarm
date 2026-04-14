@@ -114,6 +114,7 @@ class RainflowCounter:
 
     @property
     def peak_count(self) -> int:
+        """Number of peaks currently in the rainflow buffer."""
         return len(self._peaks)
 
 

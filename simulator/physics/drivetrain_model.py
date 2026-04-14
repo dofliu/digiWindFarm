@@ -65,6 +65,7 @@ class DrivetrainSpec:
 
     @classmethod
     def for_direct_drive(cls, **kwargs) -> "DrivetrainSpec":
+        """Create a spec for direct-drive turbines (no gearbox)."""
         return cls(gearbox_stages=[], total_gear_ratio=1.0, **kwargs)
 
     @classmethod
@@ -128,10 +129,12 @@ class DrivetrainModel:
 
     @property
     def generator_speed(self) -> float:
+        """Current generator speed in RPM."""
         return self._generator_speed
 
     @property
     def brake_pressure(self) -> float:
+        """Current brake hydraulic pressure in bar."""
         return self._brake_pressure
 
     def step(
@@ -322,6 +325,7 @@ class DrivetrainModel:
         return result
 
     def reset(self):
+        """Reset all drivetrain state to initial conditions."""
         self._lss_twist = 0.0
         self._hss_twist = 0.0
         self._generator_speed = 0.0
