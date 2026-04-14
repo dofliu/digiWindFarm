@@ -142,6 +142,16 @@ These parts are implemented, but still first-generation models:
 - [ ] Upgrade `setuptools` (68.1.2 → ≥78.1.1, 3 CVEs) — see #48
 - [ ] Add `pip-audit` to CI / development workflow
 
+### Testing
+- [ ] Set up pytest and basic test infrastructure — see #52
+- [ ] Unit tests for physics models (`simulator/physics/`)
+- [ ] Integration tests for API endpoints (`server/routers/`)
+- [ ] Simulation engine state machine tests (`simulator/engine.py`)
+
+### New Feature Requests
+- [ ] External data API documentation and access — see #50
+- [ ] RAG-based alert analysis with manufacturer manuals — see #51
+
 ## Notes
 
 - `README.md` and this roadmap now reflect the actual implemented state.
