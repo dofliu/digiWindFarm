@@ -52,6 +52,7 @@ class WindFarmSimulator:
             self.add_turbine(tid, seed=i)
 
     def add_turbine(self, turbine_id: str, seed: Optional[int] = None):
+        """Register a new turbine physics model with optional deterministic seed."""
         self.turbines[turbine_id] = TurbinePhysicsModel(seed=seed)
         self.latest_data[turbine_id] = {}
         self.history[turbine_id] = deque(maxlen=self.history_maxlen)
@@ -61,6 +62,7 @@ class WindFarmSimulator:
         self._callbacks.append(callback)
 
     def start(self, time_step: float = 1.0):
+        """Start the simulation loop in a background thread at the given timestep."""
         if self._running:
             return
         self._running = True
@@ -71,6 +73,7 @@ class WindFarmSimulator:
         self._thread.start()
 
     def stop(self):
+        """Stop the simulation loop and wait for the background thread to finish."""
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
@@ -273,14 +276,17 @@ class WindFarmSimulator:
         }
 
     def get_current_data(self) -> Dict[str, Dict]:
+        """Return the latest SCADA output for all turbines (thread-safe snapshot)."""
         with self._lock:
             return dict(self.latest_data)
 
     def get_turbine_data(self, turbine_id: str) -> Optional[Dict]:
+        """Return the latest SCADA output for a single turbine, or None."""
         with self._lock:
             return self.latest_data.get(turbine_id)
 
     def get_history(self, turbine_id: str, limit: int = 100) -> List[Dict]:
+        """Return the most recent *limit* in-memory trend samples for a turbine."""
         with self._lock:
             h = self.history.get(turbine_id, deque())
             return list(h)[-limit:]

@@ -237,6 +237,7 @@ class DataBroker:
 
     def start(self, config: Optional[DataSourceConfig] = None,
               sim_config: Optional[SimulationConfig] = None):
+        """Start the data broker in simulation or OPC mode and launch background maintenance."""
         if sim_config:
             self._sim_config = sim_config
         if config:
@@ -350,6 +351,7 @@ class DataBroker:
             self.storage.store_readings(readings, self._session_id)
 
     def stop(self):
+        """Stop the active data source, end the current session, and halt maintenance."""
         self._stop_maintenance()
         if self.simulator and self.simulator.is_running:
             self.simulator.stop()
@@ -359,6 +361,7 @@ class DataBroker:
 
     def switch_mode(self, config: DataSourceConfig,
                     sim_config: Optional[SimulationConfig] = None):
+        """Switch between simulation and OPC data source modes."""
         self.stop()
         self.mode = config.mode
         self.start(config, sim_config)
@@ -401,6 +404,7 @@ class DataBroker:
                 print(f"[DataBroker] Maintenance error: {e}")
 
     def get_all_turbines(self) -> List[TurbineReading]:
+        """Return current readings for all turbines, sorted by turbine ID."""
         if self.mode == DataSourceMode.SIMULATION and self.simulator:
             current = self.simulator.get_current_data()
             fault_status = self.simulator.fault_engine.get_fault_status()
@@ -413,6 +417,7 @@ class DataBroker:
         return []
 
     def get_turbine(self, turbine_id: str) -> Optional[TurbineReading]:
+        """Return the current reading for a single turbine, or None if not found."""
         if self.mode == DataSourceMode.SIMULATION and self.simulator:
             output = self.simulator.get_turbine_data(turbine_id)
             if output:
@@ -424,15 +429,18 @@ class DataBroker:
 
     def get_history(self, turbine_id: str, start: Optional[str] = None,
                     end: Optional[str] = None, limit: int = 1000) -> List[dict]:
+        """Query stored SCADA history for a turbine within an optional time range."""
         return self.storage.query_history(turbine_id, start, end, limit)
 
     def get_history_events(self, turbine_id: Optional[str] = None, start: Optional[str] = None,
                            end: Optional[str] = None, limit: int = 500) -> List[dict]:
+        """Query stored history events (faults, grid, operator actions) with optional filters."""
         return self.storage.query_events(turbine_id, start, end, limit)
 
     def record_event(self, event_type: str, source: str, title: str,
                      turbine_id: Optional[str] = None, detail: Optional[str] = None,
                      payload: Optional[Dict] = None, end_timestamp: Optional[str] = None):
+        """Persist a history event (fault, grid change, operator action, etc.) to storage."""
         self.storage.record_event(
             event_type=event_type,
             source=source,
@@ -445,6 +453,7 @@ class DataBroker:
 
     def close_open_events(self, event_type: str, source: Optional[str] = None,
                           turbine_id: Optional[str] = None, closed_at: Optional[str] = None):
+        """Close open-ended events by setting their end timestamp."""
         self.storage.close_open_events(
             event_type=event_type,
             source=source,
@@ -713,6 +722,7 @@ class DataBroker:
         }.get(state, f"State {state}")
 
     def get_farm_status(self) -> FarmStatus:
+        """Aggregate current turbine states into a farm-level status summary."""
         turbines = self.get_all_turbines()
         now = datetime.now()
         if not turbines:
