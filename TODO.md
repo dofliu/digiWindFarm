@@ -155,10 +155,10 @@ These parts are implemented, but still first-generation models:
 ## Known Issues / Next Improvements
 
 ### Physics Realism (from data quality analysis)
-- [ ] Region 3 power CV too low (0.8-0.9%): pitch controller needs response delay and wind turbulence coupling to produce realistic 3-5% variation at rated power
-- [ ] Spectral sideband analysis (modulated harmonics around gear mesh)
-- [ ] Bearing defect frequency computation (BPFO/BPFI from geometry)
-- [ ] Tower fore-aft dynamic response (natural frequency oscillation)
+- [x] Region 3 power CV too low (0.8-0.9%): switched to Cp aerodynamic model, pitch lag now creates realistic variation — see #61
+- [ ] Spectral sideband analysis (modulated harmonics around gear mesh) — see #58
+- [ ] Bearing defect frequency computation (BPFO/BPFI from geometry) — see #58
+- [ ] Tower fore-aft dynamic response (natural frequency oscillation) — see #62
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
