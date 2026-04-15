@@ -322,27 +322,34 @@ class ScadaRegistry:
         return tag_id in self._tags
 
     def get(self, tag_id: str) -> Optional[ScadaTag]:
+        """Look up a SCADA tag definition by its tag ID."""
         return self._tags.get(tag_id)
 
     @property
     def all_tags(self) -> List[ScadaTag]:
+        """All registered SCADA tag definitions."""
         return list(self._tags.values())
 
     @property
     def tag_ids(self) -> List[str]:
+        """List of all registered tag ID strings."""
         return list(self._tags.keys())
 
     @property
     def display_tags(self) -> List[ScadaTag]:
+        """Tags marked for frontend display."""
         return [t for t in self._tags.values() if t.is_display]
 
     def by_subsystem(self, subsystem: str) -> List[ScadaTag]:
+        """Return tags belonging to a given subsystem (e.g. 'generator', 'grid')."""
         return self._by_subsystem.get(subsystem, [])
 
     def by_opc_tag(self, opc_tag: str) -> Optional[ScadaTag]:
+        """Look up a tag by its OPC UA node path."""
         return self._by_opc.get(opc_tag)
 
     def by_modbus(self, register: str) -> Optional[ScadaTag]:
+        """Look up a tag by its Modbus register address."""
         return self._by_modbus.get(register)
 
     def labels(self, lang: str = "en") -> Dict[str, str]:
