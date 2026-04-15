@@ -18,6 +18,7 @@ ws_clients: List[WebSocket] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage application lifecycle: start simulator and Modbus on startup, clean up on shutdown."""
     # Startup: start simulator
     config = DataSourceConfig(mode=DataSourceMode.SIMULATION)
     sim_config = SimulationConfig(turbineCount=14)
@@ -84,6 +85,7 @@ app.include_router(maintenance_router)
 
 @app.get("/api/health")
 async def health():
+    """Return system health status including data source mode and turbine count."""
     return {
         "status": "ok",
         "mode": broker.mode.value,
@@ -93,6 +95,7 @@ async def health():
 
 @app.websocket("/ws/realtime")
 async def websocket_realtime(ws: WebSocket):
+    """Handle a WebSocket connection for real-time SCADA data streaming."""
     await ws.accept()
     ws_clients.append(ws)
     try:

@@ -169,6 +169,7 @@ class WindEventPropagation:
         self._y = np.array([p.y for p in positions])
 
     def add_event(self, event: WindEvent):
+        """Queue a wind event (gust, ramp, direction shift) for farm-wide propagation."""
         self._active_events.append(event)
 
     def generate_natural_events(self, mean_wind: float, dt: float):

@@ -55,7 +55,7 @@ Implemented and usable today:
 - history page with event markers, event details, focus windows, and CSV export
 - electrical response model (frequency-watt, reactive power, power factor, ride-through)
 - spectral vibration model (1P/3P/gear/HF/broadband bands, crest factor, kurtosis)
-- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage)
+- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage, alarm thresholds, RUL estimation)
 - fault lifecycle tracking with start/end duration events
 - event export API (JSON/CSV) with severity grouping
 - Docker Compose deployment (backend + frontend with nginx reverse proxy)
@@ -232,6 +232,6 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 - deployment hardening: JWT, RBAC, HTTPS not yet implemented (Docker Compose is available)
 - sideband vibration detail and spectral alarm thresholds not yet implemented
 - full protection relay coordination not yet implemented
-- fatigue-based alarm thresholds and remaining useful life estimation pending
+- frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)
 - use the status and roadmap docs as the source of truth for current implementation state

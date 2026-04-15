@@ -313,6 +313,15 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("WLOD_ProdHours", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_ProdHours",
              "WLOD", "REAL32", "h", "Production Hours", "發電運轉時數",
              0, 100000),
+    ScadaTag("WLOD_AlmTwr", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_AlmTwr",
+             "WLOD", "SINT16", "", "Tower Fatigue Alarm Level", "塔架疲勞警報等級",
+             0, 4),
+    ScadaTag("WLOD_AlmBld", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_AlmBld",
+             "WLOD", "SINT16", "", "Blade Fatigue Alarm Level", "葉片疲勞警報等級",
+             0, 4),
+    ScadaTag("WLOD_RulHours", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_RulHours",
+             "WLOD", "REAL32", "h", "Remaining Useful Life", "剩餘使用壽命",
+             -1, 1000000),
 
     # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
@@ -347,27 +356,34 @@ class ScadaRegistry:
         return tag_id in self._tags
 
     def get(self, tag_id: str) -> Optional[ScadaTag]:
+        """Look up a SCADA tag definition by its tag ID."""
         return self._tags.get(tag_id)
 
     @property
     def all_tags(self) -> List[ScadaTag]:
+        """All registered SCADA tag definitions."""
         return list(self._tags.values())
 
     @property
     def tag_ids(self) -> List[str]:
+        """List of all registered tag ID strings."""
         return list(self._tags.keys())
 
     @property
     def display_tags(self) -> List[ScadaTag]:
+        """Tags marked for frontend display."""
         return [t for t in self._tags.values() if t.is_display]
 
     def by_subsystem(self, subsystem: str) -> List[ScadaTag]:
+        """Return tags belonging to a given subsystem (e.g. 'generator', 'grid')."""
         return self._by_subsystem.get(subsystem, [])
 
     def by_opc_tag(self, opc_tag: str) -> Optional[ScadaTag]:
+        """Look up a tag by its OPC UA node path."""
         return self._by_opc.get(opc_tag)
 
     def by_modbus(self, register: str) -> Optional[ScadaTag]:
+        """Look up a tag by its Modbus register address."""
         return self._by_modbus.get(register)
 
     def labels(self, lang: str = "en") -> Dict[str, str]:

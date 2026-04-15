@@ -260,6 +260,8 @@ class Storage:
         conn.commit()
 
     def get_sessions(self, limit: int = 20) -> List[dict]:
+        """Return the most recent sessions, newest first."""
+        """Return recent sessions ordered by newest first."""
         conn = self._get_conn()
         rows = conn.execute(
             "SELECT * FROM sessions ORDER BY id DESC LIMIT ?", (limit,)
@@ -276,6 +278,8 @@ class Storage:
         return result
 
     def get_active_session(self) -> Optional[dict]:
+        """Return the latest session that has not ended, or None."""
+        """Return the most recent session that has not ended, or None."""
         conn = self._get_conn()
         row = conn.execute(
             "SELECT * FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
@@ -393,6 +397,8 @@ class Storage:
         conn.commit()
 
     def store_readings(self, readings: List[dict], session_id: int = None):
+        """Store a batch of turbine readings."""
+        """Store multiple turbine readings in a single call."""
         for r in readings:
             self.store_reading(r, session_id)
 
@@ -426,6 +432,8 @@ class Storage:
         conn.commit()
 
     def store_snapshots(self, readings: List[dict], event_ref: str, session_id: int = None):
+        """Store a batch of 1s snapshot readings for an event."""
+        """Store multiple 1s snapshot readings linked to an event."""
         for r in readings:
             self.store_snapshot(r, event_ref, session_id)
 
@@ -552,6 +560,8 @@ class Storage:
 
     def query_history(self, turbine_id: str, start: Optional[str] = None,
                       end: Optional[str] = None, limit: int = 1000) -> List[dict]:
+        """Query raw turbine data with optional time-range filter."""
+        """Query raw turbine_data rows for a turbine within an optional time range."""
         conn = self._get_conn()
         query = "SELECT * FROM turbine_data WHERE turbine_id = ?"
         params: list = [turbine_id]
@@ -579,6 +589,8 @@ class Storage:
         return result
 
     def query_latest(self, turbine_id: str) -> Optional[dict]:
+        """Return the most recent reading for a single turbine."""
+        """Return the most recent reading for a turbine, or None."""
         rows = self.query_history(turbine_id, limit=1)
         return rows[0] if rows else None
 
@@ -589,6 +601,8 @@ class Storage:
         end: Optional[str] = None,
         limit: int = 500,
     ) -> List[dict]:
+        """Query history events with optional turbine and time-range filter."""
+        """Query history_events with optional turbine, time range, and limit filters."""
         conn = self._get_conn()
         query = """
             SELECT * FROM history_events
@@ -622,6 +636,7 @@ class Storage:
         return result
 
     def query_all_latest(self) -> List[dict]:
+        """Return the most recent reading for every turbine."""
         conn = self._get_conn()
         rows = conn.execute("""
             SELECT t1.* FROM turbine_data t1
@@ -637,6 +652,8 @@ class Storage:
     def query_snapshots(self, turbine_id: str, event_ref: Optional[str] = None,
                         start: Optional[str] = None, end: Optional[str] = None,
                         limit: int = 1000) -> List[dict]:
+        """Query high-frequency snapshot readings with optional event and time filter."""
+        """Query high-frequency snapshot readings for a turbine, optionally filtered by event."""
         conn = self._get_conn()
         query = "SELECT * FROM turbine_snapshots WHERE turbine_id = ?"
         params: list = [turbine_id]
@@ -670,6 +687,8 @@ class Storage:
     def create_work_order(self, turbine_id: int, turbine_name: str,
                           fault_description: str,
                           technician_id: Optional[int] = None) -> dict:
+        """Create a new maintenance work order and return it."""
+        """Create a new work order and return it as a dict."""
         conn = self._get_conn()
         wo_id = f"WO-{int(_time.time() * 1000)}"
         now = datetime.now().isoformat()
@@ -685,6 +704,8 @@ class Storage:
         return self.get_work_order(wo_id)
 
     def get_work_order(self, wo_id: str) -> Optional[dict]:
+        """Return a single work order by ID, or None."""
+        """Return a single work order by ID, or None if not found."""
         conn = self._get_conn()
         row = conn.execute("SELECT * FROM work_orders WHERE id = ?", (wo_id,)).fetchone()
         if not row:
@@ -694,6 +715,8 @@ class Storage:
     def query_work_orders(self, status: Optional[str] = None,
                           turbine_id: Optional[int] = None,
                           limit: int = 100) -> List[dict]:
+        """List work orders filtered by status and/or turbine."""
+        """Query work orders with optional status and turbine filters."""
         conn = self._get_conn()
         query = "SELECT * FROM work_orders WHERE 1=1"
         params: list = []
@@ -709,6 +732,8 @@ class Storage:
         return [self._wo_row_to_dict(r) for r in rows]
 
     def update_work_order(self, wo_id: str, **kwargs) -> Optional[dict]:
+        """Update work order fields (status, notes, photos) and return it."""
+        """Update work order fields (status, notes, photos) and return the updated record."""
         conn = self._get_conn()
         sets = []
         params = []
@@ -759,6 +784,8 @@ class Storage:
     # ══════════════════════════════════════════════════════════════════
 
     def create_technician(self, name: str, status: str = "ON_DUTY") -> dict:
+        """Add a technician and return the new record."""
+        """Create a new technician record and return it."""
         conn = self._get_conn()
         cursor = conn.execute(
             "INSERT INTO technicians (name, status) VALUES (?, ?)", (name, status)
@@ -767,11 +794,14 @@ class Storage:
         return {"id": cursor.lastrowid, "name": name, "status": status}
 
     def query_technicians(self) -> List[dict]:
+        """Return all technicians ordered by ID."""
         conn = self._get_conn()
         rows = conn.execute("SELECT * FROM technicians ORDER BY id").fetchall()
         return [{"id": r["id"], "name": r["name"], "status": r["status"]} for r in rows]
 
     def update_technician(self, tech_id: int, status: str) -> Optional[dict]:
+        """Update a technician's duty status and return the record."""
+        """Update a technician's status and return the updated record."""
         conn = self._get_conn()
         conn.execute("UPDATE technicians SET status = ? WHERE id = ?", (status, tech_id))
         conn.commit()

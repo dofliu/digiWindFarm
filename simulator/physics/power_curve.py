@@ -267,6 +267,7 @@ class PowerCurveModel:
 
     @property
     def last_aero(self) -> AeroOutput:
+        """Most recent aerodynamic output (Cp, Ct, thrust, tip-speed ratio)."""
         return self._last_aero
 
     def get_region(self, wind_speed: float) -> int:

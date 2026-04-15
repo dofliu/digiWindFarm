@@ -34,7 +34,7 @@
 - [x] 59 SCADA tags total (was 40): +7 electrical response + 12 vibration spectral bands
 - [x] Vibration spectral alarm thresholds with ISO 10816-inspired zones and hysteresis
 - [x] Fatigue/load model: tower/blade bending moments, rainflow cycle counting, DEL, Miner's damage
-- [x] 80 SCADA tags total (was 59): +8 vibration alarm + 13 structural load/fatigue
+- [x] 80 SCADA tags total (was 59): +8 vibration alarm + 13 structural load/fatigue + 3 fatigue alarm/RUL
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -116,6 +116,16 @@ These parts are implemented, but still first-generation models:
 - [x] Cumulative fatigue damage (Miner's rule)
 - [x] Frontend load/fatigue tab
 - [x] History trend chart preset for load data
+- [x] Fatigue alarm thresholds (4-level: notice/warning/danger/shutdown) — see #57
+- [x] Remaining Useful Life (RUL) estimation from damage rate — see #57
+- [x] Fatigue alarm event integration (auto-generate history events on threshold crossing) — see #57
+- [ ] Frontend RUL display and alarm level visualization — see #57
+
+### Priority F: Vibration Condition Monitoring
+- [ ] Spectral alarm threshold curves per frequency band — see #58
+- [ ] Crest factor / kurtosis anomaly alarms — see #58
+- [ ] Sideband analysis (gear mesh modulation) — see #58
+- [ ] Bearing defect frequency simulation (BPFO/BPFI) — see #58
 
 ## Product / Platform Gaps
 
@@ -165,6 +175,16 @@ These parts are implemented, but still first-generation models:
 
 ### Storage
 - [ ] Decide whether long-term storage should stay on SQLite or move to time-series DB
+
+### Testing
+- [ ] Set up pytest and basic test infrastructure — see #52
+- [ ] Unit tests for physics models (`simulator/physics/`)
+- [ ] Integration tests for API endpoints (`server/routers/`)
+- [ ] Simulation engine state machine tests (`simulator/engine.py`)
+
+### New Feature Requests
+- [ ] External data API documentation and access — see #50
+- [ ] RAG-based alert analysis with manufacturer manuals — see #51
 
 ## Notes
 

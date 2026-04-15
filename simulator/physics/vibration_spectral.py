@@ -56,6 +56,7 @@ class VibrationBands:
     kurtosis: float = 3.0     # signal kurtosis (3.0 = Gaussian normal)
 
     def to_dict(self) -> Dict[str, float]:
+        """Serialize all spectral band amplitudes and statistical indicators to a flat dict."""
         return {
             "vib_band_1p_x": round(self.band_1p_x, 4),
             "vib_band_1p_y": round(self.band_1p_y, 4),

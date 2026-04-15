@@ -57,10 +57,14 @@ Report: `examples/data_quality_report.txt`
 
 Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
-- sideband vibration detail (harmonics/fault signatures)
+- sideband vibration detail (harmonics/fault signatures) — see #58
 - full protection relay coordination (LVRT/OVRT)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
+- no automated test suite (pytest) — see #52
+- external data API documentation — see #50
+- RAG-based alert analysis — see #51
+- frontend RUL visualization — see #57 (fatigue alarm event integration completed)
 
 ## Source of Truth
 

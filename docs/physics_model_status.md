@@ -366,14 +366,15 @@ Implemented:
 - cumulative fatigue damage via Miner's rule (S-N curve based)
 - per-turbine individuality (stiffness scale offsets and material fatigue ±15%)
 - emergency stop transient load amplification (1.8× tower FA)
-- 13 new SCADA tags (WLOD_ prefix)
+- 16 SCADA tags (WLOD_ prefix), including 3 alarm/RUL tags
 - frontend Load/Fatigue tab with instantaneous loads, DEL, and damage
 - fault coupling: blade_icing, pitch_imbalance, yaw_misalignment, bearing_wear, gearbox_overheat
+- fatigue alarm thresholds: 4-level alarm (notice ≥0.30, warning ≥0.60, danger ≥0.80, shutdown ≥0.95)
+- remaining useful life (RUL) estimation from average damage rate
 
 Still missing:
 - full aeroelastic tower/blade FEM coupling
-- fatigue-based alarm thresholds
-- DEL-based remaining useful life estimation
+- frontend RUL display and alarm level visualization
 
 ### 3.4 Event Layer for Historical Analysis
 Status: **implemented**
@@ -454,16 +455,18 @@ Implemented:
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
-- fatigue / load modeling (tower + blade moments, DEL, Miner's damage)
-- 80 SCADA tags (electrical + vibration + structural load + diagnostics)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL)
+- 80 SCADA tags (electrical + vibration + structural load + alarm/RUL + diagnostics)
 
 ### Still Weak
-- sideband vibration detail
+- sideband vibration detail — see #58
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM + natural frequency response)
+- frontend RUL visualization — see #57 (alarm event integration completed)
 
 ### Recommended Immediate Direction
-1. deployment hardening (JWT auth, RBAC, Docker Compose)
-2. spectral sideband analysis (harmonics/fault signatures)
+1. frontend RUL display and alarm level visualization (see #57)
+2. spectral sideband analysis (harmonics/fault signatures) (see #58)
 3. detailed bearing defect frequency computation (BPFO/BPFI)
 4. tower dynamic natural frequency response
+5. deployment hardening (JWT auth, RBAC, Docker Compose)

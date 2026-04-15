@@ -1,54 +1,60 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-04-13（第二次更新）
+> 最後更新：2026-04-15（第二次更新）
 
 ## 昨日 Commit 摘要
 
 過去 24 小時 main 分支合併：
-- [8bd89f3] Merge pull request #47 from dofliu/claude/cool-newton-9NAoS
-- [ab4d114] Merge pull request #46 from dofliu/claude/jolly-feynman-l88Tt
-- [e21c365] docs: update physics_model_status.md to reflect current state
-- [edc69b9] docs: add daily report for 2026-04-13
-- [3c070dc] chore: auto-fix 53 ruff lint errors, update README API list and CLAUDE.md gaps
+- [096f924] Merge pull request #59 from dofliu/claude/awesome-albattani-o49ay
+- [15b5e9c] docs: update project docs and daily report for 2026-04-15
+- [d2a5c1f] Merge pull request #56 from dofliu/claude/determined-goldberg-f1OFZ
+- [7220898] Merge pull request #55 from dofliu/claude/gracious-mccarthy-j7IiT
+- [e658f75] Merge pull request #54 from dofliu/claude/gracious-mccarthy-MNcvo
+- [beeeee5] Merge pull request #53 from dofliu/claude/tender-ramanujan-XzZMe
 
-本次日報工作提交（分支 `claude/tender-ramanujan-sgTfg`）：
-- 修復核心模組 15 個 lint 錯誤（server/ + simulator/ 全部通過）
-- 關閉 3 個已完成 issue（#41、#42、#43）
-- 新建 1 個安全漏洞 issue（#48）
-- 更新日報、專案文件
+本次日報工作提交（分支 `claude/awesome-albattani-IzD2C`）：
+- [86e1707] feat: add fatigue alarm event integration — auto-generate history events on threshold crossing (#57)
+- [06860a1] docs: add 23 docstrings to public functions across server and simulator (#45)
 
 ## Issue 狀態
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 關閉 | #41 | 疲勞/載荷模型 — DEL、Miner 累積損傷 | PR #46 已合併至 main，程式碼已驗證 |
-| 關閉 | #42 | Docker Compose 部署 + .env 整理 | PR #46 已合併至 main，程式碼已驗證 |
-| 關閉 | #43 | README.md API endpoint 列表不完整 | commit 3c070dc 已修復，53 路由全部同步 |
-| 新建 | #48 | pip-audit 偵測到 17 個安全漏洞（5 套件） | cryptography、pip、pyjwt、setuptools、wheel |
-| 保持 | #44 | Ruff lint 179 個錯誤 | 核心模組已全部修復（0 錯誤），剩餘 109 個在 opc_bachmann/ 和原型檔 |
-| 保持 | #45 | 108 個公開函數缺少 docstring | 掃描結果 109 個，分布同上次 |
-| 保持 | #26 | 部署強化 — 認證、權限、Docker、HTTPS | Docker Compose 已完成（#42 關閉），JWT/RBAC/HTTPS 待做 |
-| 保持 | #24 | 歷史資料儲存 — 保留策略、儲存架構 | 保留策略已實作，SQLite vs 時序 DB 待決策 |
+| 進展 | #57 | 疲勞警報閾值與剩餘使用壽命（RUL）估算 | 新增疲勞警報事件整合：閾值跨越時自動產生歷史事件 |
+| 進展 | #45 | 108 個公開函數缺少 docstring | 累計修復 99 個（今日 23 個），剩餘約 9 個 |
+| 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 待實作 |
+| 保持 | #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | 仍無 pytest，需優先處理 |
+| 保持 | #51 | 警報處理透過 RAG 機制來產生結果 | 用戶功能需求，待規劃 |
+| 保持 | #50 | 提供可讓外部擷取資料的 API 功能 | 用戶功能需求，待規劃 |
+| 保持 | #48 | pip-audit 偵測到 17 個安全漏洞（5 套件） | 漏洞數量不變，尚未升級 |
+| 保持 | #44 | Ruff lint 179 個錯誤 | 核心模組維持 0 錯誤，剩餘 109 個在 opc_bachmann/ 和根目錄原型 |
+| 保持 | #26 | 部署強化 — 認證、權限、Docker、HTTPS | Docker Compose 已完成，JWT/RBAC/HTTPS 待做 |
+| 保持 | #24 | 歷史資料儲存 — 保留策略、儲存架構 | 保留策略已做，架構決策待定 |
 
 ## Open Issues 總覽
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #48 | pip-audit 偵測到 17 個安全漏洞 | security, auto-detected | 2026-04-13 | 新建：cryptography 41→46 跨度大 |
-| #45 | 108 個公開函數缺少 docstring | documentation, auto-detected | 2026-04-13 | 持續追蹤 |
-| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組已清零，剩餘皆為舊原型/第三方 |
-| #26 | 部署強化 — 認證、權限、Docker、HTTPS | enhancement, deployment | 2026-04-05 | Docker 已完成，JWT/RBAC/HTTPS 待做 |
-| #24 | 歷史資料儲存 — 保留策略、儲存架構 | enhancement, platform | 2026-04-05 | 保留策略已做，架構決策待定 |
+| #58 | 頻譜振動警報閾值與邊帶分析 | auto-detected, enhancement, physics | 2026-04-15 | 待實作 |
+| #57 | 疲勞警報閾值與剩餘使用壽命（RUL）估算 | auto-detected, enhancement, physics | 2026-04-15 | 警報閾值+RUL+事件整合已完成，剩前端視覺化 |
+| #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | auto-detected, code-quality | 2026-04-14 | 無進展 |
+| #51 | 警報處理透過 RAG 機制來產生結果 | — | 2026-04-14 | 用戶功能需求 |
+| #50 | 提供可讓外部擷取資料的 API 功能 | — | 2026-04-14 | 用戶功能需求 |
+| #48 | pip-audit 偵測到 17 個安全漏洞 | security, auto-detected | 2026-04-13 | cryptography 41→46 跨度大 |
+| #45 | 108 個公開函數缺少 docstring | documentation, auto-detected | 2026-04-13 | 已修 99 個，剩約 9 個 |
+| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組已清零 |
+| #26 | 部署強化 — 認證、權限、Docker、HTTPS | enhancement, deployment | 2026-04-05 | Docker 已完成 |
+| #24 | 歷史資料儲存 — 保留策略、儲存架構 | enhancement, platform | 2026-04-05 | 架構決策待定 |
 
 ## 模組狀態
 
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
-| `server/` | 2026-04-13 | 0 | 無測試套件 | API route handlers，lint 全部通過 |
-| `server/routers/` | 2026-04-13 | 0 | 無測試套件 | 8 個 router 模組 |
-| `simulator/` | 2026-04-13 | 0 | 無測試套件 | 引擎、grid_model、modbus_server |
-| `simulator/physics/` | 2026-04-13 | 0 | 無測試套件 | 14 個物理模型檔案，lint 全部通過 |
-| `frontend/` | 2026-04-12 | 0 | 無測試套件 | React 前端 |
+| `server/` | 2026-04-15 | 0 | 無測試套件 | 新增疲勞警報事件偵測邏輯 |
+| `server/routers/` | 2026-04-15 | 0 | 無測試套件 | 8 個 router 模組全部有 docstring |
+| `simulator/` | 2026-04-15 | 0 | 無測試套件 | engine 和 modbus_server property 已補 docstring |
+| `simulator/physics/` | 2026-04-15 | 0 | 無測試套件 | 14 個物理模型，疲勞事件整合完成 |
+| `frontend/` | 2026-04-12 | 0 | 無測試套件 | React 前端，RUL 視覺化待實作 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案（dashboard.py 等） |
 
 ## API Endpoints
@@ -111,21 +117,42 @@
 
 ## 程式碼品質
 
-- Lint 錯誤：109（核心模組 server/ + simulator/ 已全部修復為 0，剩餘皆在 opc_bachmann/ 和根目錄原型檔案）
-- 無 docstring 的公開函數：109
-- Broken imports：0（核心模組）；5（根目錄早期原型，dash/plotly/pandas/openopc2 — 已知非核心）
-- 測試套件：未建立（無 pytest）
-- 安全漏洞：17 個（5 個套件），詳見 #48
+- Lint 錯誤：109（核心模組 server/ + simulator/ 維持 0 錯誤，剩餘皆在 opc_bachmann/ 和根目錄原型檔案）
+- 無 docstring 的公開函數：約 9 個（上次 32，今日修復 23 個，累計修復 99 個）
+- Broken imports：0（核心模組結構正確）；環境缺少依賴套件（numpy/fastapi）非程式碼問題；根目錄早期原型有 5 個已知缺失（dash/plotly/pandas/openopc2）
+- 測試套件：未建立（無 pytest）— 追蹤 issue #52
+- 安全漏洞：17 個（5 個套件），與上次相同，詳見 #48
   - cryptography 41.0.7 → 需升級至 ≥46.0.6（7 個 CVE）
   - pyjwt 2.7.0 → 需升級至 ≥2.12.0（1 個 CVE）
   - setuptools 68.1.2 → 需升級至 ≥78.1.1（3 個 CVE）
   - pip 24.0 → 需升級至 ≥26.0（4 個 CVE）
   - wheel 0.42.0 → 需升級至 ≥0.46.2（2 個 CVE）
+- TODO/FIXME/HACK：0 個（核心模組；opc_bachmann/ 中有 4 個，屬第三方套件）
+- SCADA 標籤：75 個（含 3 個疲勞警報/RUL 標籤）
+
+## 今日新增功能
+
+### 疲勞警報事件整合（#57）
+- **自動事件產生**：當疲勞警報等級變化（塔架或葉片）時，自動產生歷史事件記錄
+- **事件內容**：包含元件名稱、從/到等級、等級名稱（正常/注意/警告/危險/停機）、RUL 估算
+- **事件類型**：`fatigue`，來源 `simulator`，可透過歷史事件 API 查詢
+- **追蹤機制**：使用 `_last_fatigue_alarm` 字典追蹤每部風機的上次警報等級，避免重複事件
+
+### Docstring 補充（#45）
+- 新增 23 個 docstring，覆蓋：
+  - `server/app.py`：lifespan、health、websocket_realtime
+  - 6 個 router 的 `get_broker()` 函數
+  - `server/opc_adapter.py`：on_data、start、stop
+  - `server/data_broker.py`：turbine_ids property
+  - `simulator/engine.py`：is_running、turbine_ids properties
+  - `simulator/modbus_server.py`：get_status、is_running
+  - `simulator/physics/`：fault_engine、power_curve、thermal_model、vibration_spectral、wind_field、yaw_model
 
 ## 建議行動
 
-1. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）和 `pyjwt`（影響未來 JWT 實作），注意大版本升級的兼容性
-2. **建立測試套件**：核心物理模型（`simulator/physics/`）和 API endpoint 仍無自動化測試，建議優先建立
-3. **清理早期原型檔案**：根目錄的 `dashboard.py`、`scada_system.py`、`turbine_model.py`、`main_architecture.py` 等有 109 個 lint 錯誤中的大部分，建議移至 `legacy/` 或移除
-4. **更新 #44 進度**：核心模組 lint 已全部修復，可考慮將 issue 重新定義為「清理根目錄原型 lint」或關閉
-5. **推進 #26 部署強化**：Docker Compose 已完成並關閉 #42，下一步是 JWT 認證和基本 RBAC
+1. **完善 #57 前端視覺化**：前端新增 RUL 顯示和疲勞警報等級視覺化（後端事件整合已完成）
+2. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試
+3. **實作 #58 頻譜警報**：各頻帶警報閾值定義、峰值因子/峭度超標警報
+4. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）
+5. **完成 docstring**（#45）：剩餘約 9 個，主要是 storage.py 內部函數和 engine.py time_scale setter
+6. **處理用戶功能需求**（#50、#51）：外部 API 文件和 RAG 警報處理

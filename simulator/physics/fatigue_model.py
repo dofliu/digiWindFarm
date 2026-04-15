@@ -48,6 +48,12 @@ class FatigueSpec:
     # Cycle buffer length for rainflow counting
     rainflow_buffer_len: int = 600  # ~10 min at 1 Hz
 
+    # Fatigue alarm thresholds (damage fraction 0→1)
+    alarm_notice: float = 0.30    # level 1: 注意
+    alarm_warning: float = 0.60   # level 2: 警告
+    alarm_danger: float = 0.80    # level 3: 危險
+    alarm_shutdown: float = 0.95  # level 4: 停機
+
 
 class RainflowCounter:
     """Simplified online rainflow cycle counter.
@@ -114,6 +120,7 @@ class RainflowCounter:
 
     @property
     def peak_count(self) -> int:
+        """Number of peaks currently in the rainflow buffer."""
         return len(self._peaks)
 
 
@@ -172,6 +179,12 @@ class FatigueModel:
         self.load_tower_ss: float = 0.0
         self.load_blade_flap: float = 0.0
         self.load_blade_edge: float = 0.0
+
+        # Alarm level tracking (0=normal, 1=notice, 2=warning, 3=danger, 4=shutdown)
+        self.alarm_level_tower: int = 0
+        self.alarm_level_blade: int = 0
+        # Remaining useful life estimate (hours), -1 = insufficient data
+        self.rul_hours: float = -1.0
 
         # Lifetime counters
         self._total_sim_time: float = 0.0
@@ -281,6 +294,21 @@ class FatigueModel:
         self.damage_blade_flap = min(1.0, self.damage_blade_flap)
         self.damage_blade_edge = min(1.0, self.damage_blade_edge)
 
+        # ── Alarm level from worst-case damage ──
+        max_tower_dmg = max(self.damage_tower_fa, self.damage_tower_ss)
+        max_blade_dmg = max(self.damage_blade_flap, self.damage_blade_edge)
+        self.alarm_level_tower = self._damage_to_alarm(max_tower_dmg)
+        self.alarm_level_blade = self._damage_to_alarm(max_blade_dmg)
+
+        # ── RUL estimation from average damage rate ──
+        prod_h = self._total_production_time / 3600.0
+        max_dmg = max(max_tower_dmg, max_blade_dmg)
+        if prod_h > 1.0 and max_dmg > 1e-10:
+            rate_per_h = max_dmg / prod_h
+            self.rul_hours = max(0.0, (1.0 - max_dmg) / rate_per_h)
+        else:
+            self.rul_hours = -1.0
+
         return {
             "tower_fa_moment_knm": round(self.load_tower_fa, 1),
             "tower_ss_moment_knm": round(self.load_tower_ss, 1),
@@ -295,7 +323,23 @@ class FatigueModel:
             "damage_blade_flap": round(self.damage_blade_flap, 8),
             "damage_blade_edge": round(self.damage_blade_edge, 8),
             "production_hours": round(self._total_production_time / 3600.0, 2),
+            "alarm_level_tower": self.alarm_level_tower,
+            "alarm_level_blade": self.alarm_level_blade,
+            "rul_hours": round(self.rul_hours, 1),
         }
+
+    def _damage_to_alarm(self, damage: float) -> int:
+        """Convert damage fraction to alarm level (0–4)."""
+        s = self.spec
+        if damage >= s.alarm_shutdown:
+            return 4
+        if damage >= s.alarm_danger:
+            return 3
+        if damage >= s.alarm_warning:
+            return 2
+        if damage >= s.alarm_notice:
+            return 1
+        return 0
 
     def _compute_loads(self, wind_speed: float, rotor_speed_rpm: float,
                        power_kw: float, pitch_deg: float,

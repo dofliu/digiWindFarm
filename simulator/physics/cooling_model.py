@@ -62,12 +62,15 @@ class CoolingComponent:
         return self._effectiveness * self.health if self.is_running else 0.0
 
     def start(self):
+        """Activate this cooling component."""
         self.is_running = True
 
     def stop(self):
+        """Deactivate this cooling component."""
         self.is_running = False
 
     def step(self, dt: float):
+        """Track runtime hours for maintenance scheduling."""
         if self.is_running:
             self._run_hours += dt / 3600.0
 
@@ -88,18 +91,22 @@ class WaterCoolingLoop:
 
     @property
     def flow_lpm(self) -> float:
+        """Coolant flow rate in litres per minute."""
         return self._flow_lpm
 
     @property
     def pressure_bar(self) -> float:
+        """Coolant loop pressure in bar."""
         return self._pressure_bar
 
     @property
     def coolant_temp(self) -> float:
+        """Bulk coolant temperature in degrees Celsius."""
         return self._coolant_temp_c
 
     @property
     def fouling(self) -> float:
+        """Heat exchanger fouling factor (0 = clean)."""
         return self._fouling_factor
 
     def step(self, heat_load_kw: float, ambient_temp: float,
@@ -193,10 +200,12 @@ class FanBank:
 
     @property
     def active_count(self) -> int:
+        """Number of fans currently running with usable health."""
         return sum(1 for f in self.fans if f.is_running and f.health > 0.1)
 
     @property
     def total_count(self) -> int:
+        """Total number of installed fans."""
         return len(self.fans)
 
     def step(self, dt: float, turbine_running: bool) -> float:

@@ -16,6 +16,7 @@ class GridEnvironmentModel:
         self._profile_start_time: Optional[datetime] = None
 
     def set_override(self, frequency_hz: Optional[float] = None, voltage_v: Optional[float] = None):
+        """Apply manual frequency and/or voltage override."""
         self._override_frequency = frequency_hz
         self._override_voltage = voltage_v
         self._active_profile = "manual" if frequency_hz is not None or voltage_v is not None else None
@@ -23,12 +24,14 @@ class GridEnvironmentModel:
             self._profile_start_time = datetime.now()
 
     def clear_override(self):
+        """Remove all manual overrides and return to auto mode."""
         self._override_frequency = None
         self._override_voltage = None
         self._active_profile = None
         self._profile_start_time = None
 
     def set_profile(self, profile: str):
+        """Activate a named grid profile (nominal, low_freq, high_freq, etc.)."""
         nom_f = self.base_frequency_hz
         nom_v = self.base_voltage_v
         profiles = {
@@ -56,6 +59,7 @@ class GridEnvironmentModel:
             self._override_voltage = volt
 
     def get_status(self) -> dict:
+        """Return current grid model status including mode, profile, and overrides."""
         return {
             "mode": "manual" if self._active_profile else "auto",
             "profile": self._active_profile,
@@ -64,6 +68,7 @@ class GridEnvironmentModel:
         }
 
     def get_frequency(self, timestamp: datetime) -> float:
+        """Compute current grid frequency (Hz) with profile and noise effects."""
         if self._active_profile == "recovery" and self._profile_start_time:
             elapsed = (timestamp - self._profile_start_time).total_seconds()
             base = (self.base_frequency_hz - 1.0) + min(1.0, elapsed / 120.0)
@@ -73,6 +78,7 @@ class GridEnvironmentModel:
         return self.base_frequency_hz + 0.05 * np.sin(timestamp.timestamp() / 180.0) + np.random.normal(0, 0.01)
 
     def get_voltage(self, timestamp: datetime) -> float:
+        """Compute current grid voltage (V) with profile and noise effects."""
         nom = self.base_voltage_v
         if self._active_profile == "recovery" and self._profile_start_time:
             elapsed = (timestamp - self._profile_start_time).total_seconds()
