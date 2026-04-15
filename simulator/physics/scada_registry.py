@@ -288,6 +288,15 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("WLOD_ProdHours", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_ProdHours",
              "WLOD", "REAL32", "h", "Production Hours", "發電運轉時數",
              0, 100000),
+    ScadaTag("WLOD_AlmTwr", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_AlmTwr",
+             "WLOD", "SINT16", "", "Tower Fatigue Alarm Level", "塔架疲勞警報等級",
+             0, 4),
+    ScadaTag("WLOD_AlmBld", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_AlmBld",
+             "WLOD", "SINT16", "", "Blade Fatigue Alarm Level", "葉片疲勞警報等級",
+             0, 4),
+    ScadaTag("WLOD_RulHours", "WLOD.Z72PLC__UI_Loc_WLOD_Analogue_RulHours",
+             "WLOD", "REAL32", "h", "Remaining Useful Life", "剩餘使用壽命",
+             -1, 1000000),
 
     # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
