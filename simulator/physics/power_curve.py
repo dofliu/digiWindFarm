@@ -235,16 +235,18 @@ class PowerCurveModel:
 
         # Blend Cp-based with lookup curve.
         # Region 2 (partial load): Cp model is primary — captures TSR tracking.
-        # Region 3 (rated): lookup is primary — pitch controller holds rated power.
+        # Region 3 (rated): Cp model — pitch controller lag creates realistic variation.
         p_lookup = self.get_power(wind_speed)
         region = self.get_region(wind_speed)
         if region == 2:
             # Partial load: Cp drives power, lookup as safety floor
             out.power_kw = max(p_aero_kw, p_lookup * 0.85)
         else:
-            # Region 3: pitch controls power to rated — use lookup
-            out.power_kw = p_lookup
-        out.power_kw = min(self.rated_power_kw, out.power_kw)
+            # Region 3: Cp model — pitch controller lag and dead-band
+            # create realistic power variation around rated (target CV 3-5%)
+            out.power_kw = p_aero_kw
+        # Allow 4% overshoot — real turbines briefly exceed rated before pitch catches up
+        out.power_kw = min(self.rated_power_kw * 1.04, out.power_kw)
 
         # Thrust coefficient and force
         out.ct = self.cp_surface.get_ct(tsr, pitch_deg) * out.stall_factor

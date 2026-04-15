@@ -375,7 +375,8 @@ class TurbinePhysicsModel:
                 * self._individuality["power_scale"]
                 * grid_derate
             )
-        effective_limit = s.rated_power_kw
+        # Allow brief overshoot matching power_curve Region 3 Cp-based output
+        effective_limit = s.rated_power_kw * 1.04
         if self.curtailment_kw is not None:
             effective_limit = min(effective_limit, self.curtailment_kw)
         elif s.curtailment_kw is not None:
@@ -390,7 +391,10 @@ class TurbinePhysicsModel:
         else:
             target_power_kw = 0.0
 
-        ramp_tau = 4.0 if is_producing else 2.0
+        # Region 3: shorter ramp tau (2s) lets pitch-lag power variation pass through;
+        # Region 2: keep 4s to smooth partial-load transitions
+        region3 = is_producing and effective_wind_speed >= s.rated_speed
+        ramp_tau = 2.0 if region3 else 4.0 if is_producing else 2.0
         if is_normal_stop:
             ramp_tau = 2.0
         elif is_emergency_stop:
