@@ -359,13 +359,15 @@ Implemented:
 - cumulative fatigue damage via Miner's rule (S-N curve based)
 - per-turbine individuality (stiffness scale offsets)
 - emergency stop transient load amplification (1.8× tower FA)
-- 13 new SCADA tags (WLOD_ prefix)
+- 16 SCADA tags (WLOD_ prefix), including 3 alarm/RUL tags
 - frontend Load/Fatigue tab with instantaneous loads, DEL, and damage
+- fatigue alarm thresholds: 4-level alarm (notice ≥0.30, warning ≥0.60, danger ≥0.80, shutdown ≥0.95)
+- remaining useful life (RUL) estimation from average damage rate
 
 Still missing:
 - full aeroelastic tower/blade FEM coupling
-- fatigue-based alarm thresholds
-- DEL-based remaining useful life estimation
+- fatigue alarm event integration (auto-generate history events on threshold crossing)
+- frontend RUL display and alarm level visualization
 
 ### 3.4 Event Layer for Historical Analysis
 Status: **implemented**
@@ -445,17 +447,17 @@ Implemented:
 - active cooling system with fouling
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
-- fatigue / load modeling (tower + blade moments, DEL, Miner's damage)
-- 72 SCADA tags (electrical + vibration + structural load)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL)
+- 75 SCADA tags (electrical + vibration + structural load + alarm/RUL)
 
 ### Still Weak
-- sideband vibration detail
+- sideband vibration detail — see #58
 - full protection relay coordination
 - aeroelastic coupling
-- fatigue-based alarm thresholds
+- fatigue alarm event integration and frontend visualization — see #57
 
 ### Recommended Immediate Direction
-1. advanced fatigue / DEL metrics (in progress, see #41)
-2. spectral alarm threshold curves
-3. sideband vibration analysis
+1. fatigue alarm event integration + frontend RUL display (see #57)
+2. spectral alarm threshold curves (see #58)
+3. sideband vibration analysis (see #58)
 4. protection relay coordination model

@@ -33,13 +33,14 @@ Secondary focus:
 
 Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
-- sideband vibration detail and spectral alarm thresholds
+- sideband vibration detail and spectral alarm thresholds — see #58
 - full protection relay coordination
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52
 - external data API documentation — see #50
 - RAG-based alert analysis — see #51
+- fatigue alarm event integration and frontend RUL visualization — see #57
 
 ## Source of Truth
 

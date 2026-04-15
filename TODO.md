@@ -32,7 +32,7 @@
 - [x] Electrical response model: frequency-watt droop, reactive power, power factor, LVRT/HVRT ride-through, synthetic inertia, converter modes
 - [x] Spectral vibration model: 1P/3P/gear-mesh/HF/broadband bands with fault-specific signatures, crest factor, kurtosis
 - [x] Fatigue/load model: tower/blade bending moments, rainflow cycle counting, DEL, Miner's damage
-- [x] 72 SCADA tags total (was 59): +13 structural load/fatigue tags
+- [x] 75 SCADA tags total (was 72): +3 fatigue alarm/RUL tags (WLOD_AlmTwr, WLOD_AlmBld, WLOD_RulHours)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -114,6 +114,16 @@ These parts are implemented, but still first-generation models:
 - [x] Cumulative fatigue damage (Miner's rule)
 - [x] Frontend load/fatigue tab
 - [x] History trend chart preset for load data
+- [x] Fatigue alarm thresholds (4-level: notice/warning/danger/shutdown) — see #57
+- [x] Remaining Useful Life (RUL) estimation from damage rate — see #57
+- [ ] Fatigue alarm event integration (auto-generate history events on threshold crossing) — see #57
+- [ ] Frontend RUL display and alarm level visualization — see #57
+
+### Priority F: Vibration Condition Monitoring
+- [ ] Spectral alarm threshold curves per frequency band — see #58
+- [ ] Crest factor / kurtosis anomaly alarms — see #58
+- [ ] Sideband analysis (gear mesh modulation) — see #58
+- [ ] Bearing defect frequency simulation (BPFO/BPFI) — see #58
 
 ## Product / Platform Gaps
 

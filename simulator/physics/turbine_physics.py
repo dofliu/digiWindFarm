@@ -643,6 +643,9 @@ class TurbinePhysicsModel:
             "WLOD_DmgBldFlap": fatigue_out["damage_blade_flap"],
             "WLOD_DmgBldEdge": fatigue_out["damage_blade_edge"],
             "WLOD_ProdHours": fatigue_out["production_hours"],
+            "WLOD_AlmTwr": fatigue_out["alarm_level_tower"],
+            "WLOD_AlmBld": fatigue_out["alarm_level_blade"],
+            "WLOD_RulHours": fatigue_out["rul_hours"],
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -1041,12 +1044,14 @@ class TurbinePhysicsModel:
         # Tags that should not be filtered through the sensor model
         _integer_tags = {"WTUR_TurSt", "WCNV_CnvMode", "WCNV_RtBand",
                          "WROT_RotLckd", "WROT_SrvcBrkAct", "WROT_LckngPnPos",
-                         "WSRV_SrvOn", "MBUS_Contact2"}
+                         "WSRV_SrvOn", "MBUS_Contact2",
+                         "WLOD_AlmTwr", "WLOD_AlmBld"}
         # Computed metrics — pass through without sensor noise
         _passthrough_tags = {"WLOD_DmgTwrFa", "WLOD_DmgTwrSs", "WLOD_DmgBldFlap",
                              "WLOD_DmgBldEdge", "WLOD_ProdHours",
                              "WLOD_DelTwrFa", "WLOD_DelTwrSs",
-                             "WLOD_DelBldFlap", "WLOD_DelBldEdge"}
+                             "WLOD_DelBldFlap", "WLOD_DelBldEdge",
+                             "WLOD_RulHours"}
         sensorized: Dict[str, float] = {}
         for tag, value in output.items():
             if tag in _integer_tags:
