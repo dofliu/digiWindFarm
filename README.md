@@ -232,6 +232,6 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 - deployment hardening: JWT, RBAC, HTTPS not yet implemented (Docker Compose is available)
 - sideband vibration detail and spectral alarm thresholds not yet implemented
 - full protection relay coordination not yet implemented
-- fatigue alarm event integration and frontend RUL visualization pending (basic thresholds and RUL estimation implemented — see #57)
+- frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)
 - use the status and roadmap docs as the source of truth for current implementation state

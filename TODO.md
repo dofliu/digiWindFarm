@@ -116,7 +116,7 @@ These parts are implemented, but still first-generation models:
 - [x] History trend chart preset for load data
 - [x] Fatigue alarm thresholds (4-level: notice/warning/danger/shutdown) — see #57
 - [x] Remaining Useful Life (RUL) estimation from damage rate — see #57
-- [ ] Fatigue alarm event integration (auto-generate history events on threshold crossing) — see #57
+- [x] Fatigue alarm event integration (auto-generate history events on threshold crossing) — see #57
 - [ ] Frontend RUL display and alarm level visualization — see #57
 
 ### Priority F: Vibration Condition Monitoring

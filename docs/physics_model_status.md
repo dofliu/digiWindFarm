@@ -366,7 +366,6 @@ Implemented:
 
 Still missing:
 - full aeroelastic tower/blade FEM coupling
-- fatigue alarm event integration (auto-generate history events on threshold crossing)
 - frontend RUL display and alarm level visualization
 
 ### 3.4 Event Layer for Historical Analysis
@@ -454,10 +453,10 @@ Implemented:
 - sideband vibration detail — see #58
 - full protection relay coordination
 - aeroelastic coupling
-- fatigue alarm event integration and frontend visualization — see #57
+- frontend RUL visualization — see #57 (alarm event integration completed)
 
 ### Recommended Immediate Direction
-1. fatigue alarm event integration + frontend RUL display (see #57)
+1. frontend RUL display and alarm level visualization (see #57)
 2. spectral alarm threshold curves (see #58)
 3. sideband vibration analysis (see #58)
 4. protection relay coordination model

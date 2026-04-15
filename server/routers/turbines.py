@@ -7,6 +7,7 @@ router = APIRouter(prefix="/api/turbines", tags=["turbines"])
 
 
 def get_broker():
+    """Return the shared DataBroker instance from the main app module."""
     from server.app import broker
     return broker
 

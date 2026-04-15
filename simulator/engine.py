@@ -293,10 +293,12 @@ class WindFarmSimulator:
 
     @property
     def is_running(self) -> bool:
+        """Whether the simulation loop is currently active."""
         return self._running
 
     @property
     def turbine_ids(self) -> List[str]:
+        """Ordered list of all turbine IDs in the farm."""
         return list(self.turbines.keys())
 
 

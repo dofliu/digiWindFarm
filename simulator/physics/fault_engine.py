@@ -311,9 +311,11 @@ class FaultEngine:
 
     @property
     def active_faults(self) -> List[ActiveFault]:
+        """List of currently active fault instances across all turbines."""
         return list(self._active_faults)
 
     def get_scenarios(self) -> Dict[str, FaultScenario]:
+        """Return the full catalog of available fault scenarios."""
         return dict(FAULT_SCENARIOS)
 
     def inject(self, scenario_id: str, turbine_id: str,

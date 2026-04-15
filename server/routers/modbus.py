@@ -7,6 +7,7 @@ router = APIRouter(prefix="/api/modbus", tags=["modbus"])
 
 
 def get_broker():
+    """Return the shared DataBroker instance from the main app module."""
     from server.app import broker
     return broker
 
