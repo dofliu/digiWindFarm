@@ -1,6 +1,6 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-04-14（第二次）
+> 最後更新：2026-04-14（第二次更新）
 
 ## 昨日 Commit 摘要
 
@@ -12,6 +12,14 @@
 本次日報工作提交（分支 `claude/gracious-mccarthy-j7IiT`）：
 - 為 Storage 類別 16 個 public method 補充 docstring（#45 追蹤）
 - 更新日報、專案文件
+- [dd8f651] docs: update TODO.md and CLAUDE.md with new issues and gaps
+- [b6f5533] docs: update daily report for 2026-04-14
+- [b827eeb] docs: add docstrings to 16 public methods in DataBroker and SimulationEngine
+- [b295971] Merge pull request #49 from dofliu/claude/tender-ramanujan-sgTfg
+- [59b4e81] chore: fix 15 core lint errors, close #41/#42/#43, update daily report
+
+本次日報工作提交（分支 `claude/gracious-mccarthy-MNcvo`）：
+- [ce34706] 為 6 個物理模型檔案補充 34 個 public method docstring
 
 ## Issue 狀態
 
@@ -22,6 +30,11 @@
 | 保持 | #50 | 提供可讓外部擷取資料的 API 功能 | 用戶新建功能需求 |
 | 保持 | #48 | pip-audit 偵測到 17 個安全漏洞（5 套件） | 漏洞數量不變，尚未升級 |
 | 進展 | #45 | 108 個公開函數缺少 docstring | 累計修復 36 個（今日 16 個），72 個剩餘 |
+| 保持 | #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | 仍無 pytest，需優先處理 |
+| 保持 | #51 | 警報處理透過 RAG 機制來產生結果 | 用戶功能需求，待規劃 |
+| 保持 | #50 | 提供可讓外部擷取資料的 API 功能 | 用戶功能需求，待規劃 |
+| 保持 | #48 | pip-audit 偵測到 17 個安全漏洞（5 套件） | 漏洞數量不變，尚未升級 |
+| 進展 | #45 | 108 個公開函數缺少 docstring | 累計修復 50 個（剩 59 個） |
 | 保持 | #44 | Ruff lint 179 個錯誤 | 核心模組維持 0 錯誤，剩餘 109 個在 opc_bachmann/ 和根目錄原型 |
 | 保持 | #26 | 部署強化 — 認證、權限、Docker、HTTPS | Docker Compose 已完成，JWT/RBAC/HTTPS 待做 |
 | 保持 | #24 | 歷史資料儲存 — 保留策略、儲存架構 | 保留策略已做，架構決策待定 |
@@ -46,7 +59,7 @@
 | `server/` | 2026-04-14 | 0 | 無測試套件 | 今日新增 16 個 docstring（storage.py） |
 | `server/routers/` | 2026-04-14 | 0 | 無測試套件 | 8 個 router 模組 |
 | `simulator/` | 2026-04-14 | 0 | 無測試套件 | 引擎、grid_model、modbus_server |
-| `simulator/physics/` | 2026-04-14 | 0 | 無測試套件 | 14 個物理模型檔案，lint 全部通過 |
+| `simulator/physics/` | 2026-04-14 | 0 | 無測試套件 | 14 個物理模型檔案，lint 全部通過，本次新增 34 個 docstring |
 | `frontend/` | 2026-04-12 | 0 | 無測試套件 | React 前端 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案（dashboard.py 等） |
 
