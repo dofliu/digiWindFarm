@@ -89,12 +89,14 @@ class TurbineSpec:
     rotor_diameter_m: Optional[float] = None  # alias for session tracking
 
     def to_dict(self) -> dict:
+        """Serialize turbine spec to a plain dictionary."""
         d = {k: getattr(self, k) for k in self.__dataclass_fields__}
         d['rotor_diameter_m'] = self.rotor_diameter
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "TurbineSpec":
+        """Construct a TurbineSpec from a dictionary, ignoring unknown keys."""
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
@@ -300,6 +302,7 @@ class TurbinePhysicsModel:
              ambient_temp: float = 25.0, dt: float = 1.0,
              grid_frequency_ref: Optional[float] = None,
              grid_voltage_ref: Optional[float] = None) -> Dict[str, float]:
+        """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._sim_time += dt
         self._update_grid_reference(dt, grid_frequency_ref, grid_voltage_ref)
@@ -829,20 +832,24 @@ class TurbinePhysicsModel:
             self._pitch_bl[i] += self._rng.normal(0, spread)
 
     def force_state(self, state: int):
+        """Force the turbine into a specific state (1-9) for testing purposes."""
         if 1 <= state <= 9:
             self._enter_state(state)
 
     def cmd_stop(self):
+        """Request a normal (controlled) shutdown initiated by the operator."""
         self.operator_stop = True
         self.operator_start_pending = False
         self._request_stop("normal", "operator")
 
     def cmd_start(self):
+        """Request turbine startup; clears stop and service flags."""
         self.operator_stop = False
         self.service_mode = False
         self.operator_start_pending = True
 
     def cmd_reset(self):
+        """Reset turbine to idle state, clearing all faults and control flags."""
         self.operator_stop = False
         self.service_mode = False
         self.operator_start_pending = False
@@ -864,19 +871,23 @@ class TurbinePhysicsModel:
             self._enter_state(1)
 
     def cmd_service(self, on: bool):
+        """Enter or exit service/maintenance mode."""
         self.service_mode = on
         if on:
             self.operator_stop = False
             self._request_stop("normal", "service")
 
     def cmd_curtail(self, power_kw: Optional[float]):
+        """Set or clear power curtailment limit in kW."""
         self.curtailment_kw = power_kw
 
     def cmd_emergency_stop(self, cause: str = "emergency"):
+        """Trigger immediate emergency stop with rapid braking."""
         self.operator_start_pending = False
         self._request_stop("emergency", cause)
 
     def get_control_status(self) -> dict:
+        """Return current control flags and operational state summary."""
         return {
             "operator_stop": self.operator_stop,
             "service_mode": self.service_mode,
@@ -888,6 +899,7 @@ class TurbinePhysicsModel:
         }
 
     def reset(self):
+        """Full reset of turbine physics state to initial idle conditions."""
         self.tur_state = 1
         self.rotor_speed = 0.0
         self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)

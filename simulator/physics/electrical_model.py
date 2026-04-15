@@ -101,6 +101,7 @@ class ElectricalModel:
         self._q_bias = self._ind.get("grid_voltage_local_bias", 0.0) * 0.001
 
     def reset(self):
+        """Reset electrical model state to idle conditions."""
         self._active_power_kw = 0.0
         self._reactive_power_kvar = 0.0
         self._freq_watt_cmd = 1.0
