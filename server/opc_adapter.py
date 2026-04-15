@@ -90,9 +90,11 @@ class OPCDAAdapter:
         self._poll_interval = 17  # seconds (Z72 default)
 
     def on_data(self, callback: Callable[[List[Dict]], None]):
+        """Register a callback to receive polled OPC data readings."""
         self._callbacks.append(callback)
 
     def start(self):
+        """Start the OPC DA polling loop in a background thread."""
         if self._running:
             return
         self._running = True
@@ -100,6 +102,7 @@ class OPCDAAdapter:
         self._thread.start()
 
     def stop(self):
+        """Stop the OPC DA polling loop and wait for the thread to finish."""
         self._running = False
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=10)

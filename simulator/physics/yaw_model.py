@@ -30,6 +30,7 @@ class YawModel:
         self._yaw_command_filter = 0.0
 
     def step(self, wind_direction: float, is_producing: bool, dt: float) -> Dict[str, float]:
+        """Advance yaw model by one timestep, returning yaw angle, error, and motor status."""
         error = self._angle_diff(wind_direction, self.yaw_angle)
 
         if not is_producing:

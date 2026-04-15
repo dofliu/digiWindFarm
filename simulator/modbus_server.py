@@ -244,6 +244,7 @@ class ModbusSimServer:
             pass
 
     def get_status(self) -> dict:
+        """Return Modbus TCP server status including port, turbine count, and register count."""
         return {
             "running": self._running,
             "port": self.port,
@@ -253,6 +254,7 @@ class ModbusSimServer:
 
     @property
     def is_running(self) -> bool:
+        """Whether the Modbus TCP server thread is currently active."""
         return self._running
 
     @staticmethod

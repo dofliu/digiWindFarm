@@ -33,6 +33,7 @@ class ThermalElement:
         return self.temperature
 
     def reset(self, temp: float):
+        """Reset the thermal node temperature to a given value."""
         self.temperature = temp
 
 
