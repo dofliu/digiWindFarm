@@ -6,6 +6,12 @@
 
 過去 24 小時 main 分支合併：
 - [beeeee5] Merge pull request #53 from dofliu/claude/tender-ramanujan-XzZMe
+- [b295971] Merge pull request #49 from dofliu/claude/tender-ramanujan-sgTfg
+- [59b4e81] chore: fix 15 core lint errors, close #41/#42/#43, update daily report
+
+本次日報工作提交（分支 `claude/gracious-mccarthy-j7IiT`）：
+- 為 Storage 類別 16 個 public method 補充 docstring（#45 追蹤）
+- 更新日報、專案文件
 - [dd8f651] docs: update TODO.md and CLAUDE.md with new issues and gaps
 - [b6f5533] docs: update daily report for 2026-04-14
 - [b827eeb] docs: add docstrings to 16 public methods in DataBroker and SimulationEngine
@@ -19,6 +25,11 @@
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
+| 保持 | #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | 20+ 核心模組零測試覆蓋 |
+| 保持 | #51 | 警報處理透過 RAG 機制來產生結果 | 用戶新建功能需求 |
+| 保持 | #50 | 提供可讓外部擷取資料的 API 功能 | 用戶新建功能需求 |
+| 保持 | #48 | pip-audit 偵測到 17 個安全漏洞（5 套件） | 漏洞數量不變，尚未升級 |
+| 進展 | #45 | 108 個公開函數缺少 docstring | 累計修復 36 個（今日 16 個），72 個剩餘 |
 | 保持 | #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | 仍無 pytest，需優先處理 |
 | 保持 | #51 | 警報處理透過 RAG 機制來產生結果 | 用戶功能需求，待規劃 |
 | 保持 | #50 | 提供可讓外部擷取資料的 API 功能 | 用戶功能需求，待規劃 |
@@ -32,11 +43,11 @@
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | auto-detected, code-quality | 2026-04-14 | 20+ 模組零測試 |
+| #52 | 缺少自動化測試套件 — 核心模組無 pytest 覆蓋 | auto-detected, code-quality | 2026-04-14 | 無進展 |
 | #51 | 警報處理透過 RAG 機制來產生結果 | — | 2026-04-14 | 用戶功能需求 |
 | #50 | 提供可讓外部擷取資料的 API 功能 | — | 2026-04-14 | 用戶功能需求 |
 | #48 | pip-audit 偵測到 17 個安全漏洞 | security, auto-detected | 2026-04-13 | cryptography 41→46 跨度大 |
-| #45 | 108 個公開函數缺少 docstring | documentation, auto-detected | 2026-04-13 | 累計修復 50 個，剩 59 個 |
+| #45 | 108 個公開函數缺少 docstring | documentation, auto-detected | 2026-04-13 | 已修 36 個，剩 72 個 |
 | #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組已清零 |
 | #26 | 部署強化 — 認證、權限、Docker、HTTPS | enhancement, deployment | 2026-04-05 | Docker 已完成 |
 | #24 | 歷史資料儲存 — 保留策略、儲存架構 | enhancement, platform | 2026-04-05 | 架構決策待定 |
@@ -45,7 +56,7 @@
 
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
-| `server/` | 2026-04-14 | 0 | 無測試套件 | API route handlers，lint 全部通過 |
+| `server/` | 2026-04-14 | 0 | 無測試套件 | 今日新增 16 個 docstring（storage.py） |
 | `server/routers/` | 2026-04-14 | 0 | 無測試套件 | 8 個 router 模組 |
 | `simulator/` | 2026-04-14 | 0 | 無測試套件 | 引擎、grid_model、modbus_server |
 | `simulator/physics/` | 2026-04-14 | 0 | 無測試套件 | 14 個物理模型檔案，lint 全部通過，本次新增 34 個 docstring |
@@ -113,8 +124,8 @@
 ## 程式碼品質
 
 - Lint 錯誤：109（核心模組 server/ + simulator/ 維持 0 錯誤，剩餘皆在 opc_bachmann/ 和根目錄原型檔案）
-- 無 docstring 的公開函數：59（上次 93，本次修復 34 個，累計修復 50 個）
-- Broken imports：0（核心模組全部正常）；根目錄早期原型有已知缺失（dash/plotly/pandas/openopc2）
+- 無 docstring 的公開函數：72（上次 88，今日修復 16 個，累計修復 36 個）
+- Broken imports：0（核心模組全部正常）；根目錄早期原型有 5 個已知缺失（dash/plotly/pandas/openopc2）
 - 測試套件：未建立（無 pytest）— 追蹤 issue #52
 - 安全漏洞：17 個（5 個套件），與上次相同，詳見 #48
   - cryptography 41.0.7 → 需升級至 ≥46.0.6（7 個 CVE）
@@ -126,8 +137,8 @@
 
 ## 建議行動
 
-1. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試，建議優先建立 pytest 基礎框架
-2. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）和 `pyjwt`，注意大版本升級的兼容性
-3. **持續補充 docstring**（#45）：已累計修復 50 個，剩餘 59 個主要分布在 server/storage.py、server/routers/、根目錄原型
-4. **規劃用戶功能需求**（#50、#51）：外部 API 文件和 RAG 警報處理為用戶優先需求
+1. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試，建議優先建立 pytest 基礎框架和第一批測試
+2. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）和 `pyjwt`（影響未來 JWT 實作），注意大版本升級的兼容性
+3. **處理用戶功能需求**（#50、#51）：外部 API 文件和 RAG 警報處理需求，建議先規劃 #50（API 文件）因為較低複雜度
+4. **持續補充 docstring**（#45）：Storage 已完成，下一步可處理 `simulator/physics/turbine_physics.py`（12 個）和 `simulator/physics/cooling_model.py`（9 個）
 5. **推進 #26 部署強化**：Docker Compose 已完成，下一步是 JWT 認證和基本 RBAC
