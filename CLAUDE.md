@@ -40,7 +40,7 @@ Still pending or incomplete:
 - no automated test suite (pytest) — see #52
 - external data API documentation — see #50
 - RAG-based alert analysis — see #51
-- fatigue alarm event integration and frontend RUL visualization — see #57
+- frontend RUL visualization — see #57 (fatigue alarm event integration completed)
 
 ## Source of Truth
 
