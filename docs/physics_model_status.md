@@ -359,7 +359,8 @@ Status: **first version implemented**
 
 Implemented:
 - `FatigueModel` class in `simulator/physics/fatigue_model.py`
-- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic)
+- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic + SDOF first-mode filter)
+- tower SDOF dynamic response: fn≈0.28 Hz, structural+aerodynamic damping, per-turbine ±6% individuality
 - tower base side-to-side bending moment (lateral thrust + rotor imbalance)
 - blade root flapwise bending moment (thrust distribution + wind shear + pitch)
 - blade root edgewise bending moment (gravity 1P cyclic + aero torque)
@@ -375,7 +376,7 @@ Implemented:
 - remaining useful life (RUL) estimation from average damage rate
 
 Still missing:
-- full aeroelastic tower/blade FEM coupling
+- full aeroelastic tower/blade FEM coupling (SDOF first-mode is in place)
 - frontend RUL display and alarm level visualization
 
 ### 3.4 Event Layer for Historical Analysis
@@ -457,18 +458,18 @@ Implemented:
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
-- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
 - 80 SCADA tags (electrical + vibration + structural load + alarm/RUL + diagnostics)
 
 ### Still Weak
 - sideband vibration detail — see #58
 - full protection relay coordination (LVRT/OVRT)
-- aeroelastic coupling (BEM + natural frequency response)
+- aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
 
 ### Recommended Immediate Direction
 1. frontend RUL display and alarm level visualization (see #57)
 2. spectral sideband analysis (harmonics/fault signatures) (see #58)
 3. detailed bearing defect frequency computation (BPFO/BPFI)
-4. tower dynamic natural frequency response
+4. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
 5. deployment hardening (JWT auth, RBAC, Docker Compose)

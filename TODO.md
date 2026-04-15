@@ -158,7 +158,7 @@ These parts are implemented, but still first-generation models:
 - [x] Region 3 power CV too low (0.8-0.9%): switched to Cp aerodynamic model, pitch lag now creates realistic variation — see #61
 - [ ] Spectral sideband analysis (modulated harmonics around gear mesh) — see #58
 - [ ] Bearing defect frequency computation (BPFO/BPFI from geometry) — see #58
-- [ ] Tower fore-aft dynamic response (natural frequency oscillation) — see #62
+- [x] Tower fore-aft dynamic response (SDOF first-mode filter, fn≈0.28 Hz) — see #62
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
