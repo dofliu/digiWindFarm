@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 74 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 75 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -21,10 +21,10 @@ Platform includes:
 The main priority is physics realism and signal realism.
 
 Primary focus (next improvements):
-- Region 3 power variation (pitch controller delay + wind turbulence coupling)
-- spectral sideband analysis
-- bearing defect frequency (BPFO/BPFI)
-- tower dynamic response
+- Region 3 power variation — fixed: Cp model replaces lookup table, pitch lag creates natural variation — see #61
+- spectral sideband analysis — see #58
+- bearing defect frequency (BPFO/BPFI) — see #58
+- tower dynamic response — see #62
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -35,7 +35,7 @@ Ran 2-hour automated analysis with mixed wind conditions + fault injection.
 Result: **18/21 checks passed**.
 
 Issues found:
-- Region 3 power CV=0.8-0.9% (should be 3-5%) — pitch response too smooth
+- Region 3 power CV=0.8-0.9% (should be 3-5%) — **fixed** in #61: switched to Cp aerodynamic model
 - Turbine spread 36.8% (partly due to mixed operating conditions in test, not a real issue)
 
 All physical correlations verified:

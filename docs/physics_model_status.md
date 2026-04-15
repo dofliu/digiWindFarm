@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-14
+Last updated: 2026-04-15
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -43,6 +43,7 @@ Included:
 
 Current realism level:
 - Good trend-level realism.
+- Region 3 now uses Cp(λ,β) aerodynamic model — pitch controller lag and dead-band create realistic 3-5% power variation around rated (previously locked to constant lookup table). See #61.
 - Suitable for SCADA-like output and operator demo use.
 
 ### 1.3 Drivetrain and Brake Dynamics
@@ -200,7 +201,8 @@ Implemented:
 - aerodynamic thrust force computation
 - aero torque output for drivetrain coupling
 - aero load factor output for vibration coupling
-- blended output (70% Cp-based + 30% lookup) for stability
+- Region 2: Cp-based with lookup safety floor; Region 3: full Cp model (pitch lag creates variation)
+- 4% overshoot allowance for transient pitch-lag behavior
 
 Still missing:
 - full BEM (blade element momentum) method
