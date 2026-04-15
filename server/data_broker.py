@@ -224,6 +224,8 @@ class DataBroker:
         self._last_fault_phases: Dict[str, Dict[str, str]] = {}
         # Track active fault scenario keys for lifecycle start/end
         self._active_fault_keys: Dict[str, set] = {}  # {turbine_id: {scenario_id, ...}}
+        # Fatigue alarm level tracking: {turbine_id: (tower_level, blade_level)}
+        self._last_fatigue_alarm: Dict[str, tuple] = {}
         # Session tracking
         self._session_id: Optional[int] = None
         # Write throttle state
@@ -265,6 +267,7 @@ class DataBroker:
         self._last_fault_alarm_keys.clear()
         self._last_fault_phases.clear()
         self._active_fault_keys.clear()
+        self._last_fatigue_alarm.clear()
 
         self.simulator = WindFarmSimulator(
             turbine_count=self._sim_config.turbineCount,
@@ -635,6 +638,39 @@ class DataBroker:
             self._active_fault_keys[turbine_id] = current_fault_keys
             self._last_fault_phases[turbine_id] = current_phases
 
+            # ── Fatigue alarm level changes ──
+            alm_twr = int(scada.get("WLOD_AlmTwr", 0) or 0)
+            alm_bld = int(scada.get("WLOD_AlmBld", 0) or 0)
+            prev_alm = self._last_fatigue_alarm.get(turbine_id)
+            if prev_alm is None:
+                self._last_fatigue_alarm[turbine_id] = (alm_twr, alm_bld)
+            else:
+                prev_twr, prev_bld = prev_alm
+                alarm_names = {0: "正常", 1: "注意", 2: "警告", 3: "危險", 4: "停機"}
+                for label, prev_lvl, cur_lvl in [
+                    ("塔架", prev_twr, alm_twr),
+                    ("葉片", prev_bld, alm_bld),
+                ]:
+                    if cur_lvl != prev_lvl and cur_lvl > 0:
+                        direction = "升級" if cur_lvl > prev_lvl else "降級"
+                        rul = scada.get("WLOD_RulHours", -1)
+                        self.record_event(
+                            event_type="fatigue",
+                            source="simulator",
+                            title=f"疲勞警報{direction}：{label} Lv{cur_lvl} ({alarm_names.get(cur_lvl, '')})",
+                            turbine_id=turbine_id,
+                            detail=f"{turbine_id} {label}疲勞警報從 Lv{prev_lvl} {direction}至 Lv{cur_lvl}，RUL={rul}h",
+                            payload={
+                                "turbineId": turbine_id,
+                                "component": label,
+                                "fromLevel": prev_lvl,
+                                "toLevel": cur_lvl,
+                                "levelName": alarm_names.get(cur_lvl, ""),
+                                "rulHours": rul,
+                            },
+                        )
+                self._last_fatigue_alarm[turbine_id] = (alm_twr, alm_bld)
+
     def _record_state_transition_event(self, turbine_id: str, previous_state: int,
                                        current_state: int, shutdown_cause: Optional[str]):
         state_name = self._state_name(current_state)
@@ -744,6 +780,7 @@ class DataBroker:
 
     @property
     def turbine_ids(self) -> List[str]:
+        """List of active turbine IDs from the running simulator."""
         if self.simulator:
             return self.simulator.turbine_ids
         return []
