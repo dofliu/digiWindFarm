@@ -5,6 +5,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 def get_broker():
+    """Return the shared DataBroker instance from the application."""
     from server.app import broker
     return broker
 
@@ -166,6 +167,7 @@ async def generate_bulk(body: dict):
     session_id = b._session_id
 
     def store_cb(readings):
+        """Persist generated bulk readings to storage."""
         b.storage.store_readings(readings, session_id)
 
     total = b.simulator.generate_bulk(
@@ -189,6 +191,7 @@ async def generate_bulk(body: dict):
 
 @router.get("/grid")
 async def get_grid_status():
+    """Return current grid model status including mode, profile, and overrides."""
     b = get_broker()
     if not b.simulator:
         raise HTTPException(400, "Simulator not running")
@@ -197,6 +200,7 @@ async def get_grid_status():
 
 @router.post("/grid")
 async def set_grid(req: GridOverrideRequest):
+    """Apply grid profile or manual frequency/voltage override."""
     b = get_broker()
     if not b.simulator:
         raise HTTPException(400, "Simulator not running")
@@ -219,6 +223,7 @@ async def set_grid(req: GridOverrideRequest):
 
 @router.post("/grid/clear")
 async def clear_grid():
+    """Clear grid overrides and return to auto mode."""
     b = get_broker()
     if not b.simulator:
         raise HTTPException(400, "Simulator not running")
