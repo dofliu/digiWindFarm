@@ -174,6 +174,7 @@ class TurbinePhysicsModel:
             "grid_trip_margin_v": self._rng.uniform(-12.0, 14.0),
             "grid_ride_through_scale": 1.0 + self._rng.uniform(-0.22, 0.25),
             "grid_reconnect_delay": self._rng.uniform(-5.0, 8.0),
+            "tower_shadow_amp": 0.12 + self._rng.uniform(-0.03, 0.03),
         }
 
         self.power_curve = PowerCurveModel(
@@ -234,6 +235,7 @@ class TurbinePhysicsModel:
         self.rotor_speed = 0.0
         self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
         self._pitch_bl = [self.spec.pitch_vane] * 3
+        self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -337,6 +339,22 @@ class TurbinePhysicsModel:
         # Compute full aerodynamics via Cp(λ,β) surface (#27)
         aero_out = self.power_curve.get_power_cp(
             effective_wind_speed, self.rotor_speed, self.pitch_angle, dt)
+
+        # Tower shadow: 3P torque/thrust modulation (#69)
+        omega_rad = self.rotor_speed * math.pi / 30.0
+        self._rotor_azimuth = (self._rotor_azimuth + omega_rad * dt) % math.tau
+        ts_amp = self._individuality["tower_shadow_amp"]
+        ts_sigma = 0.15
+        ts_factor = 1.0
+        for i in range(3):
+            blade_az = (self._rotor_azimuth + i * math.tau / 3.0) % math.tau
+            delta = abs(blade_az - math.pi)
+            if delta > math.pi:
+                delta = math.tau - delta
+            ts_factor -= ts_amp / 3.0 * math.exp(-0.5 * (delta / ts_sigma) ** 2)
+        aero_out.aero_torque_knm *= ts_factor
+        aero_out.thrust_kn *= ts_factor
+        aero_out.power_kw *= ts_factor
 
         # Use new DrivetrainModel (#28) instead of inline dynamics
         (
@@ -557,6 +575,7 @@ class TurbinePhysicsModel:
             is_producing=is_producing,
             is_starting=is_starting,
             is_emergency_stop=is_emergency_stop,
+            rotor_azimuth_rad=self._rotor_azimuth,
         )
 
         # IGCT water pressure now driven by cooling system pump (#29)
@@ -938,6 +957,7 @@ class TurbinePhysicsModel:
         self.rotor_speed = 0.0
         self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
         self._pitch_bl = [self.spec.pitch_vane] * 3
+        self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0

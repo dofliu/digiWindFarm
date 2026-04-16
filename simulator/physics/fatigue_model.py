@@ -210,7 +210,8 @@ class FatigueModel:
              turbulence_intensity: float,
              is_producing: bool,
              is_starting: bool,
-             is_emergency_stop: bool) -> Dict[str, float]:
+             is_emergency_stop: bool,
+             rotor_azimuth_rad: float = 0.0) -> Dict[str, float]:
         """Advance fatigue model by one timestep.
 
         Args:
@@ -238,7 +239,7 @@ class FatigueModel:
             wind_speed, rotor_speed_rpm, power_kw,
             pitch_angle_deg, yaw_error_deg, thrust_kn,
             turbulence_intensity, is_producing, is_starting,
-            is_emergency_stop, dt,
+            is_emergency_stop, dt, rotor_azimuth_rad,
         )
 
         self.load_tower_fa = loads["tower_fa"]
@@ -376,7 +377,8 @@ class FatigueModel:
                        yaw_error_deg: float, thrust_kn: float,
                        ti: float, is_producing: bool,
                        is_starting: bool, is_estop: bool,
-                       dt: float) -> Dict[str, float]:
+                       dt: float,
+                       rotor_azimuth_rad: float = 0.0) -> Dict[str, float]:
         """Compute instantaneous structural loads (kNm)."""
         rho = 1.225  # air density
         R = self._rotor_diameter / 2
@@ -433,6 +435,14 @@ class FatigueModel:
             # Pitch effect: higher pitch → lower flap load
             pitch_factor = max(0.3, 1.0 - abs(pitch_deg) * 0.008)
             blade_flap *= pitch_factor
+
+            # Tower shadow 3P modulation on blade flap (#69)
+            blade_az = rotor_azimuth_rad % (2.0 * math.pi)
+            ts_delta = abs(blade_az - math.pi)
+            if ts_delta > math.pi:
+                ts_delta = 2.0 * math.pi - ts_delta
+            ts_blade = 1.0 - 0.12 * math.exp(-0.5 * (ts_delta / 0.15) ** 2)
+            blade_flap *= ts_blade
 
             # Turbulence
             blade_flap += abs(self._rng.normal(0, blade_flap * 0.1 * ti))
