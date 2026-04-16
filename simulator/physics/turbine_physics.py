@@ -647,6 +647,8 @@ class TurbinePhysicsModel:
             "WVIB_AlarmGear": float(vib_alarms.alarm_gear),
             "WVIB_AlarmHf": float(vib_alarms.alarm_hf),
             "WVIB_AlarmBb": float(vib_alarms.alarm_bb),
+            "WVIB_AlarmCrest": float(vib_alarms.alarm_crest),
+            "WVIB_AlarmKurt": float(vib_alarms.alarm_kurtosis),
             "WVIB_AlarmOverall": float(vib_alarms.alarm_overall),
             "WVIB_Thresh1pWarn": round(vib_alarms.thresh_1p_warn, 4),
             "WVIB_Thresh1pAlrm": round(vib_alarms.thresh_1p_alrm, 4),
@@ -1076,7 +1078,8 @@ class TurbinePhysicsModel:
                          "WSRV_SrvOn", "MBUS_Contact2",
                          # Vibration alarm levels (discrete integers)
                          "WVIB_Alarm1p", "WVIB_Alarm3p", "WVIB_AlarmGear",
-                         "WVIB_AlarmHf", "WVIB_AlarmBb", "WVIB_AlarmOverall",
+                         "WVIB_AlarmHf", "WVIB_AlarmBb",
+                         "WVIB_AlarmCrest", "WVIB_AlarmKurt", "WVIB_AlarmOverall",
                          # Fatigue alarm levels (discrete integers)
                          "WLOD_AlmTwr", "WLOD_AlmBld"}
         # Computed metrics — pass through without sensor noise

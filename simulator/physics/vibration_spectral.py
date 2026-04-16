@@ -34,7 +34,9 @@ class AlarmThresholds:
     alarm_gear: int = 0
     alarm_hf: int = 0
     alarm_bb: int = 0
-    alarm_overall: int = 0   # max(all bands)
+    alarm_crest: int = 0     # crest factor anomaly (0=normal, 1=warning, 2=alarm)
+    alarm_kurtosis: int = 0  # kurtosis anomaly (0=normal, 1=warning, 2=alarm)
+    alarm_overall: int = 0   # max(all bands + crest + kurtosis)
     thresh_1p_warn: float = 0.0   # mm/s — 當前 1P 警告門檻（供顯示參考）
     thresh_1p_alrm: float = 0.0   # mm/s — 當前 1P 警報門檻
 
@@ -138,6 +140,15 @@ class SpectralVibrationModel:
         # 警報狀態追蹤
         self._alarm_levels = {band: 0 for band in self._base_thresholds}
         self._alarm_timers = {band: 0.0 for band in self._base_thresholds}
+        # Crest factor / kurtosis anomaly thresholds
+        # Normal crest ~3.0-3.5; bearing defect causes impulsive peaks
+        self._crest_thresholds = {"warn": 5.0, "alarm": 7.0}
+        # Normal kurtosis ~3.0 (Gaussian); impacts raise kurtosis
+        self._kurt_thresholds = {"warn": 5.0, "alarm": 8.0}
+        self._crest_alarm_level = 0
+        self._kurt_alarm_level = 0
+        self._crest_alarm_timer = 0.0
+        self._kurt_alarm_timer = 0.0
         # 遲滯比例：須降至門檻的 85% 才解除
         self._HYST_RATIO = 0.85
         # 最短保持時間（秒）— 避免快速切換
@@ -339,18 +350,49 @@ class SpectralVibrationModel:
             self._alarm_levels[band_name] = new_level
             result_levels[band_name] = new_level
 
+        # ── Crest factor / kurtosis anomaly alarms ──
+        # Only meaningful when rotating (standstill crest/kurtosis are noise)
+        for stat_name, val, thresholds, attr_level, attr_timer in [
+            ("crest", bands.crest_factor, self._crest_thresholds,
+             "_crest_alarm_level", "_crest_alarm_timer"),
+            ("kurtosis", bands.kurtosis, self._kurt_thresholds,
+             "_kurt_alarm_level", "_kurt_alarm_timer"),
+        ]:
+            current = getattr(self, attr_level)
+            timer = getattr(self, attr_timer) + dt
+            setattr(self, attr_timer, timer)
+            if rotor_speed_rpm < 2.0:
+                new_level = 0
+            elif timer < self._HYST_MIN_HOLD_S:
+                new_level = current
+            else:
+                warn_t, alarm_t = thresholds["warn"], thresholds["alarm"]
+                new_level = current
+                if current == 0:
+                    new_level = 2 if val > alarm_t else (1 if val > warn_t else 0)
+                elif current == 1:
+                    new_level = 2 if val > alarm_t else (0 if val < warn_t * self._HYST_RATIO else 1)
+                elif current == 2:
+                    new_level = 0 if val < warn_t * self._HYST_RATIO else (1 if val < alarm_t * self._HYST_RATIO else 2)
+            if new_level != current:
+                setattr(self, attr_timer, 0.0)
+            setattr(self, attr_level, new_level)
+
         # 1P 門檻參考值（供前端顯示）
         var_1p = self._thresh_variation["1p"]
         thresh_1p_warn = self._base_thresholds["1p"]["warn"] * speed_factor * var_1p
         thresh_1p_alrm = self._base_thresholds["1p"]["alarm"] * speed_factor * var_1p
 
+        all_levels = list(result_levels.values()) + [self._crest_alarm_level, self._kurt_alarm_level]
         return AlarmThresholds(
             alarm_1p=result_levels["1p"],
             alarm_3p=result_levels["3p"],
             alarm_gear=result_levels["gear"],
             alarm_hf=result_levels["hf"],
             alarm_bb=result_levels["bb"],
-            alarm_overall=max(result_levels.values()),
+            alarm_crest=self._crest_alarm_level,
+            alarm_kurtosis=self._kurt_alarm_level,
+            alarm_overall=max(all_levels),
             thresh_1p_warn=round(thresh_1p_warn, 4),
             thresh_1p_alrm=round(thresh_1p_alrm, 4),
         )
