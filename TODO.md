@@ -39,6 +39,8 @@
 - [x] 84 SCADA tags total (was 80): +4 bearing defect frequency/amplitude
 - [x] Gear mesh sideband analysis (GMF ± n×shaft frequency, sideband energy ratio)
 - [x] 88 SCADA tags total (was 84): +4 gear mesh sideband tags
+- [x] Crest factor / kurtosis anomaly alarms with hysteresis logic
+- [x] 90 SCADA tags total (was 88): +2 crest factor/kurtosis alarm tags
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -127,7 +129,7 @@ These parts are implemented, but still first-generation models:
 
 ### Priority F: Vibration Condition Monitoring
 - [ ] Spectral alarm threshold curves per frequency band — see #58
-- [ ] Crest factor / kurtosis anomaly alarms — see #58
+- [x] Crest factor / kurtosis anomaly alarms — see #58
 - [x] Sideband analysis (gear mesh modulation) — see #58
 - [x] Bearing defect frequency simulation (BPFO/BPFI) — see #58
 

@@ -346,9 +346,13 @@ Newly implemented:
 - BPFO/BPFI bearing defect frequency computation (4 new SCADA tags)
 - gear mesh sideband analysis: GMF, 1st/2nd order sidebands, sideband energy ratio (4 new SCADA tags)
 
+Newly implemented:
+- crest factor anomaly alarms (warning > 5.0, alarm > 7.0) with hysteresis
+- kurtosis anomaly alarms (warning > 5.0, alarm > 8.0) with hysteresis
+- 2 new SCADA tags: WVIB_AlarmCrest, WVIB_AlarmKurt
+
 Still not implemented:
-- spectral alarm threshold curves per frequency band
-- crest factor / kurtosis anomaly alarms
+- spectral alarm threshold curves per frequency band (dynamic curves for frontend display)
 
 ### 3.2 Advanced Electrical Grid Interaction
 Status: **first version implemented** (see 2.5)
@@ -463,10 +467,10 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 88 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands)
+- 90 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms)
 
 ### Still Weak
-- spectral alarm threshold curves and crest factor/kurtosis anomaly alarms — see #58
+- spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)

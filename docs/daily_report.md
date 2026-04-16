@@ -1,13 +1,15 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-04-16
+> 最後更新：2026-04-16（第二次）
 
 ## 昨日 Commit 摘要
 
-本次日報工作提交（分支 `claude/happy-goodall-Mov9d`）：
-- [3a19dc8] feat: add gear mesh sideband analysis model for gearbox condition monitoring (#58)
+本次日報工作提交（分支 `claude/happy-goodall-ZKzGT`）：
+- [7f94a0e] feat: add crest factor and kurtosis anomaly alarms for vibration condition monitoring (#58)
 
 過去 24 小時 main 分支合併：
+- [1425800] Merge branch 'main'
+- [f54dbf8] Merge pull request #66（齒輪嚙合邊帶分析模型）
 - [0e0e409] Merge pull request #65（BPFO/BPFI 軸承缺陷頻率模型）
 - [fbcd68a] Merge pull request #64（塔架 SDOF 動態響應）
 - [029b929] Merge pull request #63（Cp 氣動模型 + docstrings）
@@ -21,8 +23,8 @@
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 關閉 | #45 | 108 個公開函數缺少 docstring | 核心模組全數補齊，剩 6 個非關鍵（巢狀函數+原型檔案），已完成 |
-| 進展 | #58 | 頻譜振動警報閾值與邊帶分析 | 新增齒輪嚙合邊帶（sideband）分析模型，已推送 |
+| 新建 | #67 | 完整保護繼電器協調 LVRT/OVRT | TODO 有待辦但無對應 issue，已自動建立 |
+| 進展 | #58 | 頻譜振動警報閾值與邊帶分析 | 新增峰值因子/峭度異常警報，已推送 |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，剩前端 RUL 視覺化 |
 | 保持 | #52 | 缺少自動化測試套件 | 仍無 pytest |
 | 保持 | #51 | 警報處理透過 RAG 機制 | 用戶功能需求，待規劃 |
@@ -36,7 +38,8 @@
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | BPFO/BPFI + 邊帶分析已實作，頻帶警報閾值曲線待做 |
+| #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | 新建：LVRT/OVRT 事件序列與跳脫邏輯 |
+| #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | BPFO/BPFI + 邊帶 + 峰值因子/峭度警報已完成，頻帶警報閾值曲線待做 |
 | #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 後端完成，前端待做 |
 | #52 | 缺少自動化測試套件 | auto-detected, code-quality | 2026-04-14 | 無進展 |
 | #51 | 警報處理透過 RAG 機制 | — | 2026-04-14 | 用戶功能需求 |
@@ -53,7 +56,7 @@
 | `server/` | 2026-04-16 | 0 | 無測試套件 | 疲勞警報事件偵測邏輯已完成 |
 | `server/routers/` | 2026-04-16 | 0 | 無測試套件 | 8 個 router 全部有 docstring |
 | `simulator/` | 2026-04-16 | 0 | 無測試套件 | engine time_scale setter 已補 docstring |
-| `simulator/physics/` | 2026-04-16 | 0 | 無測試套件 | 新增齒輪嚙合邊帶分析模型 |
+| `simulator/physics/` | 2026-04-16 | 0 | 無測試套件 | 新增峰值因子/峭度異常警報 |
 | `frontend/` | 2026-04-15 | 0 | 無測試套件 | RUL 視覺化待實作 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案（dashboard.py 等） |
 
@@ -128,35 +131,33 @@
 - 測試套件：未建立（無 pytest）— 追蹤 issue #52
 - 安全漏洞：17 個（5 個套件），詳見 #48
 - TODO/FIXME/HACK：0 個（核心模組）
-- SCADA 標籤：88 個（新增 4 個齒輪邊帶標籤，原 84 個）
+- SCADA 標籤：90 個（新增 2 個峰值因子/峭度警報標籤，原 88 個）
 
 ## 今日新增功能
 
-### 齒輪嚙合邊帶分析模型（#58）
-- **物理原理**：齒輪嚙合在 GMF（齒數 × 軸頻）產生振動。齒輪缺陷（磨損、裂紋）造成振幅調變，在 GMF 兩側產生邊帶（GMF ± n×f_shaft）。邊帶振幅是齒輪箱健康的關鍵診斷指標。
+### 峰值因子與峭度異常警報（#58）
+- **物理原理**：峰值因子（Crest Factor）= 振動信號峰值 / RMS，正常值約 3.0。軸承缺陷產生衝擊性信號，導致峰值因子顯著升高（>5.0 即為早期缺陷指標）。峭度（Kurtosis）衡量信號分布的尖峰程度，正常高斯分布為 3.0，衝擊性信號會大幅提升。
 - **實作方式**：
-  1. `vibration_spectral.py`：新增 GMF 計算與邊帶模型
-  2. GMF = rotor_RPM × gear_teeth / 60（ring gear 97 齒）
-  3. 健康齒輪：邊帶約 GMF 振幅的 3%（一階）和 1.5%（二階），加隨機噪聲
-  4. gearbox_overheat 故障：一階邊帶 +0.20 mm/s × severity，二階 +0.10 mm/s × severity
-  5. 邊帶能量比（sideband_ratio）= 邊帶總能量 / GMF 振幅（>0.3 表示缺陷）
-  6. 所有新欄位均帶低通平滑和非負限制
+  1. `vibration_spectral.py`：`AlarmThresholds` 新增 `alarm_crest` 和 `alarm_kurtosis` 欄位
+  2. 峰值因子門檻：warning > 5.0、alarm > 7.0
+  3. 峭度門檻：warning > 5.0、alarm > 8.0
+  4. 遲滯邏輯：下降至門檻 85% 才解除，最短保持 5 秒
+  5. 靜止（< 2 RPM）自動歸零（避免雜訊誤報）
+  6. `alarm_overall` 已納入 crest/kurtosis 等級
 - **新增 SCADA 標籤**：
-  - `WVIB_GmfFreq`：齒輪嚙合頻率（Hz）
-  - `WVIB_Sideband1Amp`：一階邊帶振幅（mm/s）
-  - `WVIB_Sideband2Amp`：二階邊帶振幅（mm/s）
-  - `WVIB_SidebandRatio`：邊帶能量比
+  - `WVIB_AlarmCrest`：峰值因子警報等級（0=正常, 1=警告, 2=危險）
+  - `WVIB_AlarmKurt`：峭度警報等級（0=正常, 1=警告, 2=危險）
 - **預期效果**：
-  - 額定轉速 ~22 RPM 下，GMF ≈ 35.6 Hz
-  - 正常運轉時 sideband_ratio < 0.10
-  - 注入 gearbox_overheat 故障後，邊帶振幅明顯上升，ratio > 0.30
-  - 可作為齒輪箱狀態監測的早期缺陷指標
+  - 正常運轉時 crest factor ~3.0-3.5、kurtosis ~3.0-3.2，均維持 alarm_level=0
+  - 注入 bearing_wear 故障後（severity > 0.5），crest factor > 5.0 → 觸發 warning
+  - 高嚴重度 bearing_wear（severity > 0.8），crest factor > 7.0 → 觸發 alarm
+  - 可作為軸承缺陷的早期預警指標，與 BPFO/BPFI 振幅互為驗證
 
 ## 建議行動
 
-1. **合併邊帶分析模型**：已推送至 `claude/happy-goodall-Mov9d`，可建立 PR 合併
-2. **完成 #58 頻帶警報閾值曲線**：各頻帶加入基於工況的動態警報閾值
-3. **實作 #58 峰值因子/峭度異常警報**：crest factor 和 kurtosis 超標自動告警
-4. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試
-5. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）
-6. **完善 #57 前端視覺化**：前端新增 RUL 顯示和疲勞警報等級視覺化
+1. **合併峰值因子/峭度警報**：已推送至 `claude/happy-goodall-ZKzGT`，可建立 PR 合併
+2. **完成 #58 振動警報事件整合**：類似疲勞警報事件（data_broker.py），振動警報等級變化時自動產生歷史事件
+3. **完成 #58 頻帶警報閾值曲線**：各頻帶加入基於工況的動態警報閾值曲線（供前端繪製）
+4. **實作 #67 保護繼電器協調**：LVRT/OVRT 電壓-時間曲線與保護動作序列
+5. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試
+6. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）

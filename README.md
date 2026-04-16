@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 84 SCADA tags aligned to Bachmann Z72 definitions
+- 90 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -230,7 +230,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 ## Known Gaps
 
 - deployment hardening: JWT, RBAC, HTTPS not yet implemented (Docker Compose is available)
-- spectral alarm threshold curves and crest factor/kurtosis anomaly alarms not yet implemented; BPFO/BPFI and gear mesh sideband analysis completed
+- spectral alarm threshold curves not yet implemented; BPFO/BPFI, gear mesh sideband analysis, and crest factor/kurtosis anomaly alarms completed
 - full protection relay coordination not yet implemented
 - frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)
