@@ -257,8 +257,8 @@ Implemented:
 - fault-coupled BPFO/BPFI amplitude (grows with bearing_wear severity)
 - per-turbine ±3% bearing geometry variation (manufacturing tolerance)
 
-Still missing:
-- sideband behavior (modulated harmonics around gear mesh frequency)
+- gear mesh sideband analysis: GMF computation, 1st/2nd order sideband amplitudes, sideband energy ratio
+- sideband fault coupling: gearbox_overheat amplifies sidebands with severity × load_factor
 
 ### 2.4 Cooling System — Active Component Model
 File: `simulator/physics/cooling_model.py`
@@ -344,9 +344,11 @@ Implemented:
 
 Newly implemented:
 - BPFO/BPFI bearing defect frequency computation (4 new SCADA tags)
+- gear mesh sideband analysis: GMF, 1st/2nd order sidebands, sideband energy ratio (4 new SCADA tags)
 
 Still not implemented:
-- sideband analysis (gear mesh modulation)
+- spectral alarm threshold curves per frequency band
+- crest factor / kurtosis anomaly alarms
 
 ### 3.2 Advanced Electrical Grid Interaction
 Status: **first version implemented** (see 2.5)
@@ -461,17 +463,18 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 84 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics)
+- 88 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands)
 
 ### Still Weak
-- sideband vibration detail (gear mesh modulation) — see #58
+- spectral alarm threshold curves and crest factor/kurtosis anomaly alarms — see #58
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
 
 ### Recommended Immediate Direction
 1. frontend RUL display and alarm level visualization (see #57)
-2. spectral sideband analysis (harmonics/fault signatures) (see #58)
-3. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
-4. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
+2. spectral alarm threshold curves per frequency band (see #58)
+3. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)
+4. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
+5. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
 5. deployment hardening (JWT auth, RBAC, Docker Compose)

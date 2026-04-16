@@ -282,6 +282,18 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("WVIB_BpfiAmp", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_BpfiAmp",
              "WVIB", "REAL32", "mm/s", "BPFI Amplitude", "內環缺陷振幅",
              0, 2),
+    ScadaTag("WVIB_GmfFreq", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_GmfFreq",
+             "WVIB", "REAL32", "Hz", "Gear Mesh Frequency", "齒輪嚙合頻率",
+             0, 100),
+    ScadaTag("WVIB_Sideband1Amp", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_Sideband1Amp",
+             "WVIB", "REAL32", "mm/s", "1st Sideband Amplitude", "一階邊帶振幅",
+             0, 2),
+    ScadaTag("WVIB_Sideband2Amp", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_Sideband2Amp",
+             "WVIB", "REAL32", "mm/s", "2nd Sideband Amplitude", "二階邊帶振幅",
+             0, 2),
+    ScadaTag("WVIB_SidebandRatio", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_SidebandRatio",
+             "WVIB", "REAL32", "", "Sideband Energy Ratio", "邊帶能量比",
+             0, 1),
 
     # ══════════════════════════════════════════════════════════════════════
     # WLOD — Structural Load & Fatigue
