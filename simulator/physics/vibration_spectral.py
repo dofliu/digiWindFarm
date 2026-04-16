@@ -54,6 +54,10 @@ class VibrationBands:
     band_bb_y: float = 0.0
     crest_factor: float = 0.0 # peak / RMS ratio (bearing defect indicator)
     kurtosis: float = 3.0     # signal kurtosis (3.0 = Gaussian normal)
+    bpfo_freq: float = 0.0    # Hz — Ball Pass Frequency Outer race
+    bpfi_freq: float = 0.0    # Hz — Ball Pass Frequency Inner race
+    bpfo_amp: float = 0.0     # mm/s — amplitude at BPFO (bearing health indicator)
+    bpfi_amp: float = 0.0     # mm/s — amplitude at BPFI (bearing health indicator)
 
     def to_dict(self) -> Dict[str, float]:
         """Serialize all spectral band amplitudes and statistical indicators to a flat dict."""
@@ -70,6 +74,10 @@ class VibrationBands:
             "vib_band_bb_y": round(self.band_bb_y, 4),
             "vib_crest_factor": round(self.crest_factor, 3),
             "vib_kurtosis": round(self.kurtosis, 3),
+            "vib_bpfo_freq": round(self.bpfo_freq, 2),
+            "vib_bpfi_freq": round(self.bpfi_freq, 2),
+            "vib_bpfo_amp": round(self.bpfo_amp, 4),
+            "vib_bpfi_amp": round(self.bpfi_amp, 4),
         }
 
 
@@ -86,6 +94,13 @@ class SpectralVibrationModel:
         self._gear_ratio = gear_ratio
         self._gear_teeth = gear_teeth  # teeth on ring gear (for mesh frequency)
         self._is_geared = gear_ratio > 1.0
+
+        # ── Bearing geometry (typical main bearing, e.g. SKF 240/710) ──
+        self._brg_n_elements = 23       # number of rolling elements
+        self._brg_d_ratio = 0.18        # roller diameter / pitch diameter
+        self._brg_contact_angle = np.radians(10.0)  # spherical roller
+        # Per-turbine geometry variation (±3% manufacturing tolerance)
+        self._brg_ratio_var = 1.0 + self._rng.uniform(-0.03, 0.03)
 
         # Per-turbine permanent characteristics
         self._imbalance_1p = 1.0 + self._rng.uniform(-0.25, 0.30)
@@ -190,6 +205,17 @@ class SpectralVibrationModel:
         bands.band_bb_x = base_bb + abs(self._rng.normal(0, 0.012))
         bands.band_bb_y = base_bb * 0.80 + abs(self._rng.normal(0, 0.010))
 
+        # ── Bearing defect frequencies (BPFO/BPFI) ──
+        shaft_freq = rotor_speed_rpm / 60.0  # Hz
+        cos_a = np.cos(self._brg_contact_angle)
+        d_ratio = self._brg_d_ratio * self._brg_ratio_var
+        n = self._brg_n_elements
+        bands.bpfo_freq = (n / 2.0) * shaft_freq * (1.0 - d_ratio * cos_a)
+        bands.bpfi_freq = (n / 2.0) * shaft_freq * (1.0 + d_ratio * cos_a)
+        # Baseline amplitude: barely detectable in healthy bearing
+        bands.bpfo_amp = 0.005 * speed_ratio + abs(self._rng.normal(0, 0.002))
+        bands.bpfi_amp = 0.004 * speed_ratio + abs(self._rng.normal(0, 0.002))
+
         # ── Crest factor and kurtosis (baseline) ──
         bands.crest_factor = 3.0 + speed_ratio * 0.3 + self._rng.normal(0, 0.15)
         bands.kurtosis = 3.0 + speed_ratio * 0.2 + self._rng.normal(0, 0.10)
@@ -212,11 +238,13 @@ class SpectralVibrationModel:
         bands.band_bb_y = self._smooth(self._prev.band_bb_y, bands.band_bb_y, alpha)
         bands.crest_factor = self._smooth(self._prev.crest_factor, bands.crest_factor, alpha)
         bands.kurtosis = self._smooth(self._prev.kurtosis, bands.kurtosis, alpha)
+        bands.bpfo_amp = self._smooth(self._prev.bpfo_amp, bands.bpfo_amp, alpha)
+        bands.bpfi_amp = self._smooth(self._prev.bpfi_amp, bands.bpfi_amp, alpha)
 
         # Ensure non-negative
         for attr in ['band_1p_x', 'band_1p_y', 'band_3p_x', 'band_3p_y',
                       'band_gear_x', 'band_gear_y', 'band_hf_x', 'band_hf_y',
-                      'band_bb_x', 'band_bb_y']:
+                      'band_bb_x', 'band_bb_y', 'bpfo_amp', 'bpfi_amp']:
             setattr(bands, attr, max(0.0, getattr(bands, attr)))
 
         self._prev = bands
@@ -324,6 +352,9 @@ class SpectralVibrationModel:
                 # Some 1P modulation from uneven bearing clearance
                 bands.band_1p_x += 0.08 * sev * speed_coupling
                 bands.band_1p_y += 0.10 * sev * speed_coupling
+                # BPFO/BPFI amplitude grows with defect severity
+                bands.bpfo_amp += 0.25 * sev * speed_coupling
+                bands.bpfi_amp += 0.15 * sev * speed_coupling
 
             elif sid in ("pitch_imbalance", "pitch_motor_fault"):
                 # Pitch imbalance: strong 1P (mass/aero imbalance)

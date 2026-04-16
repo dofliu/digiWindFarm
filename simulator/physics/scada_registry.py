@@ -270,6 +270,18 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("WVIB_Thresh1pAlrm", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_Thresh1pAlrm",
              "WVIB", "REAL32", "mm/s", "1P Alarm Threshold", "1P危險門檻",
              0, 10),
+    ScadaTag("WVIB_BpfoFreq", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_BpfoFreq",
+             "WVIB", "REAL32", "Hz", "BPFO Frequency", "外環缺陷頻率",
+             0, 10),
+    ScadaTag("WVIB_BpfiFreq", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_BpfiFreq",
+             "WVIB", "REAL32", "Hz", "BPFI Frequency", "內環缺陷頻率",
+             0, 10),
+    ScadaTag("WVIB_BpfoAmp", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_BpfoAmp",
+             "WVIB", "REAL32", "mm/s", "BPFO Amplitude", "外環缺陷振幅",
+             0, 2),
+    ScadaTag("WVIB_BpfiAmp", "WVIB.Z72PLC__UI_Loc_WVIB_Analogue_BpfiAmp",
+             "WVIB", "REAL32", "mm/s", "BPFI Amplitude", "內環缺陷振幅",
+             0, 2),
 
     # ══════════════════════════════════════════════════════════════════════
     # WLOD — Structural Load & Fatigue
