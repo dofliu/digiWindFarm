@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 80 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 84 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -24,7 +24,7 @@ Primary focus (next improvements):
 - Region 3 power variation — fixed: Cp model replaces lookup table, pitch lag creates natural variation — see #61
 - tower dynamic response — fixed: SDOF first-mode filter (fn≈0.28 Hz) with structural+aero damping — see #62
 - spectral sideband analysis — see #58
-- bearing defect frequency (BPFO/BPFI) — see #58
+- bearing defect frequency (BPFO/BPFI) — fixed: geometry-based BPFO/BPFI with fault-coupled amplitude — see #58
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -57,7 +57,7 @@ Report: `examples/data_quality_report.txt`
 
 Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
-- sideband vibration detail (harmonics/fault signatures) — see #58
+- sideband vibration detail (gear mesh modulation) — see #58; BPFO/BPFI completed
 - full protection relay coordination (LVRT/OVRT)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
