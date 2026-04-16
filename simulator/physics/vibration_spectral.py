@@ -58,6 +58,10 @@ class VibrationBands:
     bpfi_freq: float = 0.0    # Hz — Ball Pass Frequency Inner race
     bpfo_amp: float = 0.0     # mm/s — amplitude at BPFO (bearing health indicator)
     bpfi_amp: float = 0.0     # mm/s — amplitude at BPFI (bearing health indicator)
+    gmf_freq: float = 0.0     # Hz — Gear Mesh Frequency
+    sideband_1_amp: float = 0.0  # mm/s — 1st order sideband amplitude (GMF ± 1×shaft)
+    sideband_2_amp: float = 0.0  # mm/s — 2nd order sideband amplitude (GMF ± 2×shaft)
+    sideband_ratio: float = 0.0  # sideband energy / GMF energy (0→healthy, >0.3→defect)
 
     def to_dict(self) -> Dict[str, float]:
         """Serialize all spectral band amplitudes and statistical indicators to a flat dict."""
@@ -78,6 +82,10 @@ class VibrationBands:
             "vib_bpfi_freq": round(self.bpfi_freq, 2),
             "vib_bpfo_amp": round(self.bpfo_amp, 4),
             "vib_bpfi_amp": round(self.bpfi_amp, 4),
+            "vib_gmf_freq": round(self.gmf_freq, 2),
+            "vib_sideband_1_amp": round(self.sideband_1_amp, 4),
+            "vib_sideband_2_amp": round(self.sideband_2_amp, 4),
+            "vib_sideband_ratio": round(self.sideband_ratio, 4),
         }
 
 
@@ -216,6 +224,16 @@ class SpectralVibrationModel:
         bands.bpfo_amp = 0.005 * speed_ratio + abs(self._rng.normal(0, 0.002))
         bands.bpfi_amp = 0.004 * speed_ratio + abs(self._rng.normal(0, 0.002))
 
+        # ── Gear mesh sideband analysis ──
+        # GMF = rotor_speed × gear_teeth / 60; sidebands at GMF ± n×shaft_freq
+        if self._is_geared:
+            bands.gmf_freq = rotor_speed_rpm * self._gear_teeth / 60.0
+            gmf_amp = max(bands.band_gear_x, bands.band_gear_y)
+            # Healthy: sidebands at noise floor (~2-5% of GMF amplitude)
+            bands.sideband_1_amp = gmf_amp * 0.03 + abs(self._rng.normal(0, 0.003))
+            bands.sideband_2_amp = gmf_amp * 0.015 + abs(self._rng.normal(0, 0.002))
+            bands.sideband_ratio = (bands.sideband_1_amp + bands.sideband_2_amp) / max(gmf_amp, 0.01)
+
         # ── Crest factor and kurtosis (baseline) ──
         bands.crest_factor = 3.0 + speed_ratio * 0.3 + self._rng.normal(0, 0.15)
         bands.kurtosis = 3.0 + speed_ratio * 0.2 + self._rng.normal(0, 0.10)
@@ -240,11 +258,18 @@ class SpectralVibrationModel:
         bands.kurtosis = self._smooth(self._prev.kurtosis, bands.kurtosis, alpha)
         bands.bpfo_amp = self._smooth(self._prev.bpfo_amp, bands.bpfo_amp, alpha)
         bands.bpfi_amp = self._smooth(self._prev.bpfi_amp, bands.bpfi_amp, alpha)
+        bands.sideband_1_amp = self._smooth(self._prev.sideband_1_amp, bands.sideband_1_amp, alpha)
+        bands.sideband_2_amp = self._smooth(self._prev.sideband_2_amp, bands.sideband_2_amp, alpha)
+        # Recompute ratio after smoothing
+        if self._is_geared and bands.gmf_freq > 0:
+            gmf_amp = max(bands.band_gear_x, bands.band_gear_y)
+            bands.sideband_ratio = (bands.sideband_1_amp + bands.sideband_2_amp) / max(gmf_amp, 0.01)
 
         # Ensure non-negative
         for attr in ['band_1p_x', 'band_1p_y', 'band_3p_x', 'band_3p_y',
                       'band_gear_x', 'band_gear_y', 'band_hf_x', 'band_hf_y',
-                      'band_bb_x', 'band_bb_y', 'bpfo_amp', 'bpfi_amp']:
+                      'band_bb_x', 'band_bb_y', 'bpfo_amp', 'bpfi_amp',
+                      'sideband_1_amp', 'sideband_2_amp']:
             setattr(bands, attr, max(0.0, getattr(bands, attr)))
 
         self._prev = bands
@@ -372,6 +397,10 @@ class SpectralVibrationModel:
                 bands.band_bb_x += 0.12 * sev * load_factor
                 bands.band_bb_y += 0.10 * sev * load_factor
                 bands.kurtosis += 1.5 * sev * load_factor
+                # Sideband amplification: tooth defect modulates GMF at shaft freq
+                if self._is_geared:
+                    bands.sideband_1_amp += 0.20 * sev * load_factor
+                    bands.sideband_2_amp += 0.10 * sev * load_factor
 
             elif sid == "blade_icing":
                 # Ice: mass imbalance → strong 1P, aerodynamic → 3P

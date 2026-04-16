@@ -654,6 +654,10 @@ class TurbinePhysicsModel:
             "WVIB_BpfiFreq": round(vib_bands.bpfi_freq, 2),
             "WVIB_BpfoAmp": round(vib_bands.bpfo_amp, 4),
             "WVIB_BpfiAmp": round(vib_bands.bpfi_amp, 4),
+            "WVIB_GmfFreq": round(vib_bands.gmf_freq, 2),
+            "WVIB_Sideband1Amp": round(vib_bands.sideband_1_amp, 4),
+            "WVIB_Sideband2Amp": round(vib_bands.sideband_2_amp, 4),
+            "WVIB_SidebandRatio": round(vib_bands.sideband_ratio, 4),
             # ── Fatigue / structural load tags (cloud convention) ──
             "WLOD_TwrFaMom": fatigue_out["tower_fa_moment_knm"],
             "WLOD_TwrSsMom": fatigue_out["tower_ss_moment_knm"],
