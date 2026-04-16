@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-14
+Last updated: 2026-04-16
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -43,6 +43,7 @@ Included:
 
 Current realism level:
 - Good trend-level realism.
+- Region 3 now uses Cp(λ,β) aerodynamic model — pitch controller lag and dead-band create realistic 3-5% power variation around rated (previously locked to constant lookup table). See #61.
 - Suitable for SCADA-like output and operator demo use.
 
 ### 1.3 Drivetrain and Brake Dynamics
@@ -200,7 +201,8 @@ Implemented:
 - aerodynamic thrust force computation
 - aero torque output for drivetrain coupling
 - aero load factor output for vibration coupling
-- blended output (70% Cp-based + 30% lookup) for stability
+- Region 2: Cp-based with lookup safety floor; Region 3: full Cp model (pitch lag creates variation)
+- 4% overshoot allowance for transient pitch-lag behavior
 
 Still missing:
 - full BEM (blade element momentum) method
@@ -228,7 +230,6 @@ Implemented:
 Still missing:
 - gear tooth contact modeling
 - oil temperature / viscosity effects
-- detailed bearing defect frequency computation
 
 ### 2.3 Vibration Spectral Model
 File: `simulator/physics/vibration_spectral.py`
@@ -252,11 +253,12 @@ Implemented:
   - hydraulic_leak → elevated broadband
 - operating-condition coupling (speed, power, load)
 - low-pass smoothing for realistic time behavior
+- BPFO/BPFI bearing defect frequency computation from geometry (n=23, d/D=0.18, α=10°)
+- fault-coupled BPFO/BPFI amplitude (grows with bearing_wear severity)
+- per-turbine ±3% bearing geometry variation (manufacturing tolerance)
 
-Still missing:
-- sideband behavior (modulated harmonics)
-- detailed BPFO/BPFI frequency computation from bearing geometry
-- spectral alarm threshold curves
+- gear mesh sideband analysis: GMF computation, 1st/2nd order sideband amplitudes, sideband energy ratio
+- sideband fault coupling: gearbox_overheat amplifies sidebands with severity × load_factor
 
 ### 2.4 Cooling System — Active Component Model
 File: `simulator/physics/cooling_model.py`
@@ -340,9 +342,13 @@ Implemented:
 - Per-turbine threshold variation (±10%)
 - 8 new SCADA tags: WVIB_Alarm1p/3p/Gear/Hf/Bb/Overall + Thresh1pWarn/Alrm
 
+Newly implemented:
+- BPFO/BPFI bearing defect frequency computation (4 new SCADA tags)
+- gear mesh sideband analysis: GMF, 1st/2nd order sidebands, sideband energy ratio (4 new SCADA tags)
+
 Still not implemented:
-- sideband analysis
-- detailed bearing defect frequency computation
+- spectral alarm threshold curves per frequency band
+- crest factor / kurtosis anomaly alarms
 
 ### 3.2 Advanced Electrical Grid Interaction
 Status: **first version implemented** (see 2.5)
@@ -357,7 +363,8 @@ Status: **first version implemented**
 
 Implemented:
 - `FatigueModel` class in `simulator/physics/fatigue_model.py`
-- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic)
+- tower base fore-aft bending moment (thrust × hub height + turbulence dynamic + SDOF first-mode filter)
+- tower SDOF dynamic response: fn≈0.28 Hz, structural+aerodynamic damping, per-turbine ±6% individuality
 - tower base side-to-side bending moment (lateral thrust + rotor imbalance)
 - blade root flapwise bending moment (thrust distribution + wind shear + pitch)
 - blade root edgewise bending moment (gravity 1P cyclic + aero torque)
@@ -373,7 +380,7 @@ Implemented:
 - remaining useful life (RUL) estimation from average damage rate
 
 Still missing:
-- full aeroelastic tower/blade FEM coupling
+- full aeroelastic tower/blade FEM coupling (SDOF first-mode is in place)
 - frontend RUL display and alarm level visualization
 
 ### 3.4 Event Layer for Historical Analysis
@@ -455,18 +462,19 @@ Implemented:
 - electrical response (frequency-watt, reactive power, ride-through)
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
-- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL)
-- 80 SCADA tags (electrical + vibration + structural load + alarm/RUL + diagnostics)
+- fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
+- 88 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands)
 
 ### Still Weak
-- sideband vibration detail — see #58
+- spectral alarm threshold curves and crest factor/kurtosis anomaly alarms — see #58
 - full protection relay coordination (LVRT/OVRT)
-- aeroelastic coupling (BEM + natural frequency response)
+- aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
 
 ### Recommended Immediate Direction
 1. frontend RUL display and alarm level visualization (see #57)
-2. spectral sideband analysis (harmonics/fault signatures) (see #58)
-3. detailed bearing defect frequency computation (BPFO/BPFI)
-4. tower dynamic natural frequency response
+2. spectral alarm threshold curves per frequency band (see #58)
+3. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)
+4. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
+5. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
 5. deployment hardening (JWT auth, RBAC, Docker Compose)

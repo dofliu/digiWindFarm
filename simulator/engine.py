@@ -85,6 +85,7 @@ class WindFarmSimulator:
 
     @time_scale.setter
     def time_scale(self, value: float):
+        """Set time acceleration factor (clamped to minimum 1.0)."""
         self.wind_model.time_scale = max(1.0, value)
 
     def _run_one_step(self, sim_time: datetime, time_step: float):

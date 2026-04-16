@@ -35,6 +35,10 @@
 - [x] Vibration spectral alarm thresholds with ISO 10816-inspired zones and hysteresis
 - [x] Fatigue/load model: tower/blade bending moments, rainflow cycle counting, DEL, Miner's damage
 - [x] 80 SCADA tags total (was 59): +8 vibration alarm + 13 structural load/fatigue + 3 fatigue alarm/RUL
+- [x] Bearing defect frequency model (BPFO/BPFI) with geometry-based computation
+- [x] 84 SCADA tags total (was 80): +4 bearing defect frequency/amplitude
+- [x] Gear mesh sideband analysis (GMF ± n×shaft frequency, sideband energy ratio)
+- [x] 88 SCADA tags total (was 84): +4 gear mesh sideband tags
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -124,8 +128,8 @@ These parts are implemented, but still first-generation models:
 ### Priority F: Vibration Condition Monitoring
 - [ ] Spectral alarm threshold curves per frequency band — see #58
 - [ ] Crest factor / kurtosis anomaly alarms — see #58
-- [ ] Sideband analysis (gear mesh modulation) — see #58
-- [ ] Bearing defect frequency simulation (BPFO/BPFI) — see #58
+- [x] Sideband analysis (gear mesh modulation) — see #58
+- [x] Bearing defect frequency simulation (BPFO/BPFI) — see #58
 
 ## Product / Platform Gaps
 
@@ -155,10 +159,10 @@ These parts are implemented, but still first-generation models:
 ## Known Issues / Next Improvements
 
 ### Physics Realism (from data quality analysis)
-- [ ] Region 3 power CV too low (0.8-0.9%): pitch controller needs response delay and wind turbulence coupling to produce realistic 3-5% variation at rated power
-- [ ] Spectral sideband analysis (modulated harmonics around gear mesh)
-- [ ] Bearing defect frequency computation (BPFO/BPFI from geometry)
-- [ ] Tower fore-aft dynamic response (natural frequency oscillation)
+- [x] Region 3 power CV too low (0.8-0.9%): switched to Cp aerodynamic model, pitch lag now creates realistic variation — see #61
+- [x] Spectral sideband analysis (modulated harmonics around gear mesh) — see #58
+- [x] Bearing defect frequency computation (BPFO/BPFI from geometry) — see #58
+- [x] Tower fore-aft dynamic response (SDOF first-mode filter, fn≈0.28 Hz) — see #62
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

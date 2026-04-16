@@ -55,6 +55,7 @@ def _find_available_port(start: int, host: str = "0.0.0.0", max_tries: int = 10)
 
 
 def main():
+    """Parse CLI arguments and start the backend server with uvicorn."""
     _load_dotenv()
 
     default_port = int(os.environ.get("BACKEND_PORT", "8100"))

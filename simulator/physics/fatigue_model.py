@@ -54,6 +54,10 @@ class FatigueSpec:
     alarm_danger: float = 0.80    # level 3: 危險
     alarm_shutdown: float = 0.95  # level 4: 停機
 
+    # Tower first-mode SDOF dynamics
+    tower_fn_hz: float = 0.28          # natural frequency (soft-stiff design)
+    tower_damping_struct: float = 0.015 # structural damping ratio (~1.5%)
+
 
 class RainflowCounter:
     """Simplified online rainflow cycle counter.
@@ -147,6 +151,12 @@ class FatigueModel:
         # Per-turbine individuality (small persistent offsets)
         self._tower_stiffness_scale = 1.0 + self._rng.uniform(-0.06, 0.06)
         self._blade_stiffness_scale = 1.0 + self._rng.uniform(-0.08, 0.08)
+
+        # Tower SDOF dynamic response state (first fore-aft bending mode)
+        fn_individuality = 1.0 + self._rng.uniform(-0.06, 0.06)
+        self._tower_omega_n = 2.0 * math.pi * self.spec.tower_fn_hz * fn_individuality
+        self._tower_dyn_moment = 0.0  # filtered moment state (kNm)
+        self._tower_dyn_vel = 0.0     # moment rate state
 
         # Rainflow counters for each load channel
         buf_len = self.spec.rainflow_buffer_len
@@ -341,6 +351,26 @@ class FatigueModel:
             return 1
         return 0
 
+    def _tower_dynamic_step(self, m_qs_knm: float, dt: float,
+                            is_producing: bool, wind_speed: float) -> float:
+        """Apply SDOF tower first-mode filter to quasi-static bending moment.
+
+        Adds realistic ~0.28 Hz oscillation with structural + aerodynamic damping.
+        Uses sub-stepping for numerical stability at large simulation dt.
+        """
+        omega = self._tower_omega_n
+        zeta = self.spec.tower_damping_struct
+        if is_producing and wind_speed > 3.0:
+            zeta += 0.06  # aerodynamic damping (~6% when producing)
+        n_sub = max(1, int(math.ceil(omega * dt / 0.5)))
+        dt_sub = dt / n_sub
+        for _ in range(n_sub):
+            accel = (omega ** 2 * (m_qs_knm - self._tower_dyn_moment)
+                     - 2.0 * zeta * omega * self._tower_dyn_vel)
+            self._tower_dyn_vel += accel * dt_sub
+            self._tower_dyn_moment += self._tower_dyn_vel * dt_sub
+        return self._tower_dyn_moment
+
     def _compute_loads(self, wind_speed: float, rotor_speed_rpm: float,
                        power_kw: float, pitch_deg: float,
                        yaw_error_deg: float, thrust_kn: float,
@@ -374,6 +404,9 @@ class FatigueModel:
         # Starting: moderate loads
         if is_starting:
             tower_fa *= 0.4 + self._rng.uniform(0, 0.1)
+
+        # Tower first-mode dynamic response (SDOF filter at ~0.28 Hz)
+        tower_fa = self._tower_dynamic_step(tower_fa, dt, is_producing, wind_speed)
 
         # ── Tower side-to-side bending moment ──
         # Driven by yaw error, rotor imbalance, and lateral turbulence

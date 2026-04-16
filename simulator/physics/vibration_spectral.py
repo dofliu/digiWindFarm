@@ -54,6 +54,14 @@ class VibrationBands:
     band_bb_y: float = 0.0
     crest_factor: float = 0.0 # peak / RMS ratio (bearing defect indicator)
     kurtosis: float = 3.0     # signal kurtosis (3.0 = Gaussian normal)
+    bpfo_freq: float = 0.0    # Hz — Ball Pass Frequency Outer race
+    bpfi_freq: float = 0.0    # Hz — Ball Pass Frequency Inner race
+    bpfo_amp: float = 0.0     # mm/s — amplitude at BPFO (bearing health indicator)
+    bpfi_amp: float = 0.0     # mm/s — amplitude at BPFI (bearing health indicator)
+    gmf_freq: float = 0.0     # Hz — Gear Mesh Frequency
+    sideband_1_amp: float = 0.0  # mm/s — 1st order sideband amplitude (GMF ± 1×shaft)
+    sideband_2_amp: float = 0.0  # mm/s — 2nd order sideband amplitude (GMF ± 2×shaft)
+    sideband_ratio: float = 0.0  # sideband energy / GMF energy (0→healthy, >0.3→defect)
 
     def to_dict(self) -> Dict[str, float]:
         """Serialize all spectral band amplitudes and statistical indicators to a flat dict."""
@@ -70,6 +78,14 @@ class VibrationBands:
             "vib_band_bb_y": round(self.band_bb_y, 4),
             "vib_crest_factor": round(self.crest_factor, 3),
             "vib_kurtosis": round(self.kurtosis, 3),
+            "vib_bpfo_freq": round(self.bpfo_freq, 2),
+            "vib_bpfi_freq": round(self.bpfi_freq, 2),
+            "vib_bpfo_amp": round(self.bpfo_amp, 4),
+            "vib_bpfi_amp": round(self.bpfi_amp, 4),
+            "vib_gmf_freq": round(self.gmf_freq, 2),
+            "vib_sideband_1_amp": round(self.sideband_1_amp, 4),
+            "vib_sideband_2_amp": round(self.sideband_2_amp, 4),
+            "vib_sideband_ratio": round(self.sideband_ratio, 4),
         }
 
 
@@ -86,6 +102,13 @@ class SpectralVibrationModel:
         self._gear_ratio = gear_ratio
         self._gear_teeth = gear_teeth  # teeth on ring gear (for mesh frequency)
         self._is_geared = gear_ratio > 1.0
+
+        # ── Bearing geometry (typical main bearing, e.g. SKF 240/710) ──
+        self._brg_n_elements = 23       # number of rolling elements
+        self._brg_d_ratio = 0.18        # roller diameter / pitch diameter
+        self._brg_contact_angle = np.radians(10.0)  # spherical roller
+        # Per-turbine geometry variation (±3% manufacturing tolerance)
+        self._brg_ratio_var = 1.0 + self._rng.uniform(-0.03, 0.03)
 
         # Per-turbine permanent characteristics
         self._imbalance_1p = 1.0 + self._rng.uniform(-0.25, 0.30)
@@ -190,6 +213,27 @@ class SpectralVibrationModel:
         bands.band_bb_x = base_bb + abs(self._rng.normal(0, 0.012))
         bands.band_bb_y = base_bb * 0.80 + abs(self._rng.normal(0, 0.010))
 
+        # ── Bearing defect frequencies (BPFO/BPFI) ──
+        shaft_freq = rotor_speed_rpm / 60.0  # Hz
+        cos_a = np.cos(self._brg_contact_angle)
+        d_ratio = self._brg_d_ratio * self._brg_ratio_var
+        n = self._brg_n_elements
+        bands.bpfo_freq = (n / 2.0) * shaft_freq * (1.0 - d_ratio * cos_a)
+        bands.bpfi_freq = (n / 2.0) * shaft_freq * (1.0 + d_ratio * cos_a)
+        # Baseline amplitude: barely detectable in healthy bearing
+        bands.bpfo_amp = 0.005 * speed_ratio + abs(self._rng.normal(0, 0.002))
+        bands.bpfi_amp = 0.004 * speed_ratio + abs(self._rng.normal(0, 0.002))
+
+        # ── Gear mesh sideband analysis ──
+        # GMF = rotor_speed × gear_teeth / 60; sidebands at GMF ± n×shaft_freq
+        if self._is_geared:
+            bands.gmf_freq = rotor_speed_rpm * self._gear_teeth / 60.0
+            gmf_amp = max(bands.band_gear_x, bands.band_gear_y)
+            # Healthy: sidebands at noise floor (~2-5% of GMF amplitude)
+            bands.sideband_1_amp = gmf_amp * 0.03 + abs(self._rng.normal(0, 0.003))
+            bands.sideband_2_amp = gmf_amp * 0.015 + abs(self._rng.normal(0, 0.002))
+            bands.sideband_ratio = (bands.sideband_1_amp + bands.sideband_2_amp) / max(gmf_amp, 0.01)
+
         # ── Crest factor and kurtosis (baseline) ──
         bands.crest_factor = 3.0 + speed_ratio * 0.3 + self._rng.normal(0, 0.15)
         bands.kurtosis = 3.0 + speed_ratio * 0.2 + self._rng.normal(0, 0.10)
@@ -212,11 +256,20 @@ class SpectralVibrationModel:
         bands.band_bb_y = self._smooth(self._prev.band_bb_y, bands.band_bb_y, alpha)
         bands.crest_factor = self._smooth(self._prev.crest_factor, bands.crest_factor, alpha)
         bands.kurtosis = self._smooth(self._prev.kurtosis, bands.kurtosis, alpha)
+        bands.bpfo_amp = self._smooth(self._prev.bpfo_amp, bands.bpfo_amp, alpha)
+        bands.bpfi_amp = self._smooth(self._prev.bpfi_amp, bands.bpfi_amp, alpha)
+        bands.sideband_1_amp = self._smooth(self._prev.sideband_1_amp, bands.sideband_1_amp, alpha)
+        bands.sideband_2_amp = self._smooth(self._prev.sideband_2_amp, bands.sideband_2_amp, alpha)
+        # Recompute ratio after smoothing
+        if self._is_geared and bands.gmf_freq > 0:
+            gmf_amp = max(bands.band_gear_x, bands.band_gear_y)
+            bands.sideband_ratio = (bands.sideband_1_amp + bands.sideband_2_amp) / max(gmf_amp, 0.01)
 
         # Ensure non-negative
         for attr in ['band_1p_x', 'band_1p_y', 'band_3p_x', 'band_3p_y',
                       'band_gear_x', 'band_gear_y', 'band_hf_x', 'band_hf_y',
-                      'band_bb_x', 'band_bb_y']:
+                      'band_bb_x', 'band_bb_y', 'bpfo_amp', 'bpfi_amp',
+                      'sideband_1_amp', 'sideband_2_amp']:
             setattr(bands, attr, max(0.0, getattr(bands, attr)))
 
         self._prev = bands
@@ -324,6 +377,9 @@ class SpectralVibrationModel:
                 # Some 1P modulation from uneven bearing clearance
                 bands.band_1p_x += 0.08 * sev * speed_coupling
                 bands.band_1p_y += 0.10 * sev * speed_coupling
+                # BPFO/BPFI amplitude grows with defect severity
+                bands.bpfo_amp += 0.25 * sev * speed_coupling
+                bands.bpfi_amp += 0.15 * sev * speed_coupling
 
             elif sid in ("pitch_imbalance", "pitch_motor_fault"):
                 # Pitch imbalance: strong 1P (mass/aero imbalance)
@@ -341,6 +397,10 @@ class SpectralVibrationModel:
                 bands.band_bb_x += 0.12 * sev * load_factor
                 bands.band_bb_y += 0.10 * sev * load_factor
                 bands.kurtosis += 1.5 * sev * load_factor
+                # Sideband amplification: tooth defect modulates GMF at shaft freq
+                if self._is_geared:
+                    bands.sideband_1_amp += 0.20 * sev * load_factor
+                    bands.sideband_2_amp += 0.10 * sev * load_factor
 
             elif sid == "blade_icing":
                 # Ice: mass imbalance → strong 1P, aerodynamic → 3P

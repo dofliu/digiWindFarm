@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 74 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 88 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -21,10 +21,10 @@ Platform includes:
 The main priority is physics realism and signal realism.
 
 Primary focus (next improvements):
-- Region 3 power variation (pitch controller delay + wind turbulence coupling)
-- spectral sideband analysis
-- bearing defect frequency (BPFO/BPFI)
-- tower dynamic response
+- Region 3 power variation — fixed: Cp model replaces lookup table, pitch lag creates natural variation — see #61
+- tower dynamic response — fixed: SDOF first-mode filter (fn≈0.28 Hz) with structural+aero damping — see #62
+- spectral sideband analysis — fixed: gear mesh sideband model with fault-coupled amplitude modulation — see #58
+- bearing defect frequency (BPFO/BPFI) — fixed: geometry-based BPFO/BPFI with fault-coupled amplitude — see #58
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -35,7 +35,7 @@ Ran 2-hour automated analysis with mixed wind conditions + fault injection.
 Result: **18/21 checks passed**.
 
 Issues found:
-- Region 3 power CV=0.8-0.9% (should be 3-5%) — pitch response too smooth
+- Region 3 power CV=0.8-0.9% (should be 3-5%) — **fixed** in #61: switched to Cp aerodynamic model
 - Turbine spread 36.8% (partly due to mixed operating conditions in test, not a real issue)
 
 All physical correlations verified:
@@ -57,7 +57,7 @@ Report: `examples/data_quality_report.txt`
 
 Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
-- sideband vibration detail (harmonics/fault signatures) — see #58
+- spectral alarm threshold curves and crest factor/kurtosis anomaly alarms — see #58; BPFO/BPFI and sideband analysis completed
 - full protection relay coordination (LVRT/OVRT)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
