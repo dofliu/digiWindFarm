@@ -25,6 +25,7 @@ Primary focus (next improvements):
 - tower dynamic response — fixed: SDOF first-mode filter (fn≈0.28 Hz) with structural+aero damping — see #62
 - spectral sideband analysis — fixed: gear mesh sideband model with fault-coupled amplitude modulation — see #58
 - bearing defect frequency (BPFO/BPFI) — fixed: geometry-based BPFO/BPFI with fault-coupled amplitude — see #58
+- tower shadow effect — fixed: rotor azimuth tracking + Gaussian 3P torque/thrust/load modulation — see #69
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -59,6 +60,7 @@ Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
 - spectral alarm threshold curves — see #58; BPFO/BPFI, sideband analysis, and crest factor/kurtosis anomaly alarms completed
 - full protection relay coordination (LVRT/OVRT) — see #67
+- tower shadow effect implemented (#69), pending merge
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

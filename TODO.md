@@ -165,6 +165,7 @@ These parts are implemented, but still first-generation models:
 - [x] Spectral sideband analysis (modulated harmonics around gear mesh) — see #58
 - [x] Bearing defect frequency computation (BPFO/BPFI from geometry) — see #58
 - [x] Tower fore-aft dynamic response (SDOF first-mode filter, fn≈0.28 Hz) — see #62
+- [x] Tower shadow effect: rotor azimuth tracking + 3P Gaussian torque/thrust/load modulation — see #69
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

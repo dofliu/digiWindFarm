@@ -204,10 +204,12 @@ Implemented:
 - Region 2: Cp-based with lookup safety floor; Region 3: full Cp model (pitch lag creates variation)
 - 4% overshoot allowance for transient pitch-lag behavior
 
+Newly implemented:
+- tower shadow effect: rotor azimuth tracking, Gaussian per-blade shadow model, 3P torque/thrust/power modulation (see #69)
+
 Still missing:
 - full BEM (blade element momentum) method
 - detailed blade aerodynamic loading distribution
-- tower shadow effect
 
 ### 2.2 Drivetrain — Multi-Stage Gearbox Model
 File: `simulator/physics/drivetrain_model.py`
@@ -383,6 +385,9 @@ Implemented:
 - fatigue alarm thresholds: 4-level alarm (notice ≥0.30, warning ≥0.60, danger ≥0.80, shutdown ≥0.95)
 - remaining useful life (RUL) estimation from average damage rate
 
+Newly implemented:
+- 3P tower shadow modulation on blade flapwise moment (rotor azimuth-dependent, see #69)
+
 Still missing:
 - full aeroelastic tower/blade FEM coupling (SDOF first-mode is in place)
 - frontend RUL display and alarm level visualization
@@ -474,6 +479,7 @@ Implemented:
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
+- full blade element loading distribution (tower shadow 3P is implemented via azimuth tracking)
 
 ### Recommended Immediate Direction
 1. frontend RUL display and alarm level visualization (see #57)
@@ -481,4 +487,5 @@ Implemented:
 3. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)
 4. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
 5. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
-5. deployment hardening (JWT auth, RBAC, Docker Compose)
+6. ~~tower shadow effect~~ → done (#69, rotor azimuth tracking + 3P Gaussian shadow model)
+7. deployment hardening (JWT auth, RBAC, Docker Compose)
