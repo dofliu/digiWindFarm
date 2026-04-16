@@ -3,7 +3,7 @@ name_zh: 數位孿生風機模擬器
 category: wind_energy
 progress: 85
 status: active
-last_updated: "2026-04-12"
+last_updated: "2026-04-16"
 next_milestone: "Deployment hardening (JWT auth, Docker Compose)"
 technologies:
   - FastAPI
