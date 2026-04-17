@@ -362,6 +362,12 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("MBUS_Contact2", "MBUS.Z72PLC__UI_Mbus_Contact[2]",
              "MBUS", "UINT16", "", "Local/Remote Control", "風機本地/遠端控制",
              0, 1, "Contact[2]"),
+    # ══════════════════════════════════════════════════════════════════════
+    # Drivetrain — gearbox oil temperature (1 tag)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WDRV_GbxOilTmp", "WDRV.Z72PLC__UI_Drv_Tmp_GbxOil",
+             "WDRV", "REAL32", "°C", "Gearbox Oil Temperature", "齒輪箱油溫",
+             -30, 120),
 ]
 
 

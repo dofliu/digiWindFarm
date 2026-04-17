@@ -127,6 +127,12 @@ class DrivetrainModel:
         self.main_bearing_heat_kw = 0.0
         self.gearbox_bearing_heat_kw = 0.0
 
+        # Gearbox oil temperature and viscosity state
+        self._oil_temp = 25.0
+        self._running_seconds = 0.0
+        self._oil_temp_ref = 60.0  # reference temperature for viscosity ratio
+        self._visc_alpha = -0.03   # Walther-type coefficient (1/°C)
+
     @property
     def generator_speed(self) -> float:
         """Current generator speed in RPM."""
@@ -136,6 +142,11 @@ class DrivetrainModel:
     def brake_pressure(self) -> float:
         """Current brake hydraulic pressure in bar."""
         return self._brake_pressure
+
+    @property
+    def oil_temperature(self) -> float:
+        """Current gearbox oil temperature (°C)."""
+        return self._oil_temp
 
     def step(
         self,
@@ -148,6 +159,7 @@ class DrivetrainModel:
         is_starting: bool,
         is_normal_stop: bool,
         is_emergency_stop: bool,
+        ambient_temp: float = 25.0,
     ) -> Tuple[float, float, float, float, float, float]:
         """Advance drivetrain by one timestep.
 
@@ -161,6 +173,9 @@ class DrivetrainModel:
         """
         s = self.spec
         gear_ratio = max(1.0, s.total_gear_ratio)
+
+        if is_producing or is_starting:
+            self._running_seconds += dt
 
         # ── Brake pressure dynamics ──
         self._update_brake_pressure(is_normal_stop, is_emergency_stop, dt)
@@ -233,12 +248,27 @@ class DrivetrainModel:
         else:
             self._generator_speed = max(0.0, self._generator_speed)
 
+        # ── Oil temperature and viscosity effects (geared only) ──
+        visc_loss_kw = 0.0
+        if self.is_geared:
+            heat_in = gearbox_loss_kw + gbx_brg_friction
+            oil_tau = 800.0 if heat_in > 0 else 1800.0
+            oil_target = ambient_temp + heat_in * 0.45
+            alpha = 1.0 - math.exp(-dt / max(1.0, oil_tau))
+            self._oil_temp += (oil_target - self._oil_temp) * alpha
+
+            visc_ratio = math.exp(self._visc_alpha * (self._oil_temp - self._oil_temp_ref))
+            cold_start_factor = 1.0 + 0.5 * math.exp(-self._running_seconds / 600.0)
+            visc_loss_kw = gearbox_loss_kw * abs(1.0 - visc_ratio) * 0.3 * cold_start_factor
+        else:
+            self._oil_temp = ambient_temp
+
         # ── Total drivetrain loss ──
-        drivetrain_loss_kw = main_brg_friction + gbx_brg_friction + gearbox_loss_kw
+        drivetrain_loss_kw = main_brg_friction + gbx_brg_friction + gearbox_loss_kw + visc_loss_kw
 
         # ── Bearing heat for thermal model ──
         self.main_bearing_heat_kw = main_brg_friction + brake_heat_kw * 0.15
-        self.gearbox_bearing_heat_kw = gbx_brg_friction + gearbox_loss_kw * 0.4
+        self.gearbox_bearing_heat_kw = gbx_brg_friction + gearbox_loss_kw * 0.4 + visc_loss_kw * 0.8
 
         # ── Torsional vibration outputs ──
         torsion_vib_lss = min(2.0, abs(self._lss_twist) * 0.65)
@@ -335,3 +365,5 @@ class DrivetrainModel:
         self._stage_losses_kw = []
         self.main_bearing_heat_kw = 0.0
         self.gearbox_bearing_heat_kw = 0.0
+        self._oil_temp = 25.0
+        self._running_seconds = 0.0
