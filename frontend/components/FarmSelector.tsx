@@ -211,18 +211,19 @@ const CreateFarmModal: React.FC<CreateModalProps> = ({ lang, onClose, onCreated 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
-      <div className="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-full max-w-md my-auto max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-lg font-bold text-white">{ui('Create Wind Farm', '建立新風場')}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] overflow-y-auto" onClick={onClose}>
+      <div className="min-h-full flex items-center justify-center p-4">
+        <div className="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <div className="px-5 py-4 border-b border-gray-700 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white">{ui('Create Wind Farm', '建立新風場')}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-        <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+          <div className="px-5 py-4 space-y-4">
           {/* Farm Name */}
           <div>
             <label className="block text-sm text-gray-300 mb-1">{ui('Farm Name', '風場名稱')} *</label>
@@ -300,20 +301,21 @@ const CreateFarmModal: React.FC<CreateModalProps> = ({ lang, onClose, onCreated 
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-gray-700 flex justify-end space-x-3 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
-          >
-            {ui('Cancel', '取消')}
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={creating || !name.trim()}
-            className="px-4 py-2 text-sm font-medium bg-cyan-600 hover:bg-cyan-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {creating ? ui('Creating...', '建立中...') : ui('Create & Activate', '建立並啟用')}
-          </button>
+          <div className="px-5 py-3 border-t border-gray-700 flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+            >
+              {ui('Cancel', '取消')}
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating || !name.trim()}
+              className="px-4 py-2 text-sm font-medium bg-cyan-600 hover:bg-cyan-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {creating ? ui('Creating...', '建立中...') : ui('Create & Activate', '建立並啟用')}
+            </button>
+          </div>
         </div>
       </div>
     </div>
