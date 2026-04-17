@@ -14,6 +14,7 @@ import WorkOrderDetailModal from './components/WorkOrderDetailModal';
 import SettingsPage from './components/SettingsPage';
 import { useSettings } from './hooks/useSettings';
 import HistoryPage from './components/HistoryPage';
+import FarmSelector from './components/FarmSelector';
 
 const NavButton = ({ isActive, onClick, children }: {isActive: boolean, onClick: ()=>void, children: React.ReactNode}) => (
     <button
@@ -183,6 +184,7 @@ const App: React.FC = () => {
                 <span className={`font-bold ${getStatusColorClass(farmStatus)}`}>{farmStatus}</span>
               </div>
             </div>
+            <FarmSelector lang={lang} />
             {/* Language toggle */}
             <button onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')}
               className="text-xs px-2 py-1 rounded border border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
