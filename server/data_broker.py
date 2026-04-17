@@ -12,6 +12,7 @@ from server.models import (
     DataSourceConfig, SimulationConfig, FarmStatus,
 )
 from server.storage import Storage
+from server.farm_registry import FarmRegistry
 from simulator.engine import WindFarmSimulator
 
 
@@ -230,8 +231,10 @@ class DataBroker:
     # Snapshot window: seconds of 1s data to capture before/after event
     SNAPSHOT_WINDOW_S = 600  # 10 minutes
 
-    def __init__(self):
+    def __init__(self, farm_registry: Optional[FarmRegistry] = None):
         self.mode = DataSourceMode.SIMULATION
+        self.farm_registry = farm_registry or FarmRegistry()
+        self._active_farm_id: Optional[str] = None
         self.storage = Storage()
         self.simulator: Optional[WindFarmSimulator] = None
         self._sim_config = SimulationConfig()
@@ -256,6 +259,44 @@ class DataBroker:
         self._maintenance_thread: Optional[threading.Thread] = None
         self._maintenance_running = False
 
+    def _init_farm_storage(self):
+        """Point storage at the active farm's database."""
+        farm_id = self._active_farm_id or self.farm_registry.get_active_farm_id()
+        if not farm_id:
+            farm_id = self.farm_registry.ensure_default_farm()
+        self._active_farm_id = farm_id
+        db_path = str(self.farm_registry.get_farm_db_path(farm_id))
+        self.storage = Storage(db_path=db_path)
+
+    def switch_farm(self, farm_id: str) -> bool:
+        """Switch the active wind farm. Stops current simulator, swaps DB, restarts."""
+        farm = self.farm_registry.get_farm(farm_id)
+        if not farm:
+            return False
+        self.stop()
+        self.farm_registry.set_active_farm(farm_id)
+        self._active_farm_id = farm_id
+        self._init_farm_storage()
+
+        from simulator.physics.turbine_physics import TurbineSpec
+        if farm.turbine_spec:
+            spec = TurbineSpec.from_dict(farm.turbine_spec)
+        else:
+            spec = TurbineSpec()
+
+        self._sim_config = SimulationConfig(turbineCount=farm.turbine_count)
+        self.start()
+
+        if self.simulator:
+            for model in self.simulator.turbines.values():
+                model.update_spec(spec)
+
+        return True
+
+    @property
+    def active_farm_id(self) -> Optional[str]:
+        return self._active_farm_id
+
     def start(self, config: Optional[DataSourceConfig] = None,
               sim_config: Optional[SimulationConfig] = None):
         """Start the data broker in simulation or OPC mode and launch background maintenance."""
@@ -263,6 +304,9 @@ class DataBroker:
             self._sim_config = sim_config
         if config:
             self.mode = config.mode
+
+        if self._active_farm_id is None:
+            self._init_farm_storage()
 
         if self.mode == DataSourceMode.SIMULATION:
             self._start_simulator()
