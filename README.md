@@ -55,7 +55,7 @@ Implemented and usable today:
 - history page with event markers, event details, focus windows, and CSV export
 - electrical response model (frequency-watt, reactive power, power factor, ride-through)
 - spectral vibration model (1P/3P/gear/HF/broadband bands, crest factor, kurtosis, BPFO/BPFI bearing defect frequencies, gear mesh sideband analysis)
-- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage, alarm thresholds, RUL estimation, tower SDOF dynamic response, tower shadow 3P blade load modulation)
+- fatigue/load model (tower/blade moments, rainflow cycle counting, DEL, Miner's damage, alarm thresholds, RUL estimation, tower SDOF dynamic response, tower shadow 3P blade load modulation, wind shear 1P azimuth-dependent blade loading)
 - fault lifecycle tracking with start/end duration events
 - event export API (JSON/CSV) with severity grouping
 - Docker Compose deployment (backend + frontend with nginx reverse proxy)
