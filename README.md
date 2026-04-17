@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 90 SCADA tags aligned to Bachmann Z72 definitions
+- 91 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -46,7 +46,7 @@ In `Settings`, select `Physics Simulation (Backend)` to use backend realtime sim
 
 Implemented and usable today:
 - turbine startup, synchronization, production, normal stop, and emergency stop
-- separated rotor and generator speeds with first drivetrain torsion model
+- separated rotor and generator speeds with first drivetrain torsion model and gearbox oil temperature/viscosity effects
 - 10-point thermal model with residual heat behavior
 - vibration, yaw, wind field, wake, and per-turbine individuality
 - 7 fault scenarios with fault-to-physics coupling
