@@ -175,6 +175,7 @@ class TurbinePhysicsModel:
             "grid_ride_through_scale": 1.0 + self._rng.uniform(-0.22, 0.25),
             "grid_reconnect_delay": self._rng.uniform(-5.0, 8.0),
             "tower_shadow_amp": 0.12 + self._rng.uniform(-0.03, 0.03),
+            "wind_shear_exp": 0.2 + self._rng.uniform(-0.04, 0.06),
         }
 
         self.power_curve = PowerCurveModel(
@@ -355,6 +356,21 @@ class TurbinePhysicsModel:
         aero_out.aero_torque_knm *= ts_factor
         aero_out.thrust_kn *= ts_factor
         aero_out.power_kw *= ts_factor
+
+        # Wind shear: 1P torque modulation from vertical wind profile (#71)
+        # V(h) = V_hub × (h/h_hub)^α — blade sweeps different wind speeds
+        shear_exp = self._individuality.get("wind_shear_exp", 0.2)
+        R = s.rotor_diameter / 2.0
+        H = s.hub_height
+        shear_torque_factor = 0.0
+        for i in range(3):
+            blade_az = (self._rotor_azimuth + i * math.tau / 3.0) % math.tau
+            h_blade = H + R * 0.7 * math.cos(blade_az)
+            h_blade = max(10.0, h_blade)
+            shear_torque_factor += (h_blade / H) ** (shear_exp * 2.0)
+        shear_torque_factor /= 3.0  # average across 3 blades, force ~ V²
+        aero_out.aero_torque_knm *= shear_torque_factor
+        aero_out.thrust_kn *= shear_torque_factor
 
         # Use new DrivetrainModel (#28) instead of inline dynamics
         (
@@ -576,6 +592,7 @@ class TurbinePhysicsModel:
             is_starting=is_starting,
             is_emergency_stop=is_emergency_stop,
             rotor_azimuth_rad=self._rotor_azimuth,
+            wind_shear_exponent=self._individuality.get("wind_shear_exp", 0.2),
         )
 
         # IGCT water pressure now driven by cooling system pump (#29)
