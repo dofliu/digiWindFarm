@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -206,6 +206,7 @@ Implemented:
 
 Newly implemented:
 - tower shadow effect: rotor azimuth tracking, Gaussian per-blade shadow model, 3P torque/thrust/power modulation (see #69)
+- wind shear profile: power-law V(h) = V_hub × (h/h_hub)^α, azimuth-dependent blade loading, 1P torque modulation, per-turbine shear exponent individuality (see #71)
 
 Still missing:
 - full BEM (blade element momentum) method
@@ -324,9 +325,12 @@ Implemented:
 - stochastic natural event generation (gusts ~10-20 min, ramps ~30-60 min, dir shifts ~20-40 min)
 - API for injecting custom wind events
 
+Newly implemented:
+- wind shear profile: power-law vertical wind profile with configurable exponent (default α=0.2, per-turbine variation ±0.04-0.06), azimuth-dependent blade loading in fatigue model (see #71)
+
 Still missing:
 - localized turbulence pockets
-- terrain-dependent wind shear
+- wind veer (directional shear with height)
 - more sophisticated wake model (e.g. Frandsen, Bastankhah)
 
 ## 3. Not Yet Modeled
@@ -387,6 +391,7 @@ Implemented:
 
 Newly implemented:
 - 3P tower shadow modulation on blade flapwise moment (rotor azimuth-dependent, see #69)
+- azimuth-dependent wind shear blade loading: V²-scaled flapwise moment per blade position (see #71)
 
 Still missing:
 - full aeroelastic tower/blade FEM coupling (SDOF first-mode is in place)
@@ -479,13 +484,18 @@ Implemented:
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
-- full blade element loading distribution (tower shadow 3P is implemented via azimuth tracking)
+- full blade element loading distribution (tower shadow 3P + wind shear 1P implemented, full BEM missing)
+- blade mass imbalance and rotor dynamic imbalance — see #72
+- gearbox oil temperature and viscosity effects — see #73
 
 ### Recommended Immediate Direction
-1. frontend RUL display and alarm level visualization (see #57)
-2. spectral alarm threshold curves per frequency band (see #58)
-3. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)
-4. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
-5. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
-6. ~~tower shadow effect~~ → done (#69, rotor azimuth tracking + 3P Gaussian shadow model)
-7. deployment hardening (JWT auth, RBAC, Docker Compose)
+1. blade mass imbalance with speed² coupling for 1P vibration (see #72)
+2. gearbox oil temperature/viscosity model (see #73)
+3. frontend RUL display and alarm level visualization (see #57)
+4. spectral alarm threshold curves per frequency band (see #58)
+5. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)
+6. ~~detailed bearing defect frequency computation (BPFO/BPFI)~~ → done (#58, geometry-based)
+7. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
+8. ~~tower shadow effect~~ → done (#69, rotor azimuth tracking + 3P Gaussian shadow model)
+9. ~~wind shear profile~~ → done (#71, power-law V(h) with azimuth-dependent blade loading)
+10. deployment hardening (JWT auth, RBAC, Docker Compose)
