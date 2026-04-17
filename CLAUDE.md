@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 90 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 94 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -61,8 +61,8 @@ Still pending or incomplete:
 - deployment hardening (JWT, RBAC, HTTPS) — see #26
 - spectral alarm threshold curves — see #58; BPFO/BPFI, sideband analysis, and crest factor/kurtosis anomaly alarms completed
 - full protection relay coordination (LVRT/OVRT) — see #67
-- blade mass imbalance and rotor dynamic imbalance — see #72
-- gearbox oil temperature and viscosity effects — see #73
+- coolant level / leak detection — see #75
+- gear tooth contact modeling — see #76
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

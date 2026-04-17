@@ -212,7 +212,8 @@ class FatigueModel:
              is_starting: bool,
              is_emergency_stop: bool,
              rotor_azimuth_rad: float = 0.0,
-             wind_shear_exponent: float = 0.2) -> Dict[str, float]:
+             wind_shear_exponent: float = 0.2,
+             imbalance_force_kn: float = 0.0) -> Dict[str, float]:
         """Advance fatigue model by one timestep.
 
         Args:
@@ -241,7 +242,7 @@ class FatigueModel:
             pitch_angle_deg, yaw_error_deg, thrust_kn,
             turbulence_intensity, is_producing, is_starting,
             is_emergency_stop, dt, rotor_azimuth_rad,
-            wind_shear_exponent,
+            wind_shear_exponent, imbalance_force_kn,
         )
 
         self.load_tower_fa = loads["tower_fa"]
@@ -381,7 +382,8 @@ class FatigueModel:
                        is_starting: bool, is_estop: bool,
                        dt: float,
                        rotor_azimuth_rad: float = 0.0,
-                       wind_shear_exponent: float = 0.2) -> Dict[str, float]:
+                       wind_shear_exponent: float = 0.2,
+                       imbalance_force_kn: float = 0.0) -> Dict[str, float]:
         """Compute instantaneous structural loads (kNm)."""
         rho = 1.225  # air density
         R = self._rotor_diameter / 2
@@ -417,9 +419,9 @@ class FatigueModel:
         # Driven by yaw error, rotor imbalance, and lateral turbulence
         yaw_rad = math.radians(yaw_error_deg)
         lateral_thrust = thrust_kn * abs(math.sin(yaw_rad)) if thrust_kn > 0 else 0.0
-        rotor_imbalance = rotor_speed_rpm * 0.15 * self._rng.normal(1, 0.2) if rotor_speed_rpm > 1 else 0.0
+        imb_ss = imbalance_force_kn * H * 0.3 if rotor_speed_rpm > 1 else 0.0
 
-        tower_ss = (lateral_thrust * H * 0.3 + rotor_imbalance +
+        tower_ss = (lateral_thrust * H * 0.3 + imb_ss +
                     abs(self._rng.normal(0, turb_dynamic * 0.08)))
 
         # ── Blade flapwise bending moment ──
@@ -449,6 +451,9 @@ class FatigueModel:
                 ts_delta = 2.0 * math.pi - ts_delta
             ts_blade = 1.0 - 0.12 * math.exp(-0.5 * (ts_delta / 0.15) ** 2)
             blade_flap *= ts_blade
+
+            # Blade mass imbalance: centrifugal force modulates flapwise moment (#72)
+            blade_flap += imbalance_force_kn * R * 0.15
 
             # Turbulence
             blade_flap += abs(self._rng.normal(0, blade_flap * 0.1 * ti))

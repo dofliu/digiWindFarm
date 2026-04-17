@@ -163,6 +163,7 @@ class SpectralVibrationModel:
         turbulence: float,
         dt: float,
         active_faults: Optional[List[Dict]] = None,
+        imbalance_force_kn: float = 0.0,
     ) -> VibrationBands:
         """Compute spectral vibration bands for current conditions.
 
@@ -174,6 +175,7 @@ class SpectralVibrationModel:
             turbulence: Wind turbulence intensity
             dt: Timestep
             active_faults: List of active fault dicts with scenario_id and severity
+            imbalance_force_kn: Centrifugal imbalance force from blade mass offsets
 
         Returns:
             VibrationBands with per-band amplitudes
@@ -195,10 +197,12 @@ class SpectralVibrationModel:
         power_ratio = min(1.0, power_kw / max(rated_power_kw, 1.0))
         load_factor = max(power_ratio, speed_ratio)
 
-        # ── 1P band (rotor imbalance) ──
-        base_1p = self._imbalance_1p * speed_ratio * 0.35
-        bands.band_1p_x = base_1p * 0.85 + abs(self._rng.normal(0, 0.015))
-        bands.band_1p_y = base_1p * 1.10 + abs(self._rng.normal(0, 0.018))
+        # ── 1P band (rotor imbalance) — ω² coupling from mass imbalance (#72) ──
+        speed_sq = speed_ratio ** 2
+        base_1p = self._imbalance_1p * speed_sq * 0.35
+        imb_contrib = imbalance_force_kn * 0.6
+        bands.band_1p_x = base_1p * 0.85 + imb_contrib * 0.8 + abs(self._rng.normal(0, 0.015))
+        bands.band_1p_y = base_1p * 1.10 + imb_contrib * 1.1 + abs(self._rng.normal(0, 0.018))
 
         # ── 3P band (blade pass / tower shadow) ──
         base_3p = self._blade_3p * speed_ratio * 0.22

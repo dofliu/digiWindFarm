@@ -230,9 +230,11 @@ Implemented:
 - automatic direct-drive vs geared selection from TurbineSpec
 - per-turbine individuality for stiffness, damping, and brake response
 
+Newly implemented:
+- gearbox oil temperature/viscosity effects: Walther equation, cold-start efficiency loss, overheat degradation (see #73)
+
 Still missing:
-- gear tooth contact modeling
-- oil temperature / viscosity effects
+- gear tooth contact modeling (see #76)
 
 ### 2.3 Vibration Spectral Model
 File: `simulator/physics/vibration_spectral.py`
@@ -392,6 +394,7 @@ Implemented:
 Newly implemented:
 - 3P tower shadow modulation on blade flapwise moment (rotor azimuth-dependent, see #69)
 - azimuth-dependent wind shear blade loading: V²-scaled flapwise moment per blade position (see #71)
+- blade mass imbalance: per-turbine blade mass offsets (±0.5%), centrifugal force F=Δm×r_cg×ω², coupling to 1P vibration + tower SS moment + blade flapwise (see #72)
 
 Still missing:
 - full aeroelastic tower/blade FEM coupling (SDOF first-mode is in place)
@@ -477,7 +480,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 90 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms)
+- 94 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + rotor imbalance)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -485,12 +488,12 @@ Implemented:
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
 - full blade element loading distribution (tower shadow 3P + wind shear 1P implemented, full BEM missing)
-- blade mass imbalance and rotor dynamic imbalance — see #72
-- gearbox oil temperature and viscosity effects — see #73
+- ~~blade mass imbalance and rotor dynamic imbalance~~ → done (#72, centrifugal force ω² coupling)
+- ~~gearbox oil temperature and viscosity effects~~ → done (#73, Walther equation)
 
 ### Recommended Immediate Direction
-1. blade mass imbalance with speed² coupling for 1P vibration (see #72)
-2. gearbox oil temperature/viscosity model (see #73)
+1. ~~blade mass imbalance with speed² coupling for 1P vibration~~ → done (#72)
+2. ~~gearbox oil temperature/viscosity model~~ → done (#73)
 3. frontend RUL display and alarm level visualization (see #57)
 4. spectral alarm threshold curves per frequency band (see #58)
 5. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)

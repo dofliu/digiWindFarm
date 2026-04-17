@@ -354,6 +354,13 @@ _TAGS: List[ScadaTag] = [
              -1, 1000000),
 
     # ══════════════════════════════════════════════════════════════════════
+    # WROT — Rotor Imbalance (#72)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WROT_ImbForce", "WROT.Z72PLC__UI_Loc_WROT_Analogue_ImbForce",
+             "WROT", "REAL32", "kN", "Rotor Imbalance Force", "轉子不平衡力",
+             0, 50),
+
+    # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
     # ══════════════════════════════════════════════════════════════════════
     ScadaTag("WSRV_SrvOn", "WSRV.Z72PLC__UI_Srv_State_SrvOn",
