@@ -184,6 +184,7 @@ class TurbinePhysicsModel:
             "tower_shadow_amp": 0.12 + self._rng.uniform(-0.03, 0.03),
             "wind_shear_exp": 0.2 + self._rng.uniform(-0.04, 0.06),
             "blade_mass_offsets": _blade_mass_offsets,
+            "wind_veer_rate": 0.10 + self._rng.uniform(-0.03, 0.03),
         }
 
         self.power_curve = PowerCurveModel(
@@ -380,6 +381,17 @@ class TurbinePhysicsModel:
         shear_torque_factor /= 3.0  # average across 3 blades, force ~ V²
         aero_out.aero_torque_knm *= shear_torque_factor
         aero_out.thrust_kn *= shear_torque_factor
+
+        # Wind veer: direction offset with height → equivalent yaw error per blade (#79)
+        veer_rate = self._individuality.get("wind_veer_rate", 0.10)
+        if is_producing and omega_rad > 0.1 and veer_rate > 0:
+            veer_power_loss = 0.0
+            for i in range(3):
+                blade_az = (self._rotor_azimuth + i * math.tau / 3.0) % math.tau
+                veer_offset_rad = math.radians(veer_rate * R * math.cos(blade_az))
+                veer_power_loss += (1.0 - math.cos(veer_offset_rad) ** 2) / 3.0
+            aero_out.aero_torque_knm *= (1.0 - veer_power_loss)
+            aero_out.power_kw *= (1.0 - veer_power_loss)
 
         # Blade mass imbalance: centrifugal force F = Δm × r_cg × ω² (#72)
         blade_mass_offsets = self._individuality["blade_mass_offsets"]
@@ -623,6 +635,7 @@ class TurbinePhysicsModel:
             rotor_azimuth_rad=self._rotor_azimuth,
             wind_shear_exponent=self._individuality.get("wind_shear_exp", 0.2),
             imbalance_force_kn=self._imbalance_force_kn,
+            wind_veer_rate=self._individuality.get("wind_veer_rate", 0.10),
         )
 
         # IGCT water pressure now driven by cooling system pump (#29)

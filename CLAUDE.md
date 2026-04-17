@@ -63,7 +63,7 @@ Still pending or incomplete:
 - full protection relay coordination (LVRT/OVRT) — see #67
 - coolant level / leak detection — done: level tracking + pump cavitation + fault coupling — see #75
 - gear tooth contact modeling — see #76
-- wind veer (directional shear with height) — see #79
+- wind veer (directional shear with height) — done: Ekman spiral model + blade lateral force coupling — see #79
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

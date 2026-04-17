@@ -335,9 +335,11 @@ Implemented:
 Newly implemented:
 - wind shear profile: power-law vertical wind profile with configurable exponent (default α=0.2, per-turbine variation ±0.04-0.06), azimuth-dependent blade loading in fatigue model (see #71)
 
+Newly implemented:
+- wind veer (directional shear with height): linear Ekman spiral model, per-turbine veer rate (0.07–0.13 °/m), azimuth-dependent blade direction offset, lateral force coupling to tower SS and blade flapwise moments (see #79)
+
 Still missing:
 - localized turbulence pockets
-- wind veer (directional shear with height)
 - more sophisticated wake model (e.g. Frandsen, Bastankhah)
 
 ## 3. Not Yet Modeled
@@ -492,10 +494,11 @@ Implemented:
 - full protection relay coordination (LVRT/OVRT)
 - aeroelastic coupling (BEM; tower first-mode SDOF is implemented)
 - frontend RUL visualization — see #57 (alarm event integration completed)
-- full blade element loading distribution (tower shadow 3P + wind shear 1P implemented, full BEM missing)
+- full blade element loading distribution (tower shadow 3P + wind shear 1P + wind veer implemented, full BEM missing)
 - ~~blade mass imbalance and rotor dynamic imbalance~~ → done (#72, centrifugal force ω² coupling)
 - ~~gearbox oil temperature and viscosity effects~~ → done (#73, Walther equation)
 - ~~coolant level / leak detection~~ → done (#75, level tracking + pump cavitation + fault coupling)
+- ~~wind veer (directional shear with height)~~ → done (#79, Ekman spiral + blade lateral force coupling)
 
 ### Recommended Immediate Direction
 1. ~~blade mass imbalance with speed² coupling for 1P vibration~~ → done (#72)
@@ -508,4 +511,5 @@ Implemented:
 7. ~~tower dynamic natural frequency response~~ → done (#62, SDOF first-mode filter)
 8. ~~tower shadow effect~~ → done (#69, rotor azimuth tracking + 3P Gaussian shadow model)
 9. ~~wind shear profile~~ → done (#71, power-law V(h) with azimuth-dependent blade loading)
-10. deployment hardening (JWT auth, RBAC, Docker Compose)
+10. ~~wind veer (directional shear with height)~~ → done (#79, Ekman spiral model)
+11. deployment hardening (JWT auth, RBAC, Docker Compose)
