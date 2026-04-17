@@ -168,6 +168,9 @@ These parts are implemented, but still first-generation models:
 - [x] Bearing defect frequency computation (BPFO/BPFI from geometry) — see #58
 - [x] Tower fore-aft dynamic response (SDOF first-mode filter, fn≈0.28 Hz) — see #62
 - [x] Tower shadow effect: rotor azimuth tracking + 3P Gaussian torque/thrust/load modulation — see #69
+- [x] Wind shear profile: power-law V(h) with azimuth-dependent blade loading, 1P torque modulation — see #71
+- [x] Blade mass imbalance: per-turbine blade mass offsets, centrifugal force F=Δm×r_cg×ω², 1P vibration + load coupling — see #72
+- [x] Gearbox oil temperature/viscosity: Walther equation, cold-start efficiency loss, overheat degradation — see #73
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

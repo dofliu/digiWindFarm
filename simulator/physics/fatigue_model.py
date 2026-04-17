@@ -211,7 +211,9 @@ class FatigueModel:
              is_producing: bool,
              is_starting: bool,
              is_emergency_stop: bool,
-             rotor_azimuth_rad: float = 0.0) -> Dict[str, float]:
+             rotor_azimuth_rad: float = 0.0,
+             wind_shear_exponent: float = 0.2,
+             imbalance_force_kn: float = 0.0) -> Dict[str, float]:
         """Advance fatigue model by one timestep.
 
         Args:
@@ -240,6 +242,7 @@ class FatigueModel:
             pitch_angle_deg, yaw_error_deg, thrust_kn,
             turbulence_intensity, is_producing, is_starting,
             is_emergency_stop, dt, rotor_azimuth_rad,
+            wind_shear_exponent, imbalance_force_kn,
         )
 
         self.load_tower_fa = loads["tower_fa"]
@@ -378,7 +381,9 @@ class FatigueModel:
                        ti: float, is_producing: bool,
                        is_starting: bool, is_estop: bool,
                        dt: float,
-                       rotor_azimuth_rad: float = 0.0) -> Dict[str, float]:
+                       rotor_azimuth_rad: float = 0.0,
+                       wind_shear_exponent: float = 0.2,
+                       imbalance_force_kn: float = 0.0) -> Dict[str, float]:
         """Compute instantaneous structural loads (kNm)."""
         rho = 1.225  # air density
         R = self._rotor_diameter / 2
@@ -414,9 +419,9 @@ class FatigueModel:
         # Driven by yaw error, rotor imbalance, and lateral turbulence
         yaw_rad = math.radians(yaw_error_deg)
         lateral_thrust = thrust_kn * abs(math.sin(yaw_rad)) if thrust_kn > 0 else 0.0
-        rotor_imbalance = rotor_speed_rpm * 0.15 * self._rng.normal(1, 0.2) if rotor_speed_rpm > 1 else 0.0
+        imb_ss = imbalance_force_kn * H * 0.3 if rotor_speed_rpm > 1 else 0.0
 
-        tower_ss = (lateral_thrust * H * 0.3 + rotor_imbalance +
+        tower_ss = (lateral_thrust * H * 0.3 + imb_ss +
                     abs(self._rng.normal(0, turb_dynamic * 0.08)))
 
         # ── Blade flapwise bending moment ──
@@ -426,11 +431,14 @@ class FatigueModel:
             blade_thrust = thrust_kn / 3.0 if thrust_kn > 0 else 0.0
             blade_flap = blade_thrust * R * 0.667 * self._blade_stiffness_scale
 
-            # Wind shear contribution (top vs bottom of rotor)
-            shear_exp = 0.2  # power law exponent
-            shear_load = (0.5 * rho * self._rotor_area / 3.0 *
-                          wind_speed ** 2 * shear_exp * 0.1 * R / 1000.0)
-            blade_flap += shear_load
+            # Azimuth-dependent wind shear: V(h) = V_hub × (h/h_hub)^α
+            # Blade 1 azimuth → compute shear speed ratio → force ~ V²
+            blade_az = rotor_azimuth_rad % (2.0 * math.pi)
+            h_blade = H + R * 0.7 * math.cos(blade_az)  # 70% span representative
+            h_blade = max(10.0, h_blade)
+            shear_ratio = (h_blade / H) ** wind_shear_exponent
+            shear_force_factor = shear_ratio ** 2  # force ~ V²
+            blade_flap *= shear_force_factor
 
             # Pitch effect: higher pitch → lower flap load
             pitch_factor = max(0.3, 1.0 - abs(pitch_deg) * 0.008)
@@ -443,6 +451,9 @@ class FatigueModel:
                 ts_delta = 2.0 * math.pi - ts_delta
             ts_blade = 1.0 - 0.12 * math.exp(-0.5 * (ts_delta / 0.15) ** 2)
             blade_flap *= ts_blade
+
+            # Blade mass imbalance: centrifugal force modulates flapwise moment (#72)
+            blade_flap += imbalance_force_kn * R * 0.15
 
             # Turbulence
             blade_flap += abs(self._rng.normal(0, blade_flap * 0.1 * ti))

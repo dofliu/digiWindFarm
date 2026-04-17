@@ -148,6 +148,13 @@ class TurbinePhysicsModel:
         self._rng = np.random.RandomState(seed)
         _seed = seed or 0
 
+        # Per-turbine blade mass offsets (fractional, ±0.5% manufacturing tolerance)
+        _blade_mass_offsets = [
+            self._rng.normal(0, 0.005),
+            self._rng.normal(0, 0.005),
+            self._rng.normal(0, 0.005),
+        ]
+
         # Per-turbine individuality: small but persistent differences in efficiency,
         # cooling, sensor alignment, and control response.
         self._individuality = {
@@ -175,6 +182,8 @@ class TurbinePhysicsModel:
             "grid_ride_through_scale": 1.0 + self._rng.uniform(-0.22, 0.25),
             "grid_reconnect_delay": self._rng.uniform(-5.0, 8.0),
             "tower_shadow_amp": 0.12 + self._rng.uniform(-0.03, 0.03),
+            "wind_shear_exp": 0.2 + self._rng.uniform(-0.04, 0.06),
+            "blade_mass_offsets": _blade_mass_offsets,
         }
 
         self.power_curve = PowerCurveModel(
@@ -236,6 +245,7 @@ class TurbinePhysicsModel:
         self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
         self._pitch_bl = [self.spec.pitch_vane] * 3
         self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
+        self._imbalance_force_kn = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -355,6 +365,35 @@ class TurbinePhysicsModel:
         aero_out.aero_torque_knm *= ts_factor
         aero_out.thrust_kn *= ts_factor
         aero_out.power_kw *= ts_factor
+
+        # Wind shear: 1P torque modulation from vertical wind profile (#71)
+        # V(h) = V_hub × (h/h_hub)^α — blade sweeps different wind speeds
+        shear_exp = self._individuality.get("wind_shear_exp", 0.2)
+        R = s.rotor_diameter / 2.0
+        H = s.hub_height
+        shear_torque_factor = 0.0
+        for i in range(3):
+            blade_az = (self._rotor_azimuth + i * math.tau / 3.0) % math.tau
+            h_blade = H + R * 0.7 * math.cos(blade_az)
+            h_blade = max(10.0, h_blade)
+            shear_torque_factor += (h_blade / H) ** (shear_exp * 2.0)
+        shear_torque_factor /= 3.0  # average across 3 blades, force ~ V²
+        aero_out.aero_torque_knm *= shear_torque_factor
+        aero_out.thrust_kn *= shear_torque_factor
+
+        # Blade mass imbalance: centrifugal force F = Δm × r_cg × ω² (#72)
+        blade_mass_offsets = self._individuality["blade_mass_offsets"]
+        blade_mass_kg = 4000.0 * (R / 35.0) ** 2.5
+        r_cg = R / 3.0
+        omega_sq = omega_rad ** 2
+        imb_fx = 0.0
+        imb_fy = 0.0
+        for i in range(3):
+            dm = blade_mass_offsets[i] * blade_mass_kg
+            blade_az = (self._rotor_azimuth + i * math.tau / 3.0) % math.tau
+            imb_fx += dm * r_cg * omega_sq * math.cos(blade_az)
+            imb_fy += dm * r_cg * omega_sq * math.sin(blade_az)
+        self._imbalance_force_kn = math.sqrt(imb_fx ** 2 + imb_fy ** 2) / 1000.0
 
         # Use new DrivetrainModel (#28) instead of inline dynamics
         (
@@ -492,6 +531,10 @@ class TurbinePhysicsModel:
         yaw_out["yaw_error"] += fault_physics["yaw_error_bias"] + self._individuality["yaw_sensor_bias"]
         yaw_out["brake_pressure"] += fault_physics["yaw_brake_bias"]
 
+        # Coolant leak from converter_cooling_fault (#75)
+        leak_rate = fault_physics.get("coolant_leak_lph", 0.0)
+        self.cooling.water_loop.set_leak_rate(leak_rate)
+
         # Cooling system model (#29) — produces cooling_bias for thermal model
         cooling_bias = self.cooling.step(
             gen_power_kw, ambient_temp, effective_wind_speed, dt,
@@ -552,6 +595,7 @@ class TurbinePhysicsModel:
             turbulence=0.1,
             dt=dt,
             active_faults=self.active_faults,
+            imbalance_force_kn=self._imbalance_force_kn,
         )
 
         # Vibration alarm thresholds (local feature)
@@ -577,6 +621,8 @@ class TurbinePhysicsModel:
             is_starting=is_starting,
             is_emergency_stop=is_emergency_stop,
             rotor_azimuth_rad=self._rotor_azimuth,
+            wind_shear_exponent=self._individuality.get("wind_shear_exp", 0.2),
+            imbalance_force_kn=self._imbalance_force_kn,
         )
 
         # IGCT water pressure now driven by cooling system pump (#29)
@@ -699,6 +745,11 @@ class TurbinePhysicsModel:
             "WLOD_AlmTwr": fatigue_out["alarm_level_tower"],
             "WLOD_AlmBld": fatigue_out["alarm_level_blade"],
             "WLOD_RulHours": fatigue_out["rul_hours"],
+            # ── Rotor imbalance tag (#72) ──
+            "WROT_ImbForce": round(self._imbalance_force_kn, 4),
+            # ── Coolant level tags (#75) ──
+            "WCOL_CoolantLvl": round(self.cooling.water_loop.coolant_level_pct, 1),
+            "WCOL_CoolantAlm": float(self.cooling.water_loop.coolant_alarm_level),
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -961,6 +1012,7 @@ class TurbinePhysicsModel:
         self.pitch_angle = self.spec.pitch_vane  # Z72: vane position (86°)
         self._pitch_bl = [self.spec.pitch_vane] * 3
         self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
+        self._imbalance_force_kn = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -1205,6 +1257,7 @@ class TurbinePhysicsModel:
                 "water": 1.0,
                 "transformer": 1.0,
             },
+            "coolant_leak_lph": 0.0,
         }
 
         # Operating condition factors for load-dependent fault coupling.
@@ -1244,6 +1297,8 @@ class TurbinePhysicsModel:
                 fault_physics["cooling_bias"]["water"] *= max(0.25, 1.0 - 0.70 * severity)
                 fault_physics["cooling_bias"]["cabinet"] *= max(0.55, 1.0 - 0.35 * severity)
                 fault_physics["power_scale"] *= max(0.82, 1.0 - 0.08 * severity)
+                # O-ring degradation causes coolant leak proportional to severity
+                fault_physics["coolant_leak_lph"] += 0.8 * severity
 
             # ── transformer_overheat ─────────────────────────────────
             # Transformer losses scale with power squared (I²R).

@@ -88,6 +88,8 @@ class WaterCoolingLoop:
         self._pressure_bar = 0.0          # current loop pressure
         self._coolant_temp_c = 25.0       # bulk coolant temperature
         self._fouling_factor = 0.0        # 0=clean, fouling_max=fully fouled
+        self._coolant_level_pct = 100.0   # coolant level (100% = full)
+        self._leak_rate_lph = 0.0         # leak rate in litres/hour (0 = no leak)
 
     @property
     def flow_lpm(self) -> float:
@@ -109,6 +111,30 @@ class WaterCoolingLoop:
         """Heat exchanger fouling factor (0 = clean)."""
         return self._fouling_factor
 
+    @property
+    def coolant_level_pct(self) -> float:
+        """Coolant level as percentage (0-100)."""
+        return self._coolant_level_pct
+
+    @property
+    def coolant_alarm_level(self) -> int:
+        """Coolant alarm: 0=normal, 1=low(<70%), 2=very_low(<50%), 3=critical(<30%)."""
+        if self._coolant_level_pct < 30.0:
+            return 3
+        if self._coolant_level_pct < 50.0:
+            return 2
+        if self._coolant_level_pct < 70.0:
+            return 1
+        return 0
+
+    def set_leak_rate(self, rate_lph: float):
+        """Set coolant leak rate in litres per hour."""
+        self._leak_rate_lph = max(0.0, rate_lph)
+
+    def refill(self):
+        """Refill coolant to 100%."""
+        self._coolant_level_pct = 100.0
+
     def step(self, heat_load_kw: float, ambient_temp: float,
              wind_speed: float, dt: float, turbine_running: bool) -> float:
         """Advance cooling loop by one timestep.
@@ -122,6 +148,12 @@ class WaterCoolingLoop:
         if turbine_running and not self.pump.is_running:
             self.pump.start()
 
+        # ── Coolant level depletion from leak ──
+        if self._leak_rate_lph > 0 and self._coolant_level_pct > 0:
+            lost_litres = self._leak_rate_lph * (dt / 3600.0)
+            lost_pct = (lost_litres / s.coolant_volume_liters) * 100.0
+            self._coolant_level_pct = max(0.0, self._coolant_level_pct - lost_pct)
+
         # ── Pump flow dynamics (first-order response) ──
         if self.pump.is_running and self.pump.health > 0.1:
             target_flow = s.pump_flow_rated_lpm * self.pump.health
@@ -131,6 +163,12 @@ class WaterCoolingLoop:
         # Fouling reduces effective flow
         flow_reduction = 1.0 - self._fouling_factor * 0.6
         target_flow *= flow_reduction
+
+        # Low coolant level causes pump cavitation and flow reduction
+        level = self._coolant_level_pct
+        if level < 70.0:
+            cavitation_factor = max(0.05, (level - 10.0) / 60.0)
+            target_flow *= cavitation_factor
 
         tau_flow = 3.0  # seconds to reach target flow
         alpha = 1.0 - math.exp(-dt / tau_flow)
@@ -289,6 +327,8 @@ class CoolingSystem:
             "water_pressure_bar": round(self.water_loop.pressure_bar, 2),
             "water_coolant_temp_c": round(self.water_loop.coolant_temp, 1),
             "water_fouling": round(self.water_loop.fouling, 4),
+            "coolant_level_pct": round(self.water_loop.coolant_level_pct, 1),
+            "coolant_alarm_level": self.water_loop.coolant_alarm_level,
             "nacelle_fans_active": self.nacelle_fans.active_count,
             "nacelle_fans_total": self.nacelle_fans.total_count,
             "cabinet_fans_active": self.cabinet_fans.active_count,
@@ -313,6 +353,14 @@ class CoolingSystem:
         if 0 <= index < len(fans.fans):
             fans.fans[index].health = 1.0
             fans.fans[index].start()
+
+    def set_coolant_leak(self, rate_lph: float):
+        """Set coolant leak rate (litres/hour). Simulates O-ring degradation."""
+        self.water_loop.set_leak_rate(rate_lph)
+
+    def refill_coolant(self):
+        """Refill coolant to 100% (maintenance action)."""
+        self.water_loop.refill()
 
     def clean_water_loop(self):
         """Simulate maintenance cleaning."""

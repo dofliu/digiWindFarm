@@ -322,13 +322,16 @@ class PerTurbineWind:
     - Wake effects (direction-aware)
     - Propagating wind events (gusts, ramps, direction shifts)
     - Local terrain effects (persistent offset)
+    - Wind shear (power-law vertical wind profile)
     """
 
     def __init__(self, turbine_count: int, seed: int = 0,
                  positions: Optional[List[TurbinePosition]] = None,
-                 spacing_m: float = 500.0):
+                 spacing_m: float = 500.0,
+                 wind_shear_exponent: float = 0.2):
         self._rng = np.random.RandomState(seed)
         self._count = turbine_count
+        self.wind_shear_exponent = wind_shear_exponent
 
         # Turbine positions
         self._positions = positions or default_farm_layout(turbine_count, spacing_m)
@@ -427,4 +430,17 @@ class PerTurbineWind:
 
         # Clamp to reasonable range
         self._wake_factors = np.clip(self._wake_factors, 0.85, 1.0)
+
+    @staticmethod
+    def blade_shear_ratio(hub_height: float, rotor_radius: float,
+                          blade_azimuth_rad: float, shear_exp: float) -> float:
+        """Wind speed ratio V_blade/V_hub due to vertical wind shear.
+
+        Power law: V(h) = V_hub × (h / h_hub)^α
+        Blade tip height varies with azimuth: h = h_hub + R × cos(θ)
+        where θ=0 is top-dead-center.
+        """
+        h_blade = hub_height + rotor_radius * math.cos(blade_azimuth_rad)
+        h_blade = max(10.0, h_blade)
+        return (h_blade / hub_height) ** shear_exp
 

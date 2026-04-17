@@ -7,10 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 
 from server.models import DataSourceConfig, DataSourceMode, SimulationConfig
+from server.farm_registry import FarmRegistry
 from server.data_broker import DataBroker
 
-# Global broker instance
-broker = DataBroker()
+# Global instances
+farm_registry = FarmRegistry()
+broker = DataBroker(farm_registry=farm_registry)
 
 # WebSocket connection manager
 ws_clients: List[WebSocket] = []
@@ -19,11 +21,36 @@ ws_clients: List[WebSocket] = []
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle: start simulator and Modbus on startup, clean up on shutdown."""
-    # Startup: start simulator
+    # Migrate legacy DB if it exists
+    from pathlib import Path
+    legacy_path = Path(__file__).parent.parent / "wind_farm_data.db"
+    migrated = farm_registry.migrate_legacy_db(legacy_path)
+    if migrated:
+        print(f"[Server] Migrated legacy database to farm '{migrated}'")
+
+    # Determine active farm and its config
+    farm_id = farm_registry.ensure_default_farm()
+    farm = farm_registry.get_farm(farm_id)
+    turbine_count = farm.turbine_count if farm else 14
+    print(f"[Server] Active farm: {farm_id} ({turbine_count} turbines)")
+
+    # Startup: start simulator with active farm
     config = DataSourceConfig(mode=DataSourceMode.SIMULATION)
-    sim_config = SimulationConfig(turbineCount=14)
+    sim_config = SimulationConfig(turbineCount=turbine_count)
     broker.start(config, sim_config)
-    print("[Server] Wind farm simulator started with 14 turbines")
+
+    # Apply farm turbine spec if defined
+    if farm and farm.turbine_spec and broker.simulator:
+        from simulator.physics.turbine_physics import TurbineSpec
+        try:
+            spec = TurbineSpec.from_dict(farm.turbine_spec)
+            for model in broker.simulator.turbines.values():
+                model.update_spec(spec)
+            print("[Server] Applied turbine spec from farm config")
+        except Exception as e:
+            print(f"[Server] Warning: could not apply farm spec: {e}")
+
+    print(f"[Server] Wind farm simulator started with {turbine_count} turbines")
 
     # Auto-start Modbus TCP server
     if broker.simulator:
@@ -72,6 +99,7 @@ from server.routers.i18n import router as i18n_router  # noqa: E402
 from server.routers.modbus import router as modbus_router  # noqa: E402
 from server.routers.control import router as control_router  # noqa: E402
 from server.routers.maintenance import router as maintenance_router  # noqa: E402
+from server.routers.farms import router as farms_router  # noqa: E402
 
 app.include_router(turbines_router)
 app.include_router(config_router)
@@ -81,6 +109,7 @@ app.include_router(i18n_router)
 app.include_router(modbus_router)
 app.include_router(control_router)
 app.include_router(maintenance_router)
+app.include_router(farms_router)
 
 
 @app.get("/api/health")
@@ -90,6 +119,7 @@ async def health():
         "status": "ok",
         "mode": broker.mode.value,
         "turbineCount": len(broker.turbine_ids),
+        "activeFarmId": broker.active_farm_id,
     }
 
 

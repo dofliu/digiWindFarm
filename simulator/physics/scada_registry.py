@@ -354,6 +354,23 @@ _TAGS: List[ScadaTag] = [
              -1, 1000000),
 
     # ══════════════════════════════════════════════════════════════════════
+    # WROT — Rotor Imbalance (#72)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WROT_ImbForce", "WROT.Z72PLC__UI_Loc_WROT_Analogue_ImbForce",
+             "WROT", "REAL32", "kN", "Rotor Imbalance Force", "轉子不平衡力",
+             0, 50),
+
+    # ══════════════════════════════════════════════════════════════════════
+    # WCOL — Coolant Level (#75)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WCOL_CoolantLvl", "WCOL.Z72PLC__UI_Loc_WCOL_Analogue_CoolantLvl",
+             "WCNV", "REAL32", "%", "Coolant Level", "冷卻液液位",
+             0, 100),
+    ScadaTag("WCOL_CoolantAlm", "WCOL.Z72PLC__UI_Loc_WCOL_State_CoolantAlm",
+             "WCNV", "SINT16", "", "Coolant Level Alarm", "冷卻液液位警報",
+             0, 3),
+
+    # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
     # ══════════════════════════════════════════════════════════════════════
     ScadaTag("WSRV_SrvOn", "WSRV.Z72PLC__UI_Srv_State_SrvOn",
