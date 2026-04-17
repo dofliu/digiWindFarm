@@ -361,6 +361,16 @@ _TAGS: List[ScadaTag] = [
              0, 50),
 
     # ══════════════════════════════════════════════════════════════════════
+    # WCOL — Coolant Level (#75)
+    # ══════════════════════════════════════════════════════════════════════
+    ScadaTag("WCOL_CoolantLvl", "WCOL.Z72PLC__UI_Loc_WCOL_Analogue_CoolantLvl",
+             "WCNV", "REAL32", "%", "Coolant Level", "冷卻液液位",
+             0, 100),
+    ScadaTag("WCOL_CoolantAlm", "WCOL.Z72PLC__UI_Loc_WCOL_State_CoolantAlm",
+             "WCNV", "SINT16", "", "Coolant Level Alarm", "冷卻液液位警報",
+             0, 3),
+
+    # ══════════════════════════════════════════════════════════════════════
     # WSRV / MBUS — Service & Control
     # ══════════════════════════════════════════════════════════════════════
     ScadaTag("WSRV_SrvOn", "WSRV.Z72PLC__UI_Srv_State_SrvOn",
