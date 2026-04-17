@@ -283,8 +283,10 @@ Implemented:
 - IGCT water pressure now driven by actual pump state
 - API hooks for pump degradation, fan failure/repair, loop cleaning
 
+Newly implemented:
+- coolant level tracking with leak detection: level state variable (0-100%), leak rate input (L/h), pump cavitation at low level (<70%), 3-level alarm (low/very_low/critical), `converter_cooling_fault` triggers O-ring degradation leak, maintenance refill API (see #75)
+
 Still missing:
-- coolant level / leak detection
 - detailed radiator fin model
 - ambient humidity effect on air cooling
 
@@ -480,7 +482,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 94 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + rotor imbalance)
+- 96 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + rotor imbalance + coolant level)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -490,10 +492,12 @@ Implemented:
 - full blade element loading distribution (tower shadow 3P + wind shear 1P implemented, full BEM missing)
 - ~~blade mass imbalance and rotor dynamic imbalance~~ → done (#72, centrifugal force ω² coupling)
 - ~~gearbox oil temperature and viscosity effects~~ → done (#73, Walther equation)
+- ~~coolant level / leak detection~~ → done (#75, level tracking + pump cavitation + fault coupling)
 
 ### Recommended Immediate Direction
 1. ~~blade mass imbalance with speed² coupling for 1P vibration~~ → done (#72)
 2. ~~gearbox oil temperature/viscosity model~~ → done (#73)
+2b. ~~coolant level / leak detection~~ → done (#75)
 3. frontend RUL display and alarm level visualization (see #57)
 4. spectral alarm threshold curves per frequency band (see #58)
 5. ~~spectral sideband analysis (harmonics/fault signatures)~~ → done (#58, GMF sideband model)

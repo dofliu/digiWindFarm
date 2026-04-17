@@ -530,6 +530,10 @@ class TurbinePhysicsModel:
         yaw_out["yaw_error"] += fault_physics["yaw_error_bias"] + self._individuality["yaw_sensor_bias"]
         yaw_out["brake_pressure"] += fault_physics["yaw_brake_bias"]
 
+        # Coolant leak from converter_cooling_fault (#75)
+        leak_rate = fault_physics.get("coolant_leak_lph", 0.0)
+        self.cooling.water_loop.set_leak_rate(leak_rate)
+
         # Cooling system model (#29) — produces cooling_bias for thermal model
         cooling_bias = self.cooling.step(
             gen_power_kw, ambient_temp, effective_wind_speed, dt,
@@ -740,6 +744,9 @@ class TurbinePhysicsModel:
             "WLOD_RulHours": fatigue_out["rul_hours"],
             # ── Rotor imbalance tag (#72) ──
             "WROT_ImbForce": round(self._imbalance_force_kn, 4),
+            # ── Coolant level tags (#75) ──
+            "WCOL_CoolantLvl": round(self.cooling.water_loop.coolant_level_pct, 1),
+            "WCOL_CoolantAlm": float(self.cooling.water_loop.coolant_alarm_level),
         }
 
         # NOTE: fault_modifiers tag-offset path has been removed.
@@ -1247,6 +1254,7 @@ class TurbinePhysicsModel:
                 "water": 1.0,
                 "transformer": 1.0,
             },
+            "coolant_leak_lph": 0.0,
         }
 
         # Operating condition factors for load-dependent fault coupling.
@@ -1286,6 +1294,8 @@ class TurbinePhysicsModel:
                 fault_physics["cooling_bias"]["water"] *= max(0.25, 1.0 - 0.70 * severity)
                 fault_physics["cooling_bias"]["cabinet"] *= max(0.55, 1.0 - 0.35 * severity)
                 fault_physics["power_scale"] *= max(0.82, 1.0 - 0.08 * severity)
+                # O-ring degradation causes coolant leak proportional to severity
+                fault_physics["coolant_leak_lph"] += 0.8 * severity
 
             # ── transformer_overheat ─────────────────────────────────
             # Transformer losses scale with power squared (I²R).

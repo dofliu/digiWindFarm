@@ -43,6 +43,8 @@
 - [x] 90 SCADA tags total (was 88): +2 crest factor/kurtosis alarm tags
 - [x] Blade mass imbalance model with centrifugal force ω² coupling (per-turbine offsets)
 - [x] 94 SCADA tags total (was 90): +1 rotor imbalance force + gearbox oil tags
+- [x] Coolant level tracking with leak detection, pump cavitation, and fault coupling
+- [x] 96 SCADA tags total (was 94): +2 coolant level/alarm tags
 
 ### Backend
 - [x] FastAPI REST APIs
