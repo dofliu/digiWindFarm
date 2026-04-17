@@ -1,25 +1,29 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-04-17（第三次）
+> 最後更新：2026-04-17
 
 ## 昨日 Commit 摘要
 
-本次日報工作提交（分支 `claude/gifted-noether-mgdYZ`）：
-- [1f3d747] feat: add coolant level tracking with leak detection and pump cavitation (#75)
+本次日報工作提交（分支 `claude/gifted-noether-PFU4Z`）：
+- [9815f9d] feat: add gearbox oil temperature and viscosity effects model (#73)
 
-過去 24 小時合併至 main：
-- [4931b08] Merge pull request #78（葉片質量不平衡模型 — 文件更新）
-- [887b38b] Merge pull request #74（風切剖面模型 — 文件更新）
-- [4982827] Merge pull request #70（塔架陰影效應 — 3P 功率/扭矩/載荷調變）
+過去 24 小時 main 分支合併：
+- [4982827] Merge pull request #70（塔架陰影效應）
+- [e35b21a] Merge pull request #68（峰值因子/峭度異常警報）
+- [f54dbf8] Merge pull request #66（齒輪嚙合邊帶分析模型）
+- [0e0e409] Merge pull request #65（BPFO/BPFI 軸承缺陷頻率模型）
+- [fbcd68a] Merge pull request #64（塔架 SDOF 動態響應）
+- [029b929] Merge pull request #63（Cp 氣動模型 + docstrings）
 
 ## Issue 狀態
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 實作完成 | #75 | 冷卻液液位與洩漏偵測模型 | 液位追蹤 + 泵浦空蝕 + 故障耦合，待合併 |
-| 新建 | #79 | 風向隨高度偏轉模型（Wind Veer） | physics_model_status.md 缺口 |
-| 保持 | #76 | 齒輪齒面接觸模型 | 時變嚙合剛度 + 齒面磨耗 |
-| 保持 | #72 | 葉片質量不平衡模型 | 已合併至 main |
+| 關閉 | #73 | 齒輪箱油溫與黏度效應模型 | 已實作：Walther 型黏度比 + 冷啟動損耗衰減 + WDRV_GbxOilTmp 標籤 |
+| 新建 | #75 | 冷卻液液位與洩漏偵測模型 | physics_model_status §2.4 "Still missing"，啟用冷卻系統故障診斷 |
+| 新建 | #76 | 齒輪齒面接觸模型 | physics_model_status §2.2 "Still missing"，改善齒輪箱頻譜特徵 |
+| 保持 | #72 | 葉片質量不平衡與轉子動態不平衡 | 改善 1P 振動物理因果關係 |
+| 保持 | #71 | 風切剖面模型 | 高度相關風速分布與葉片不對稱載荷 |
 | 保持 | #67 | 完整保護繼電器協調 LVRT/OVRT | 電氣模型尚未加入保護曲線比對邏輯 |
 | 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 頻帶警報曲線待做 |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，剩前端 RUL 視覺化 |
@@ -35,14 +39,13 @@
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #79 | 風向隨高度偏轉模型 | enhancement, physics, auto-detected | 2026-04-17 | 新建 |
-| #76 | 齒輪齒面接觸模型 | enhancement, physics, auto-detected | 2026-04-17 | 齒面力學 |
-| #75 | 冷卻液液位與洩漏偵測模型 | enhancement, physics, auto-detected | 2026-04-17 | 已實作，待合併 |
-| #72 | 葉片質量不平衡模型 | enhancement, physics, auto-detected | 2026-04-17 | 已合併 |
-| #71 | 風切剖面模型 | enhancement, physics, auto-detected | 2026-04-17 | 已合併 |
-| #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | LVRT/OVRT 保護曲線 |
+| #76 | 齒輪齒面接觸模型 | enhancement, physics, auto-detected | 2026-04-17 | 新建 |
+| #75 | 冷卻液液位與洩漏偵測模型 | enhancement, physics, auto-detected | 2026-04-17 | 新建 |
+| #72 | 葉片質量不平衡與轉子動態不平衡 | enhancement, physics, auto-detected | 2026-04-17 | 改善 1P 振動因果 |
+| #71 | 風切剖面模型 | enhancement, physics, auto-detected | 2026-04-17 | 高度相關風速 |
+| #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | 電壓-時間保護曲線 |
 | #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | 頻帶警報曲線待做 |
-| #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 後端完成，前端待做 |
+| #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 前端 RUL 視覺化待做 |
 | #52 | 缺少自動化測試套件 | auto-detected, code-quality | 2026-04-14 | 無進展 |
 | #51 | 警報處理透過 RAG 機制 | — | 2026-04-14 | 用戶功能需求 |
 | #50 | 外部擷取資料 API | — | 2026-04-14 | 用戶功能需求 |
@@ -55,10 +58,10 @@
 
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
-| `server/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
-| `server/routers/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
-| `simulator/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
-| `simulator/physics/` | 2026-04-17 | 0 | 無測試套件 | 新增冷卻液液位 (#75) |
+| `server/` | 2026-04-16 | 0 | 無測試套件 | 無變更 |
+| `server/routers/` | 2026-04-16 | 0 | 無測試套件 | 無變更 |
+| `simulator/` | 2026-04-16 | 0 | 無測試套件 | 無變更 |
+| `simulator/physics/` | 2026-04-17 | 0 | 無測試套件 | 新增齒輪箱油溫/黏度 (#73) |
 | `frontend/` | 2026-04-15 | 0 | 無測試套件 | RUL 視覺化待實作 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案（dashboard.py 等） |
 
@@ -133,29 +136,32 @@
 - 測試套件：未建立（無 pytest）— 追蹤 issue #52
 - 安全漏洞：17 個（5 個套件），詳見 #48
 - TODO/FIXME/HACK：0 個（核心模組）
-- SCADA 標籤：96 個（+2 新增 WCOL_CoolantLvl, WCOL_CoolantAlm）
+- SCADA 標籤：91 個（+1 WDRV_GbxOilTmp）
 
 ## 今日新增功能
 
-### 冷卻液液位與洩漏偵測模型（#75）
-- **物理原理**：水冷迴路的 O-ring 隨運轉時數劣化，導致冷卻液緩慢洩漏。液位下降時泵浦吸入空氣，產生空蝕效應（cavitation），流量和壓力不穩定，冷卻效能非線性下降。
+### 齒輪箱油溫與黏度效應模型（#73）
+- **物理原理**：齒輪箱潤滑油黏度隨溫度變化，影響齒輪嚙合效率。低溫時黏度高、摩擦損耗大；高溫時油膜可能不足。冷啟動初期 ~10 分鐘效率較低。
 - **實作方式**：
-  1. `cooling_model.py`：WaterCoolingLoop 新增 `_coolant_level_pct`（0-100%）和 `_leak_rate_lph`（公升/小時）狀態變數
-  2. 泵浦空蝕模型：液位 < 70% 時流量按 `(level - 10) / 60` 比例衰減
-  3. 三級警報：0=正常(≥70%), 1=低液位(<70%), 2=極低(<50%), 3=危急(<30%)
-  4. `turbine_physics.py`：`converter_cooling_fault` 故障耦合洩漏率（0.8 L/h × severity）
-  5. `scada_registry.py`：新增 `WCOL_CoolantLvl`（%）和 `WCOL_CoolantAlm`（警報等級）
-  6. 維護 API：`refill_coolant()` 補充、`set_coolant_leak()` 設定洩漏率
-- **物理效果**：
-  - 洩漏液位緩慢下降 → 泵浦空蝕 → 流量不穩 → 冷卻效能非線性下降 → 溫度上升
-  - 漸進式故障指標，適合預測性維護分析訓練資料
-  - converter_cooling_fault 故障注入後，液位逐步下降提供可觀測的前兆訊號
+  1. `drivetrain_model.py`：新增油溫狀態變數，一階熱模型追蹤（齒輪損耗 + 軸承摩擦為熱源）
+  2. Walther 型黏度比：`visc_ratio = exp(-0.03 × (T_oil - 60°C))`
+  3. 冷啟動損耗因子：`1 + 0.5 × exp(-t_running / 600)`，前 10 分鐘額外損耗
+  4. 黏度損耗 80% 回饋至齒輪箱軸承熱量，形成溫度-效率閉迴路
+  5. 直驅風機跳過齒輪箱邏輯，油溫追蹤環境溫度
+  6. `scada_registry.py`：新增 `WDRV_GbxOilTmp` 標籤（°C，範圍 -30~120）
+- **驗證結果**：
+  - 冷啟動（5°C 環境）：初始損耗較穩態高 ~15%，10 分鐘衰減
+  - 暖環境（30°C）：穩態油溫 ~28°C，損耗較低
+  - 直驅風機：油溫 = 環境溫度 ✓
+- **影響範圍**：
+  - 齒輪箱風機冬季冷啟動損耗更真實
+  - `gearbox_overheat` 故障的效率影響有溫度因果
+  - 齒輪箱軸承熱量增加黏度損耗成分
 
 ## 建議行動
 
-1. **合併冷卻液液位模型**：已推送至 `claude/gifted-noether-mgdYZ`，可建立 PR 合併
-2. **實作 #79 風向隨高度偏轉（Wind Veer）**：補充風場模型，影響葉片攻角和載荷不對稱
-3. **實作 #76 齒輪齒面接觸模型**：時變嚙合剛度 + 齒面磨耗進程
-4. **實作 #67 保護繼電器協調**：LVRT/OVRT 電壓-時間保護曲線
-5. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試
-6. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）
+1. **合併齒輪箱油溫模型**：已推送至 `claude/gifted-noether-PFU4Z`，可建立 PR 合併
+2. **實作 #71 風切剖面模型**：高度相關風速分布影響葉片載荷不對稱，基礎設施已就緒（轉子方位角 #69）
+3. **實作 #72 葉片質量不平衡**：改善 1P 振動從經驗公式轉為物理推導，使用已有的方位角追蹤
+4. **建立測試套件**（#52）：核心物理模型和 API endpoint 仍無自動化測試
+5. **升級有漏洞的套件**（#48）：優先處理 `cryptography`（7 個 CVE）

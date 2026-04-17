@@ -41,10 +41,8 @@
 - [x] 88 SCADA tags total (was 84): +4 gear mesh sideband tags
 - [x] Crest factor / kurtosis anomaly alarms with hysteresis logic
 - [x] 90 SCADA tags total (was 88): +2 crest factor/kurtosis alarm tags
-- [x] Blade mass imbalance model with centrifugal force ω² coupling (per-turbine offsets)
-- [x] 94 SCADA tags total (was 90): +1 rotor imbalance force + gearbox oil tags
-- [x] Coolant level tracking with leak detection, pump cavitation, and fault coupling
-- [x] 96 SCADA tags total (was 94): +2 coolant level/alarm tags
+- [x] Gearbox oil temperature and viscosity effects (Walther-type model, cold-start decay) — see #73
+- [x] 91 SCADA tags total (was 90): +1 gearbox oil temperature tag
 
 ### Backend
 - [x] FastAPI REST APIs

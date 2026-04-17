@@ -231,7 +231,10 @@ Implemented:
 - per-turbine individuality for stiffness, damping, and brake response
 
 Newly implemented:
-- gearbox oil temperature/viscosity effects: Walther equation, cold-start efficiency loss, overheat degradation (see #73)
+- gearbox oil temperature tracking (first-order thermal model from gearbox losses)
+- Walther-type viscosity ratio with cold-start loss decay (~10 min)
+- viscosity-adjusted drivetrain losses feed back into gearbox bearing heat
+- new SCADA tag: `WDRV_GbxOilTmp` (see #73)
 
 Still missing:
 - gear tooth contact modeling (see #76)
@@ -482,7 +485,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 96 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + rotor imbalance + coolant level)
+- 91 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)

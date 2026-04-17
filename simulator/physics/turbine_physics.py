@@ -413,6 +413,7 @@ class TurbinePhysicsModel:
             is_starting=is_starting,
             is_normal_stop=is_normal_stop,
             is_emergency_stop=is_emergency_stop,
+            ambient_temp=ambient_temp,
         )
         # Combined torsion vibration (backward compatible single value)
         torsion_vib = torsion_vib_lss + torsion_vib_hss * 0.5
@@ -683,6 +684,8 @@ class TurbinePhysicsModel:
             "WYAW_CabWup": round(yaw_out["cable_windup"], 2),
             "WSRV_SrvOn": 1.0 if self.service_mode else 0.0,
             "MBUS_Contact2": 1.0 if self.local_control else 0.0,
+            # ── Drivetrain tags ──
+            "WDRV_GbxOilTmp": round(self.drivetrain.oil_temperature, 2),
             # ── Electrical response tags ──
             "WCNV_ReactPwr": round(reactive_power_kvar, 2),
             "WCNV_PwrFactor": round(power_factor, 4),
