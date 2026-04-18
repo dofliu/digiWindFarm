@@ -164,6 +164,8 @@ class SpectralVibrationModel:
         dt: float,
         active_faults: Optional[List[Dict]] = None,
         imbalance_force_kn: float = 0.0,
+        tooth_wear_index: float = 0.0,
+        mesh_stiffness_ripple: float = 0.0,
     ) -> VibrationBands:
         """Compute spectral vibration bands for current conditions.
 
@@ -215,8 +217,20 @@ class SpectralVibrationModel:
             # Gear mesh frequency = rotor_speed * teeth / 60
             base_gear = self._gear_mesh_amp * speed_ratio * 0.18
             load_gear = power_ratio * 0.08  # load-dependent gear vibration
-            bands.band_gear_x = base_gear + load_gear + abs(self._rng.normal(0, 0.010))
-            bands.band_gear_y = (base_gear + load_gear) * 0.7 + abs(self._rng.normal(0, 0.008))
+            # Tooth contact ripple: deterministic mesh-stiffness variation
+            # (#76). The drivetrain passes us the normalized ΔK/K ripple; it
+            # maps into measured casing vibration at GMF.
+            contact_ripple = abs(mesh_stiffness_ripple) * (0.3 + 0.7 * load_factor) * 1.2
+            # Wear gradually raises the mesh vibration floor.
+            wear_gear = 0.35 * max(0.0, tooth_wear_index) * (0.4 + 0.6 * load_factor)
+            bands.band_gear_x = (
+                base_gear + load_gear + contact_ripple + wear_gear
+                + abs(self._rng.normal(0, 0.010))
+            )
+            bands.band_gear_y = (
+                (base_gear + load_gear) * 0.7 + contact_ripple * 0.8 + wear_gear * 0.8
+                + abs(self._rng.normal(0, 0.008))
+            )
 
         # ── High-frequency band (bearings, electrical) ──
         base_hf = self._hf_floor + speed_ratio * 0.06 + power_ratio * 0.04
@@ -244,9 +258,16 @@ class SpectralVibrationModel:
         if self._is_geared:
             bands.gmf_freq = rotor_speed_rpm * self._gear_teeth / 60.0
             gmf_amp = max(bands.band_gear_x, bands.band_gear_y)
-            # Healthy: sidebands at noise floor (~2-5% of GMF amplitude)
-            bands.sideband_1_amp = gmf_amp * 0.03 + abs(self._rng.normal(0, 0.003))
-            bands.sideband_2_amp = gmf_amp * 0.015 + abs(self._rng.normal(0, 0.002))
+            # Healthy: sidebands at noise floor (~2-5% of GMF amplitude).
+            # Tooth wear and pitting modulate the mesh at shaft frequency, so
+            # sidebands rise faster than the carrier → sideband_ratio grows.
+            wear_sb = max(0.0, tooth_wear_index)
+            bands.sideband_1_amp = (
+                gmf_amp * (0.03 + 0.40 * wear_sb) + abs(self._rng.normal(0, 0.003))
+            )
+            bands.sideband_2_amp = (
+                gmf_amp * (0.015 + 0.22 * wear_sb) + abs(self._rng.normal(0, 0.002))
+            )
             bands.sideband_ratio = (bands.sideband_1_amp + bands.sideband_2_amp) / max(gmf_amp, 0.01)
 
         # ── Crest factor and kurtosis (baseline) ──

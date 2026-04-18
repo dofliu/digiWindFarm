@@ -426,6 +426,11 @@ class TurbinePhysicsModel:
             is_normal_stop=is_normal_stop,
             is_emergency_stop=is_emergency_stop,
             ambient_temp=ambient_temp,
+            gearbox_overheat_severity=next(
+                (float(f.get("severity", 0.0)) for f in self.active_faults
+                 if f.get("scenario_id") == "gearbox_overheat"),
+                0.0,
+            ),
         )
         # Combined torsion vibration (backward compatible single value)
         torsion_vib = torsion_vib_lss + torsion_vib_hss * 0.5
@@ -608,6 +613,8 @@ class TurbinePhysicsModel:
             dt=dt,
             active_faults=self.active_faults,
             imbalance_force_kn=self._imbalance_force_kn,
+            tooth_wear_index=self.drivetrain.tooth_wear_index,
+            mesh_stiffness_ripple=self.drivetrain.mesh_stiffness_variation,
         )
 
         # Vibration alarm thresholds (local feature)
@@ -699,6 +706,7 @@ class TurbinePhysicsModel:
             "MBUS_Contact2": 1.0 if self.local_control else 0.0,
             # ── Drivetrain tags ──
             "WDRV_GbxOilTmp": round(self.drivetrain.oil_temperature, 2),
+            "WDRV_GbxToothWear": round(self.drivetrain.tooth_wear_index * 100.0, 3),
             # ── Electrical response tags ──
             "WCNV_ReactPwr": round(reactive_power_kvar, 2),
             "WCNV_PwrFactor": round(power_factor, 4),
