@@ -444,3 +444,16 @@ class PerTurbineWind:
         h_blade = max(10.0, h_blade)
         return (h_blade / hub_height) ** shear_exp
 
+    @staticmethod
+    def blade_veer_offset_deg(rotor_radius: float,
+                              blade_azimuth_rad: float,
+                              veer_rate_deg_per_m: float) -> float:
+        """Wind direction offset (degrees) at blade position due to wind veer.
+
+        Ekman spiral: θ(h) = θ_hub + veer_rate × (h - h_hub).
+        Blade height offset = R × cos(azimuth), where azimuth=0 is top-dead-center.
+        Offshore typical veer_rate: 0.05–0.15 °/m.
+        """
+        h_offset = rotor_radius * math.cos(blade_azimuth_rad)
+        return veer_rate_deg_per_m * h_offset
+
