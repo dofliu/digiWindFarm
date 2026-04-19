@@ -151,6 +151,9 @@ _TAGS: List[ScadaTag] = [
     ScadaTag("WMET_TmpOutside", "WMET.Z72PLC__UI_Loc_WMET_Analogue_TmpOutside",
              "WMET", "REAL32", "°C", "Outside Temperature", "室外溫度",
              -10, 45),
+    ScadaTag("WMET_HumOutside", "WMET.Z72PLC__UI_Loc_WMET_Analogue_HumOutside",
+             "WMET", "REAL32", "%", "Outside Relative Humidity", "室外相對濕度",
+             0, 100),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle

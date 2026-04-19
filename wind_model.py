@@ -305,3 +305,33 @@ class WindEnvironmentModel:
         weather = -3.0 * self._weather._pressure_state
 
         return base + diurnal + weather + self._rng.normal(0, 0.3)
+
+    def get_ambient_humidity(self, timestamp: datetime) -> float:
+        """Relative humidity (%) with seasonal/diurnal/weather modulation.
+
+        Offshore wind sites sit in the marine boundary layer where RH is high
+        year-round and peaks during rainy season and overnight.
+        """
+        if self._override_ambient_temp is not None:
+            # During manual override we keep humidity stable to avoid surprising
+            # coolant behavior during demos; still add a little sensor noise.
+            return 65.0 + self._rng.normal(0, 1.0)
+
+        month = timestamp.month
+        hour = timestamp.hour + timestamp.minute / 60.0
+
+        # Seasonal baseline — higher during East-Asian rainy / typhoon season
+        seasonal_rh = {
+            1: 72, 2: 74, 3: 76, 4: 78, 5: 82, 6: 85,
+            7: 82, 8: 83, 9: 80, 10: 74, 11: 70, 12: 70,
+        }
+        base = seasonal_rh.get(month, 75)
+
+        # Diurnal: overnight/near-dawn peak, mid-afternoon trough (≈±8%)
+        diurnal = -8.0 * math.sin((hour - 5) * math.pi / 12)
+
+        # Low-pressure fronts pull humidity up by ~10%
+        weather = -10.0 * self._weather._pressure_state
+
+        rh = base + diurnal + weather + self._rng.normal(0, 0.8)
+        return max(15.0, min(100.0, rh))
