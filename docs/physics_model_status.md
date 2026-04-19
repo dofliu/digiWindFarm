@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -293,9 +293,11 @@ Implemented:
 Newly implemented:
 - coolant level tracking with leak detection: level state variable (0-100%), leak rate input (L/h), pump cavitation at low level (<70%), 3-level alarm (low/very_low/critical), `converter_cooling_fault` triggers O-ring degradation leak, maintenance refill API (see #75)
 
+Newly implemented:
+- ambient humidity effect on air cooling (#89): moist-air density factor `1 − 0.0007 × max(0, RH − 50)` (floor 0.965), dew-point condensation penalty `max(0, (5 − (T − T_d)) × 0.01)` (floor 0.94), applied to nacelle and cabinet fan effectiveness; seasonal/diurnal/weather-front humidity profile from `WindEnvironmentModel.get_ambient_humidity`; new SCADA tag `WMET_HumOutside`
+
 Still missing:
 - detailed radiator fin model
-- ambient humidity effect on air cooling
 
 ### 2.5 Electrical / Converter Response
 File: `simulator/physics/electrical_model.py`
@@ -491,7 +493,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 91 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp)
+- 93 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)

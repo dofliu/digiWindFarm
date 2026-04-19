@@ -45,6 +45,8 @@
 - [x] 91 SCADA tags total (was 90): +1 gearbox oil temperature tag
 - [x] Gear tooth contact modeling (time-varying mesh stiffness, contact ratio, tooth wear index, GMF excitation → HSS torsion) — see #76
 - [x] 92 SCADA tags total (was 91): +1 gear tooth wear tag (`WDRV_GbxToothWear`)
+- [x] Ambient humidity effect on air cooling (moist-air density + dew-point condensation penalty on nacelle/cabinet fans) — see #89
+- [x] 93 SCADA tags total (was 92): +1 outside relative humidity tag (`WMET_HumOutside`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -173,6 +175,7 @@ These parts are implemented, but still first-generation models:
 - [x] Wind shear profile: power-law V(h) with azimuth-dependent blade loading, 1P torque modulation — see #71
 - [x] Blade mass imbalance: per-turbine blade mass offsets, centrifugal force F=Δm×r_cg×ω², 1P vibration + load coupling — see #72
 - [x] Gearbox oil temperature/viscosity: Walther equation, cold-start efficiency loss, overheat degradation — see #73
+- [x] Ambient humidity effect on air cooling: moist-air density factor + dew-point condensation penalty, seasonal/diurnal humidity profile — see #89
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

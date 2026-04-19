@@ -287,10 +287,16 @@ class CoolingSystem:
 
     def step(self, gen_power_kw: float, ambient_temp: float,
              wind_speed: float, dt: float,
-             turbine_running: bool) -> Dict[str, float]:
+             turbine_running: bool,
+             ambient_humidity_pct: float = 65.0) -> Dict[str, float]:
         """Advance cooling system and return cooling_bias for ThermalSystem.
 
         Returns dict with keys: nacelle, exposed, cabinet, water, transformer
+
+        ambient_humidity_pct affects air-side cooling only (fans). Moist air is
+        less dense, so mass flow and convection drop; when the cabinet surface
+        approaches dew point, condensation on fins further degrades heat
+        transfer.
         """
         self._sim_hours += dt / 3600.0
 
@@ -302,6 +308,26 @@ class CoolingSystem:
         # Fan banks
         nacelle_fan_eff = self.nacelle_fans.step(dt, turbine_running)
         cabinet_fan_eff = self.cabinet_fans.step(dt, turbine_running)
+
+        # ── Humidity penalty on air-cooled paths ──────────────────────────
+        # 1) Moist-air density factor: RH>50% reduces ρ_air ~ 0.07%/%RH,
+        #    capped at -3.5% at RH=100% (matches psychrometric chart trend).
+        rh = max(0.0, min(100.0, ambient_humidity_pct))
+        density_factor = max(0.965, 1.0 - 0.0007 * max(0.0, rh - 50.0))
+
+        # 2) Dew-point proximity: T_d ≈ T − (100 − RH)/5 (Magnus close-form).
+        #    When (T_surface − T_d) < 5 °C, condensation forms on cabinet fins
+        #    and degrades heat transfer up to -6%. Use ambient as surrogate
+        #    surface temperature because cabinet skin tracks it closely when
+        #    the fan is actively exchanging with outside air.
+        dew_point = ambient_temp - (100.0 - rh) / 5.0
+        dew_margin = ambient_temp - dew_point
+        condensation_factor = max(0.94, 1.0 - max(0.0, (5.0 - dew_margin)) * 0.01)
+
+        humidity_factor = density_factor * condensation_factor
+
+        nacelle_fan_eff *= humidity_factor
+        cabinet_fan_eff *= humidity_factor
 
         # Apply individuality scaling
         scale = self._individuality
@@ -316,7 +342,19 @@ class CoolingSystem:
             "transformer": nacelle_fan_eff * 0.5 * scale + 0.5,  # Transformer has its own cooling
         }
 
+        self._last_humidity_factor = humidity_factor
+        self._last_ambient_humidity = rh
         return cooling_bias
+
+    @property
+    def last_humidity_factor(self) -> float:
+        """Most recent humidity cooling factor (density × condensation)."""
+        return getattr(self, "_last_humidity_factor", 1.0)
+
+    @property
+    def last_ambient_humidity(self) -> float:
+        """Most recent ambient humidity input (%)."""
+        return getattr(self, "_last_ambient_humidity", 65.0)
 
     def get_status(self) -> Dict:
         """Get cooling system status for diagnostics / SCADA display."""
@@ -333,6 +371,8 @@ class CoolingSystem:
             "nacelle_fans_total": self.nacelle_fans.total_count,
             "cabinet_fans_active": self.cabinet_fans.active_count,
             "cabinet_fans_total": self.cabinet_fans.total_count,
+            "ambient_humidity_pct": round(self.last_ambient_humidity, 1),
+            "humidity_factor": round(self.last_humidity_factor, 4),
             "sim_hours": round(self._sim_hours, 1),
         }
 

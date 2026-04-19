@@ -93,6 +93,7 @@ class WindFarmSimulator:
         base_wind = self.wind_model.get_wind_speed(sim_time)
         wind_direction = self.wind_model.get_wind_direction(sim_time)
         ambient_temp = self.wind_model.get_ambient_temp(sim_time)
+        ambient_humidity = self.wind_model.get_ambient_humidity(sim_time)
         grid_frequency = self.grid_model.get_frequency(sim_time)
         grid_voltage = self.grid_model.get_voltage(sim_time)
 
@@ -139,6 +140,7 @@ class WindFarmSimulator:
                 time_step,
                 grid_frequency_ref=grid_frequency,
                 grid_voltage_ref=grid_voltage,
+                ambient_humidity_pct=ambient_humidity,
             )
 
             output = self._scada_to_output(tid, sim_time, scada_output, local_wind, wind_direction)

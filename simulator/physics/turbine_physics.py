@@ -313,7 +313,8 @@ class TurbinePhysicsModel:
     def step(self, wind_speed: float, wind_direction: float,
              ambient_temp: float = 25.0, dt: float = 1.0,
              grid_frequency_ref: Optional[float] = None,
-             grid_voltage_ref: Optional[float] = None) -> Dict[str, float]:
+             grid_voltage_ref: Optional[float] = None,
+             ambient_humidity_pct: float = 65.0) -> Dict[str, float]:
         """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._sim_time += dt
@@ -552,10 +553,12 @@ class TurbinePhysicsModel:
         leak_rate = fault_physics.get("coolant_leak_lph", 0.0)
         self.cooling.water_loop.set_leak_rate(leak_rate)
 
-        # Cooling system model (#29) — produces cooling_bias for thermal model
+        # Cooling system model (#29) — produces cooling_bias for thermal model.
+        # Humidity (#89) derates air-cooled paths via density + condensation.
         cooling_bias = self.cooling.step(
             gen_power_kw, ambient_temp, effective_wind_speed, dt,
             turbine_running=is_producing,
+            ambient_humidity_pct=ambient_humidity_pct,
         )
         # Merge fault cooling bias (multiplicative)
         for key in cooling_bias:
@@ -695,6 +698,7 @@ class TurbinePhysicsModel:
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
+            "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
