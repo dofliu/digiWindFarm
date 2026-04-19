@@ -63,6 +63,12 @@ class DrivetrainSpec:
     brake_pressure_release_rate: float = 40.0  # bar/s release
     brake_torque_per_bar: float = 0.15        # kNm per bar of pressure
 
+    # Gear tooth contact (HSS pinion of last stage — dominant mesh excitation)
+    hss_pinion_teeth: int = 23              # pinion teeth on high-speed pinion
+    contact_ratio: float = 1.55             # typical helical ε_α ∈ [1.3, 1.8]
+    mesh_stiffness_ripple_base: float = 0.04  # baseline ΔK/K at rated (healthy)
+    tooth_wear_rate_per_hour: float = 3.5e-6  # wear index growth at rated (Δ/h)
+
     @classmethod
     def for_direct_drive(cls, **kwargs) -> "DrivetrainSpec":
         """Create a spec for direct-drive turbines (no gearbox)."""
@@ -133,6 +139,19 @@ class DrivetrainModel:
         self._oil_temp_ref = 60.0  # reference temperature for viscosity ratio
         self._visc_alpha = -0.03   # Walther-type coefficient (1/°C)
 
+        # Gear tooth contact state (#76)
+        # Time-varying mesh stiffness comes from the cyclical alternation between
+        # single-tooth contact (lower K) and double-tooth contact (higher K).
+        # Contact ratio ε_α determines the fraction of time spent in each region.
+        # Wear gradually flattens the load sharing, increasing ripple at GMF.
+        self._mesh_phase = 0.0
+        self._tooth_wear_index = 0.0  # 0 = new gears, 1 = failure threshold
+        self._ripple_individuality = 1.0 + (
+            ind.get("gear_mesh_ripple_scale", 1.0) - 1.0
+        ) if "gear_mesh_ripple_scale" in ind else 1.0
+        # gmf_excitation output (kNm) — contributes to HSS torsion excitation
+        self.gmf_excitation_knm = 0.0
+
     @property
     def generator_speed(self) -> float:
         """Current generator speed in RPM."""
@@ -148,6 +167,24 @@ class DrivetrainModel:
         """Current gearbox oil temperature (°C)."""
         return self._oil_temp
 
+    @property
+    def tooth_wear_index(self) -> float:
+        """Gear tooth wear index 0–1 (0 healthy, 1 at expected replacement)."""
+        return self._tooth_wear_index
+
+    @property
+    def mesh_stiffness_variation(self) -> float:
+        """Current ΔK/K ripple amplitude at gear mesh frequency (0 if ungeared)."""
+        if not self.is_geared:
+            return 0.0
+        # Contact-ratio envelope: (ε-1) is double-tooth fraction.
+        # Ripple amplitude scales with (2-ε) (more single-tooth → more ripple)
+        # and is amplified by wear (tooth surface deterioration).
+        s = self.spec
+        envelope = max(0.0, 2.0 - s.contact_ratio)
+        wear_gain = 1.0 + 3.0 * self._tooth_wear_index
+        return s.mesh_stiffness_ripple_base * envelope * wear_gain * self._ripple_individuality
+
     def step(
         self,
         aero_rotor_speed: float,
@@ -160,6 +197,7 @@ class DrivetrainModel:
         is_normal_stop: bool,
         is_emergency_stop: bool,
         ambient_temp: float = 25.0,
+        gearbox_overheat_severity: float = 0.0,
     ) -> Tuple[float, float, float, float, float, float]:
         """Advance drivetrain by one timestep.
 
@@ -202,6 +240,22 @@ class DrivetrainModel:
             slip_error * 0.12 * lss_stiffness - self._lss_twist * lss_damping
         ) * dt
 
+        # ── Gear tooth contact: mesh excitation + wear (#76) ──
+        # The cyclic alternation between single- and double-tooth contact
+        # produces a deterministic torque ripple at GMF. This ripple is
+        # modulated by the per-tooth load distribution, which degrades as
+        # the tooth surfaces wear or overheat.
+        self.gmf_excitation_knm = 0.0
+        if self.is_geared and (is_producing or is_starting):
+            hss_rpm = max(0.0, current_rotor_speed * gear_ratio)
+            gmf_hz = hss_rpm * s.hss_pinion_teeth / 60.0
+            self._mesh_phase = (self._mesh_phase + 2.0 * math.pi * gmf_hz * dt) % (2.0 * math.pi)
+            # Square-wave-like ripple approximated by single sinusoid at GMF
+            ripple = self.mesh_stiffness_variation * math.cos(self._mesh_phase)
+            # HSS torque at rated condition; excitation scales with aero torque / ratio
+            mean_hss_torque = aero_torque_knm / max(1.0, gear_ratio)
+            self.gmf_excitation_knm = ripple * abs(mean_hss_torque)
+
         # ── High-speed shaft torsional dynamics (geared only) ──
         if self.is_geared:
             hss_stiffness = s.hss_stiffness * self._stiffness_scale
@@ -209,6 +263,7 @@ class DrivetrainModel:
             hss_speed_error = (current_rotor_speed * gear_ratio - self._generator_speed)
             self._hss_twist += (
                 hss_speed_error * 0.08 * hss_stiffness - self._hss_twist * hss_damping
+                + self.gmf_excitation_knm * 0.015
             ) * dt
         else:
             self._hss_twist = self._lss_twist * 0.3  # Coupled for direct-drive
@@ -260,6 +315,24 @@ class DrivetrainModel:
             visc_ratio = math.exp(self._visc_alpha * (self._oil_temp - self._oil_temp_ref))
             cold_start_factor = 1.0 + 0.5 * math.exp(-self._running_seconds / 600.0)
             visc_loss_kw = gearbox_loss_kw * abs(1.0 - visc_ratio) * 0.3 * cold_start_factor
+
+            # ── Tooth wear accumulation (#76) ──
+            # Archard-like wear proxy: grows with sliding speed × contact pressure
+            # surrogated by (hss_speed × torque). Overheat accelerates it via
+            # reduced lubrication film.
+            if is_producing:
+                hss_rpm_wear = max(0.0, current_rotor_speed * gear_ratio)
+                speed_norm = hss_rpm_wear / 1800.0
+                load_norm = max(0.0, aero_torque_knm) / 1200.0
+                overheat_mult = 1.0 + 6.0 * gearbox_overheat_severity
+                # rate per hour → per second
+                dwear = (
+                    s.tooth_wear_rate_per_hour / 3600.0
+                    * speed_norm * load_norm * overheat_mult
+                )
+                self._tooth_wear_index = min(
+                    1.5, self._tooth_wear_index + dwear * dt
+                )
         else:
             self._oil_temp = ambient_temp
 
@@ -355,7 +428,11 @@ class DrivetrainModel:
         return result
 
     def reset(self):
-        """Reset all drivetrain state to initial conditions."""
+        """Reset all drivetrain state to initial conditions.
+
+        Tooth wear is persistent asset state and is NOT reset here (a stop/start
+        should not un-wear the gears). Use `reset_wear()` for test tear-down.
+        """
         self._lss_twist = 0.0
         self._hss_twist = 0.0
         self._generator_speed = 0.0
@@ -367,3 +444,9 @@ class DrivetrainModel:
         self.gearbox_bearing_heat_kw = 0.0
         self._oil_temp = 25.0
         self._running_seconds = 0.0
+        self._mesh_phase = 0.0
+        self.gmf_excitation_knm = 0.0
+
+    def reset_wear(self):
+        """Explicit reset for cumulative tooth wear (e.g. after gearbox overhaul)."""
+        self._tooth_wear_index = 0.0

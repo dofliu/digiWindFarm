@@ -43,6 +43,8 @@
 - [x] 90 SCADA tags total (was 88): +2 crest factor/kurtosis alarm tags
 - [x] Gearbox oil temperature and viscosity effects (Walther-type model, cold-start decay) — see #73
 - [x] 91 SCADA tags total (was 90): +1 gearbox oil temperature tag
+- [x] Gear tooth contact modeling (time-varying mesh stiffness, contact ratio, tooth wear index, GMF excitation → HSS torsion) — see #76
+- [x] 92 SCADA tags total (was 91): +1 gear tooth wear tag (`WDRV_GbxToothWear`)
 
 ### Backend
 - [x] FastAPI REST APIs

@@ -236,8 +236,12 @@ Newly implemented:
 - viscosity-adjusted drivetrain losses feed back into gearbox bearing heat
 - new SCADA tag: `WDRV_GbxOilTmp` (see #73)
 
+Newly implemented:
+- gear tooth contact model (#76): cyclic mesh-stiffness ripple from contact ratio (ε_α), deterministic GMF torque ripple fed into HSS torsion, Archard-like tooth wear accumulator with `gearbox_overheat` coupling, wear-driven GMF band + sideband amplification
+- new SCADA tag: `WDRV_GbxToothWear`
+
 Still missing:
-- gear tooth contact modeling (see #76)
+- per-tooth pitting/spalling frequency model (individual tooth defect)
 
 ### 2.3 Vibration Spectral Model
 File: `simulator/physics/vibration_spectral.py`
@@ -499,6 +503,7 @@ Implemented:
 - ~~gearbox oil temperature and viscosity effects~~ → done (#73, Walther equation)
 - ~~coolant level / leak detection~~ → done (#75, level tracking + pump cavitation + fault coupling)
 - ~~wind veer (directional shear with height)~~ → done (#79, Ekman spiral + blade lateral force coupling)
+- ~~gear tooth contact modeling~~ → done (#76, time-varying mesh stiffness + tooth wear index + GMF coupling)
 
 ### Recommended Immediate Direction
 1. ~~blade mass imbalance with speed² coupling for 1P vibration~~ → done (#72)
@@ -512,4 +517,5 @@ Implemented:
 8. ~~tower shadow effect~~ → done (#69, rotor azimuth tracking + 3P Gaussian shadow model)
 9. ~~wind shear profile~~ → done (#71, power-law V(h) with azimuth-dependent blade loading)
 10. ~~wind veer (directional shear with height)~~ → done (#79, Ekman spiral model)
-11. deployment hardening (JWT auth, RBAC, Docker Compose)
+11. ~~gear tooth contact modeling~~ → done (#76, contact-ratio mesh stiffness + tooth wear)
+12. deployment hardening (JWT auth, RBAC, Docker Compose)

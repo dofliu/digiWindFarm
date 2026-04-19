@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 91 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 92 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -27,6 +27,7 @@ Primary focus (next improvements):
 - bearing defect frequency (BPFO/BPFI) — fixed: geometry-based BPFO/BPFI with fault-coupled amplitude — see #58
 - tower shadow effect — fixed: rotor azimuth tracking + Gaussian 3P torque/thrust/load modulation — see #69
 - gearbox oil temperature/viscosity — fixed: Walther-type viscosity model with cold-start loss decay — see #73
+- gear tooth contact — fixed: contact-ratio mesh stiffness ripple + tooth wear index + GMF HSS-torsion excitation — see #76
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -62,7 +63,7 @@ Still pending or incomplete:
 - spectral alarm threshold curves — see #58; BPFO/BPFI, sideband analysis, and crest factor/kurtosis anomaly alarms completed
 - full protection relay coordination (LVRT/OVRT) — see #67
 - coolant level / leak detection — done: level tracking + pump cavitation + fault coupling — see #75
-- gear tooth contact modeling — see #76
+- gear tooth contact modeling — done: mesh stiffness ripple + tooth wear + GMF excitation — see #76
 - wind veer (directional shear with height) — done: Ekman spiral model + blade lateral force coupling — see #79
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
