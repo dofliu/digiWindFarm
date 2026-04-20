@@ -158,6 +158,10 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "%", "Local Turbulence Intensity Multiplier",
              "局部亂流強度倍率",
              80, 300),
+    ScadaTag("WMET_WakeDef", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WakeDef",
+             "WMET", "REAL32", "%", "Wake Velocity Deficit",
+             "尾流風速赤字",
+             0, 70),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle

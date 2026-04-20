@@ -347,10 +347,12 @@ class PerTurbineWind:
     def __init__(self, turbine_count: int, seed: int = 0,
                  positions: Optional[List[TurbinePosition]] = None,
                  spacing_m: float = 500.0,
-                 wind_shear_exponent: float = 0.2):
+                 wind_shear_exponent: float = 0.2,
+                 rotor_diameter: float = 70.65):
         self._rng = np.random.RandomState(seed)
         self._count = turbine_count
         self.wind_shear_exponent = wind_shear_exponent
+        self._rotor_diameter = rotor_diameter
 
         # Turbine positions
         self._positions = positions or default_farm_layout(turbine_count, spacing_m)
@@ -358,6 +360,7 @@ class PerTurbineWind:
         # Persistent per-turbine characteristics
         self._offsets = self._rng.normal(0, 0.35, turbine_count)
         self._wake_factors = np.ones(turbine_count)
+        self._wake_deficits = np.zeros(turbine_count)  # reported fraction 0..1
 
         # Per-turbine turbulence generators for spatial decorrelation
         self._turb_gens = [TurbulenceGenerator(seed=seed + 1000 + i) for i in range(turbine_count)]
@@ -384,8 +387,8 @@ class PerTurbineWind:
         """
         self._current_direction = wind_direction
 
-        # Update wake factors based on current wind direction
-        self._update_wake_factors(wind_direction)
+        # Update wake factors based on current wind direction, speed, and TI
+        self._update_wake_factors(wind_direction, farm_wind, turbulence_intensity)
 
         # Generate natural wind events stochastically
         self._propagation.generate_natural_events(farm_wind, dt)
@@ -429,6 +432,11 @@ class PerTurbineWind:
         """Effective TI multiplier (1.0 = baseline) at a turbine location."""
         idx = min(turbine_index, self._count - 1)
         return float(self._current_ti_multipliers[idx])
+
+    def get_wake_deficit(self, turbine_index: int) -> float:
+        """Wake deficit fraction at a turbine (0.0 = free stream, 0.6 = deep wake)."""
+        idx = min(turbine_index, self._count - 1)
+        return float(self._wake_deficits[idx])
 
     def _update_turbulence_pockets(self, farm_wind: float, dt: float):
         """Spawn / expire pockets and compute per-turbine TI multipliers."""
@@ -476,44 +484,96 @@ class PerTurbineWind:
                 weight = math.exp(-(dx * dx + dy * dy) / max(r2, 1.0))
                 self._current_ti_multipliers[i] += boost * weight
 
-    def _update_wake_factors(self, wind_direction: float):
-        """Compute direction-aware wake factors.
+    def _update_wake_factors(self, wind_direction: float,
+                             mean_wind: float = 10.0,
+                             turbulence_intensity: float = 0.08):
+        """Compute direction-aware wake factors using Bastankhah-Porté-Agel.
 
-        Turbines downwind of others lose 2-8% of wind speed.
-        Wake strength depends on alignment with wind direction.
+        Gaussian wake model (Bastankhah & Porté-Agel, Renew. Energy 70, 2014):
+            ε/D    = 0.25 · √((1 + √(1 − Ct)) / (2·√(1 − Ct)))
+            σ(x)/D = k* · (x/D) + ε/D
+            C(x)   = 1 − √(1 − Ct / (8·(σ/D)²))
+            ΔU/U   = C(x) · exp(−0.5·(r/σ)²)
+
+        Wake expansion rate (Niayifar & Porté-Agel 2016):
+            k* ≈ 0.38 · TI + 0.004  (≈0.04 at TI=0.1, typical offshore)
+
+        Multiple wakes are superposed via sum-of-squares of deficits.
         """
         angle_rad = math.radians(wind_direction)
         wind_dx = -math.sin(angle_rad)  # wind blows FROM this direction
         wind_dy = -math.cos(angle_rad)
 
         n = self._count
-        self._wake_factors = np.ones(n)
+        D = float(self._rotor_diameter)
 
-        for i in range(n):
+        # Operating Ct heuristic: peaks near V≈8 m/s (Region 2), drops above rated
+        V_rated = 11.0
+        if mean_wind < 3.0:
+            ct = 0.0
+        elif mean_wind < V_rated:
+            # Near-peak momentum extraction in Region 2
+            ct = 0.82 - 0.015 * abs(mean_wind - 8.0)
+        else:
+            # Pitched rotor above rated: Ct drops with (V_rated/V)²
+            ct = 0.82 * (V_rated / mean_wind) ** 2
+        ct = max(0.05, min(0.90, ct))
+
+        # Near-wake offset ε/D (Bastankhah eq. 7)
+        one_minus_ct = max(0.01, 1.0 - ct)
+        sqrt_one_minus_ct = math.sqrt(one_minus_ct)
+        eps_over_D = 0.25 * math.sqrt(
+            (1.0 + sqrt_one_minus_ct) / (2.0 * sqrt_one_minus_ct)
+        )
+
+        # TI-dependent wake expansion rate (Niayifar & Porté-Agel 2016)
+        k_star = max(0.02, 0.38 * max(turbulence_intensity, 0.02) + 0.004)
+
+        # Pre-compute Ct/8 for deficit discriminant
+        ct_over_8 = ct / 8.0
+
+        # Accumulate sum-of-squares deficits for each downstream turbine
+        deficits_sq = np.zeros(n)
+
+        if ct >= 0.05 and mean_wind > 2.0:
             for j in range(n):
-                if i == j:
-                    continue
-                # Vector from j to i
-                dx = self._positions[i].x - self._positions[j].x
-                dy = self._positions[i].y - self._positions[j].y
-                dist = math.sqrt(dx * dx + dy * dy)
-                if dist < 10.0:
-                    continue
+                xj = self._positions[j].x
+                yj = self._positions[j].y
+                for i in range(n):
+                    if i == j:
+                        continue
+                    dx = self._positions[i].x - xj
+                    dy = self._positions[i].y - yj
+                    # Downstream distance (along wind travel direction)
+                    x_down = dx * wind_dx + dy * wind_dy
+                    if x_down <= 0.5 * D:
+                        continue  # upstream or abreast of j → no wake
+                    # Cross-stream (perpendicular to wind) squared distance
+                    r_sq = max(0.0, dx * dx + dy * dy - x_down * x_down)
 
-                # How aligned is j→i with wind direction?
-                # cos_angle = 1.0 means i is directly downwind of j
-                cos_angle = (dx * wind_dx + dy * wind_dy) / dist
-                if cos_angle < 0.3:
-                    continue  # Not in wake zone
+                    # Wake half-width at x_down
+                    sigma_over_D = k_star * (x_down / D) + eps_over_D
+                    sigma_sq_over_D_sq = sigma_over_D * sigma_over_D
 
-                # Wake deficit: stronger when directly aligned, weaker at distance
-                # Jensen/Park-like simple model
-                alignment = max(0.0, (cos_angle - 0.3) / 0.7)
-                wake_deficit = 0.08 * alignment * (200.0 / max(dist, 200.0)) ** 0.5
-                self._wake_factors[i] *= (1.0 - wake_deficit)
+                    # Max deficit (wake centerline). Need discriminant > 0.
+                    discriminant = 1.0 - ct_over_8 / max(sigma_sq_over_D_sq, 1e-6)
+                    if discriminant <= 0.0:
+                        # Deep near-wake: cap at a physical upper bound
+                        c_max = 0.70
+                    else:
+                        c_max = 1.0 - math.sqrt(discriminant)
 
-        # Clamp to reasonable range
-        self._wake_factors = np.clip(self._wake_factors, 0.85, 1.0)
+                    # Gaussian radial profile
+                    sigma_m_sq = sigma_sq_over_D_sq * D * D
+                    radial = math.exp(-0.5 * r_sq / max(sigma_m_sq, 1.0))
+                    deficit = c_max * radial
+
+                    deficits_sq[i] += deficit * deficit
+
+        # Sum-of-squares superposition: total deficit fraction
+        total_deficit = np.sqrt(deficits_sq)
+        self._wake_deficits = np.clip(total_deficit, 0.0, 0.70)
+        self._wake_factors = 1.0 - self._wake_deficits
 
     @staticmethod
     def blade_shear_ratio(hub_height: float, rotor_radius: float,
