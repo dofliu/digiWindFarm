@@ -49,6 +49,8 @@
 - [x] 93 SCADA tags total (was 92): +1 outside relative humidity tag (`WMET_HumOutside`)
 - [x] Localized turbulence pockets (Gaussian spatial TI boost per pocket, AR(1) turbulence × per-turbine TI multiplier) — see #91
 - [x] 94 SCADA tags total (was 93): +1 local TI multiplier tag (`WMET_LocalTi`)
+- [x] Bastankhah-Porté-Agel Gaussian wake model (TI-dependent expansion k* = 0.38·TI+0.004, Ct-coupled max deficit, Gaussian radial profile, sum-of-squares multi-wake superposition) — see #93
+- [x] 95 SCADA tags total (was 94): +1 wake velocity deficit tag (`WMET_WakeDef`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -179,6 +181,7 @@ These parts are implemented, but still first-generation models:
 - [x] Gearbox oil temperature/viscosity: Walther equation, cold-start efficiency loss, overheat degradation — see #73
 - [x] Ambient humidity effect on air cooling: moist-air density factor + dew-point condensation penalty, seasonal/diurnal humidity profile — see #89
 - [x] Localized turbulence pockets: Gaussian spatial pockets with stochastic spawn (~1 per 10–15 min), per-turbine TI multiplier boost, exposed via `WMET_LocalTi` — see #91
+- [x] Wake model upgrade: Bastankhah-Porté-Agel Gaussian wake (replaces simplified Jensen top-hat); TI-dependent expansion, Ct-coupled deficit, sum-of-squares multi-wake superposition, exposed via `WMET_WakeDef` — see #93
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

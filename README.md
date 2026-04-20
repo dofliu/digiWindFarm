@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 94 SCADA tags aligned to Bachmann Z72 definitions
+- 95 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -234,6 +234,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 - coolant level / leak detection implemented (level tracking, pump cavitation, fault coupling) — see #75
 - ambient humidity effect on air cooling implemented (moist-air density + dew-point condensation penalty) — see #89
 - localized turbulence pockets implemented (Gaussian spatial TI boost pockets, per-turbine TI multiplier, `WMET_LocalTi` tag) — see #91
+- wake model upgraded to Bastankhah-Porté-Agel Gaussian (TI-dependent expansion, Ct-coupled deficit, sum-of-squares superposition, `WMET_WakeDef` tag) — see #93
 - full protection relay coordination not yet implemented
 - frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)

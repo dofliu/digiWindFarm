@@ -248,6 +248,7 @@ class TurbinePhysicsModel:
         self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
         self._imbalance_force_kn = 0.0
         self._local_ti_multiplier = 1.0
+        self._wake_deficit = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -316,10 +317,12 @@ class TurbinePhysicsModel:
              grid_frequency_ref: Optional[float] = None,
              grid_voltage_ref: Optional[float] = None,
              ambient_humidity_pct: float = 65.0,
-             local_ti_multiplier: float = 1.0) -> Dict[str, float]:
+             local_ti_multiplier: float = 1.0,
+             wake_deficit: float = 0.0) -> Dict[str, float]:
         """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._local_ti_multiplier = max(0.0, float(local_ti_multiplier))
+        self._wake_deficit = max(0.0, min(0.70, float(wake_deficit)))
         self._sim_time += dt
         self._update_grid_reference(dt, grid_frequency_ref, grid_voltage_ref)
         fault_physics = self._get_fault_physics()
@@ -703,6 +706,7 @@ class TurbinePhysicsModel:
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),
+            "WMET_WakeDef": round(self._wake_deficit * 100.0, 2),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
@@ -1043,6 +1047,7 @@ class TurbinePhysicsModel:
         self._rotor_azimuth = self._rng.uniform(0.0, math.tau)
         self._imbalance_force_kn = 0.0
         self._local_ti_multiplier = 1.0
+        self._wake_deficit = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
