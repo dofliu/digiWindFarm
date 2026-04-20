@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -344,8 +344,10 @@ Newly implemented:
 Newly implemented:
 - wind veer (directional shear with height): linear Ekman spiral model, per-turbine veer rate (0.07–0.13 °/m), azimuth-dependent blade direction offset, lateral force coupling to tower SS and blade flapwise moments (see #79)
 
+Newly implemented:
+- localized turbulence pockets (#91): Gaussian spatial pockets (R=180–380 m), stochastic spawn (~1 per 10–15 min at 10 m/s), TI multiplier 1.4–2.0× at pocket center with Gaussian falloff, rise/hold/fall envelope; applies per-turbine TI boost to `TurbulenceGenerator`; new SCADA tag `WMET_LocalTi` (local TI multiplier %)
+
 Still missing:
-- localized turbulence pockets
 - more sophisticated wake model (e.g. Frandsen, Bastankhah)
 
 ## 3. Not Yet Modeled
@@ -493,7 +495,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 93 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity)
+- 94 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -520,4 +522,5 @@ Implemented:
 9. ~~wind shear profile~~ → done (#71, power-law V(h) with azimuth-dependent blade loading)
 10. ~~wind veer (directional shear with height)~~ → done (#79, Ekman spiral model)
 11. ~~gear tooth contact modeling~~ → done (#76, contact-ratio mesh stiffness + tooth wear)
-12. deployment hardening (JWT auth, RBAC, Docker Compose)
+12. ~~localized turbulence pockets~~ → done (#91, Gaussian spatial TI boost pockets)
+13. deployment hardening (JWT auth, RBAC, Docker Compose)

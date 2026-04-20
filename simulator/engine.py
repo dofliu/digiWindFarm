@@ -118,6 +118,7 @@ class WindFarmSimulator:
             idx = int(tid[2:]) - 1
             local_wind = self._per_turbine_wind.get_local_wind(farm_wind, idx)
             local_direction = self._per_turbine_wind.get_local_direction(wind_direction, idx)
+            local_ti_multiplier = self._per_turbine_wind.get_local_ti_multiplier(idx)
 
             model.active_faults = [
                 {
@@ -141,6 +142,7 @@ class WindFarmSimulator:
                 grid_frequency_ref=grid_frequency,
                 grid_voltage_ref=grid_voltage,
                 ambient_humidity_pct=ambient_humidity,
+                local_ti_multiplier=local_ti_multiplier,
             )
 
             output = self._scada_to_output(tid, sim_time, scada_output, local_wind, wind_direction)

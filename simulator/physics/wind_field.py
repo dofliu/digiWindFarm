@@ -113,6 +113,25 @@ class TurbinePosition:
     y: float  # North-South (positive = North)
 
 
+@dataclass
+class TurbulencePocket:
+    """A localized turbulence pocket (small-scale coherent eddy).
+
+    Affects TI (turbulence intensity) only within its Gaussian influence
+    radius, without shifting the mean wind speed. Represents convective
+    structures, boundary-layer eddies, or broken-up upstream wakes with
+    spatial scale ~100–500 m and lifetime ~30–180 s.
+    """
+    center_x: float          # pocket center position, east (m)
+    center_y: float          # pocket center position, north (m)
+    radius_m: float          # Gaussian 1-sigma radius (m)
+    ti_multiplier: float     # TI boost at pocket center (e.g. 1.8 = +80%)
+    origin_time: float       # sim_time when pocket was created
+    rise_time: float         # seconds to ramp up to peak
+    hold_time: float         # seconds at peak
+    fall_time: float         # seconds to ramp down
+
+
 def default_farm_layout(count: int = 14, spacing_m: float = 500.0) -> List[TurbinePosition]:
     """Generate a default wind farm layout.
 
@@ -346,6 +365,12 @@ class PerTurbineWind:
         # Wind event propagation system
         self._propagation = WindEventPropagation(self._positions, seed=seed + 2000)
 
+        # Localized turbulence pockets (small-scale spatial TI structures)
+        self._pocket_rng = np.random.RandomState(seed + 3000)
+        self._pockets: List[TurbulencePocket] = []
+        self._pocket_sim_time = 0.0
+        self._current_ti_multipliers = np.ones(turbine_count)
+
         # State
         self._current_speed_deltas = np.zeros(turbine_count)
         self._current_dir_deltas = np.zeros(turbine_count)
@@ -368,9 +393,13 @@ class PerTurbineWind:
         # Advance event propagation
         self._current_speed_deltas, self._current_dir_deltas = self._propagation.step(dt)
 
-        # Per-turbine turbulence (spatial decorrelation)
+        # Localized turbulence pockets: stochastic spawn + per-turbine TI multiplier
+        self._update_turbulence_pockets(farm_wind, dt)
+
+        # Per-turbine turbulence (spatial decorrelation) — pocket-boosted TI
         for i in range(self._count):
-            turb = self._turb_gens[i].step(farm_wind, turbulence_intensity * 0.4, dt)
+            ti_local = turbulence_intensity * 0.4 * self._current_ti_multipliers[i]
+            turb = self._turb_gens[i].step(farm_wind, ti_local, dt)
             self._current_speed_deltas[i] += turb
 
     def get_local_wind(self, farm_wind: float, turbine_index: int) -> float:
@@ -391,6 +420,61 @@ class PerTurbineWind:
     def add_event(self, event: WindEvent):
         """Inject a wind event (for API/testing)."""
         self._propagation.add_event(event)
+
+    def add_pocket(self, pocket: TurbulencePocket):
+        """Inject a localized turbulence pocket (for API/testing)."""
+        self._pockets.append(pocket)
+
+    def get_local_ti_multiplier(self, turbine_index: int) -> float:
+        """Effective TI multiplier (1.0 = baseline) at a turbine location."""
+        idx = min(turbine_index, self._count - 1)
+        return float(self._current_ti_multipliers[idx])
+
+    def _update_turbulence_pockets(self, farm_wind: float, dt: float):
+        """Spawn / expire pockets and compute per-turbine TI multipliers."""
+        self._pocket_sim_time += dt
+
+        # Stochastic spawn: mean ~1 pocket per 10–15 min at 10 m/s
+        spawn_prob = dt * (0.0006 + 0.0004 * max(0.0, farm_wind - 6.0))
+        if self._pocket_rng.uniform() < spawn_prob and self._count > 0:
+            anchor = int(self._pocket_rng.randint(0, self._count))
+            jitter_x = self._pocket_rng.uniform(-250.0, 250.0)
+            jitter_y = self._pocket_rng.uniform(-250.0, 250.0)
+            self._pockets.append(TurbulencePocket(
+                center_x=self._positions[anchor].x + jitter_x,
+                center_y=self._positions[anchor].y + jitter_y,
+                radius_m=float(self._pocket_rng.uniform(180.0, 380.0)),
+                ti_multiplier=float(self._pocket_rng.uniform(1.4, 2.0)),
+                origin_time=self._pocket_sim_time,
+                rise_time=float(self._pocket_rng.uniform(10.0, 25.0)),
+                hold_time=float(self._pocket_rng.uniform(25.0, 90.0)),
+                fall_time=float(self._pocket_rng.uniform(15.0, 40.0)),
+            ))
+
+        # Expire pockets past their full envelope
+        self._pockets = [
+            p for p in self._pockets
+            if self._pocket_sim_time - p.origin_time < p.rise_time + p.hold_time + p.fall_time
+        ]
+
+        # Compute per-turbine TI multiplier: 1 + Σ(boost × Gaussian spatial weight × envelope)
+        self._current_ti_multipliers = np.ones(self._count)
+        for p in self._pockets:
+            local_time = self._pocket_sim_time - p.origin_time
+            if local_time < p.rise_time:
+                env = 0.5 * (1.0 - math.cos(math.pi * local_time / max(p.rise_time, 1e-3)))
+            elif local_time < p.rise_time + p.hold_time:
+                env = 1.0
+            else:
+                t_fall = local_time - p.rise_time - p.hold_time
+                env = 0.5 * (1.0 + math.cos(math.pi * t_fall / max(p.fall_time, 1e-3)))
+            boost = max(0.0, p.ti_multiplier - 1.0) * env
+            r2 = 2.0 * p.radius_m * p.radius_m
+            for i in range(self._count):
+                dx = self._positions[i].x - p.center_x
+                dy = self._positions[i].y - p.center_y
+                weight = math.exp(-(dx * dx + dy * dy) / max(r2, 1.0))
+                self._current_ti_multipliers[i] += boost * weight
 
     def _update_wake_factors(self, wind_direction: float):
         """Compute direction-aware wake factors.
