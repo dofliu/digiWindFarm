@@ -47,6 +47,8 @@
 - [x] 92 SCADA tags total (was 91): +1 gear tooth wear tag (`WDRV_GbxToothWear`)
 - [x] Ambient humidity effect on air cooling (moist-air density + dew-point condensation penalty on nacelle/cabinet fans) — see #89
 - [x] 93 SCADA tags total (was 92): +1 outside relative humidity tag (`WMET_HumOutside`)
+- [x] Localized turbulence pockets (Gaussian spatial TI boost per pocket, AR(1) turbulence × per-turbine TI multiplier) — see #91
+- [x] 94 SCADA tags total (was 93): +1 local TI multiplier tag (`WMET_LocalTi`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -176,6 +178,7 @@ These parts are implemented, but still first-generation models:
 - [x] Blade mass imbalance: per-turbine blade mass offsets, centrifugal force F=Δm×r_cg×ω², 1P vibration + load coupling — see #72
 - [x] Gearbox oil temperature/viscosity: Walther equation, cold-start efficiency loss, overheat degradation — see #73
 - [x] Ambient humidity effect on air cooling: moist-air density factor + dew-point condensation penalty, seasonal/diurnal humidity profile — see #89
+- [x] Localized turbulence pockets: Gaussian spatial pockets with stochastic spawn (~1 per 10–15 min), per-turbine TI multiplier boost, exposed via `WMET_LocalTi` — see #91
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
