@@ -1,10 +1,13 @@
 import sys
 import os
 import time
+import math
 import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Callable, Optional
 from collections import deque
+
+import numpy as np
 
 # Add parent directory so we can import original modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -40,6 +43,8 @@ class WindFarmSimulator:
         # Per-turbine wind variation and turbulence
         self._turbulence_gen = TurbulenceGenerator(seed=42)
         self._per_turbine_wind = PerTurbineWind(turbine_count, seed=99)
+        # Previous-step yaw misalignment (rad), fed into wake-steering each step
+        self._last_yaw_err_rad = np.zeros(turbine_count)
 
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -102,6 +107,11 @@ class WindFarmSimulator:
         )
         farm_wind = max(0, base_wind + turb_component)
 
+        # Feed previous-step yaw misalignments back into the wind field so the
+        # wake-steering deflection (Bastankhah 2016) is ready before we compute
+        # per-turbine wake factors this step.
+        self._per_turbine_wind.set_yaw_misalignments(self._last_yaw_err_rad)
+
         # Advance wind field: per-turbine turbulence + event propagation
         self._per_turbine_wind.step(
             farm_wind, wind_direction,
@@ -121,6 +131,7 @@ class WindFarmSimulator:
             local_ti_multiplier = self._per_turbine_wind.get_local_ti_multiplier(idx)
             wake_deficit = self._per_turbine_wind.get_wake_deficit(idx)
             wake_meander_m = self._per_turbine_wind.get_wake_meander_offset(idx)
+            wake_yaw_defl_m = self._per_turbine_wind.get_wake_yaw_deflection_offset(idx)
 
             model.active_faults = [
                 {
@@ -147,7 +158,13 @@ class WindFarmSimulator:
                 local_ti_multiplier=local_ti_multiplier,
                 wake_deficit=wake_deficit,
                 wake_meander_offset_m=wake_meander_m,
+                wake_yaw_deflection_m=wake_yaw_defl_m,
             )
+
+            # Capture yaw_error (deg) for this step; fed back next step to drive
+            # wake-steering deflection.
+            yaw_err_deg = float(scada_output.get("WYAW_YwVn1AlgnAvg5s", 0.0))
+            self._last_yaw_err_rad[idx] = math.radians(yaw_err_deg)
 
             output = self._scada_to_output(tid, sim_time, scada_output, local_wind, wind_direction)
 

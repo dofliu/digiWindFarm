@@ -381,6 +381,12 @@ class PerTurbineWind:
         self._meander_angles = np.zeros(turbine_count)  # radians, lateral
         self._meander_ref_distance_m = 3.0 * rotor_diameter  # 3D reference
 
+        # Yaw-induced wake deflection (Bastankhah & Porté-Agel 2016):
+        # per-turbine yaw misalignment γ (rad) fed from engine each step.
+        # tan(θ_c) is re-derived per wake update; offset@3D cached for SCADA.
+        self._yaw_misalignment_rad = np.zeros(turbine_count)
+        self._yaw_tan_theta_c = np.zeros(turbine_count)
+
         # State
         self._current_speed_deltas = np.zeros(turbine_count)
         self._current_dir_deltas = np.zeros(turbine_count)
@@ -457,6 +463,25 @@ class PerTurbineWind:
         """
         idx = min(turbine_index, self._count - 1)
         return float(self._meander_angles[idx] * self._meander_ref_distance_m)
+
+    def set_yaw_misalignments(self, misalignments_rad) -> None:
+        """Update per-turbine yaw misalignment γ (radians).
+
+        Sign convention follows `yaw_model`'s `yaw_error`: positive means wind
+        arrives from the +yaw_error side of the nacelle. Clamped to ±45° to keep
+        Bastankhah's small-γ derivation physically valid.
+        """
+        arr = np.asarray(misalignments_rad, dtype=float)
+        n = min(arr.shape[0] if arr.ndim else 0, self._count)
+        if n:
+            limit = math.radians(45.0)
+            self._yaw_misalignment_rad[:n] = np.clip(arr[:n], -limit, limit)
+
+    def get_wake_yaw_deflection_offset(self, turbine_index: int) -> float:
+        """Lateral deflection (m) of this turbine's own wake at the 3D reference
+        point due to rotor yaw misalignment (Bastankhah 2016)."""
+        idx = min(turbine_index, self._count - 1)
+        return float(self._yaw_tan_theta_c[idx] * self._meander_ref_distance_m)
 
     def _update_wake_meander(self, turbulence_intensity: float, dt: float):
         """Advance per-turbine wake meander angle as an AR(1) process.
@@ -571,6 +596,21 @@ class PerTurbineWind:
         # Pre-compute Ct/8 for deficit discriminant
         ct_over_8 = ct / 8.0
 
+        # Per-source yaw-induced initial skew angle (Bastankhah & Porté-Agel 2016):
+        #   θ_c(γ, Ct) = 0.3·γ·(1 − √(1 − Ct·cos(γ))) / cos(γ)
+        # Near-wake lateral deflection: δ_y(x) ≈ tan(θ_c) · x_down.
+        self._yaw_tan_theta_c.fill(0.0)
+        for j in range(n):
+            gamma = self._yaw_misalignment_rad[j]
+            if abs(gamma) < 1e-3:
+                continue
+            cos_g = math.cos(gamma)
+            if cos_g < 0.1:
+                continue
+            disc = max(0.0, 1.0 - ct * cos_g)
+            theta_c = 0.3 * gamma * (1.0 - math.sqrt(disc)) / cos_g
+            self._yaw_tan_theta_c[j] = math.tan(theta_c)
+
         # Accumulate sum-of-squares deficits for each downstream turbine
         deficits_sq = np.zeros(n)
 
@@ -593,6 +633,8 @@ class PerTurbineWind:
                     # Apply wake meandering: source j's centerline drifts
                     # laterally by θ_m[j] · x_down at this downstream distance.
                     r_lat -= self._meander_angles[j] * x_down
+                    # Apply yaw-induced deflection: δ_y(x) = tan(θ_c[j]) · x_down.
+                    r_lat -= self._yaw_tan_theta_c[j] * x_down
                     r_sq = r_lat * r_lat
 
                     # Wake half-width at x_down

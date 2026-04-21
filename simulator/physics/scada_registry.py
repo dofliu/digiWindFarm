@@ -166,6 +166,10 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "m", "Wake Meander Lateral Offset @ 3D",
              "尾流蜿蜒側向位移(3D 參考)",
              -50, 50),
+    ScadaTag("WMET_WakeDefl", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WakeDefl",
+             "WMET", "REAL32", "m", "Wake Yaw-Induced Deflection @ 3D",
+             "偏航引發尾流側向偏轉(3D 參考)",
+             -50, 50),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle
