@@ -53,6 +53,8 @@
 - [x] 95 SCADA tags total (was 94): +1 wake velocity deficit tag (`WMET_WakeDef`)
 - [x] Dynamic wake meandering (Larsen-DWM lateral AR(1) oscillation of wake centerline, σ_θ=0.3·TI, τ=25 s, applied per-source to Bastankhah Gaussian r_lat) — see #95
 - [x] 96 SCADA tags total (was 95): +1 wake meander lateral offset tag (`WMET_WakeMndr`)
+- [x] Yaw-induced wake deflection (Bastankhah 2016 θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ initial skew, δ_y(x)=tan(θ_c)·x applied per-source inside Bastankhah Gaussian r_lat, engine feeds per-turbine yaw_error back each step, ±45° clamp) — see #97
+- [x] 97 SCADA tags total (was 96): +1 yaw-induced wake deflection tag (`WMET_WakeDefl`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -185,6 +187,7 @@ These parts are implemented, but still first-generation models:
 - [x] Localized turbulence pockets: Gaussian spatial pockets with stochastic spawn (~1 per 10–15 min), per-turbine TI multiplier boost, exposed via `WMET_LocalTi` — see #91
 - [x] Wake model upgrade: Bastankhah-Porté-Agel Gaussian wake (replaces simplified Jensen top-hat); TI-dependent expansion, Ct-coupled deficit, sum-of-squares multi-wake superposition, exposed via `WMET_WakeDef` — see #93
 - [x] Dynamic wake meandering: Larsen-DWM AR(1) lateral oscillation applied per source (σ_θ=0.3·TI, τ=25 s), downstream `WMET_WakeDef` now has realistic time variability, new `WMET_WakeMndr` tag — see #95
+- [x] Yaw-induced wake deflection: Bastankhah 2016 initial skew θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ, δ_y(x)=tan(θ_c)·x coupled per-source; engine feeds per-turbine yaw_error back each step; new `WMET_WakeDefl` tag — see #97
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

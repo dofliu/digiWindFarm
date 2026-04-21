@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-21 (dynamic wake meandering)
+Last updated: 2026-04-21 (yaw-induced wake deflection / wake steering)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -353,8 +353,11 @@ Newly implemented:
 Newly implemented:
 - Dynamic wake meandering (#95, Larsen DWM 2008): each turbine's wake centerline oscillates laterally as an AR(1) process with σ_θ ≈ 0.3·TI (radians) and τ ≈ 25 s (atmospheric integral timescale). The meander offset θ_m[source]·x_down is applied to the signed cross-stream distance inside the Bastankhah Gaussian deficit term, so downstream turbines now see time-varying deficit (±1% std at TI=0.08, 500 m spacing). New SCADA tag `WMET_WakeMndr` (wake lateral offset at 3D reference, m, ±50).
 
+Newly implemented:
+- Yaw-induced wake deflection / wake steering (#97, Bastankhah & Porté-Agel 2016): for each source turbine j with yaw misalignment γ_j (=yaw_error, clamped ±45°), the initial skew angle is θ_c = 0.3·γ·(1−√(1−Ct·cos γ))/cos γ. Near-wake lateral deflection δ_y(x) = tan(θ_c)·x_down is added per-source to the signed cross-stream distance (alongside DWM meander). Engine captures per-turbine `WYAW_YwVn1AlgnAvg5s` each step and feeds it back to `PerTurbineWind.set_yaw_misalignments()` before the next wake update, so the `yaw_misalignment` fault and transient yaw lag both drive end-to-end wake steering. At γ=15°/Ct=0.82 the wake centerline deflects ~9.4 m @ 3D (exact closed-form match), ~22 m @ 500 m downstream. New SCADA tag `WMET_WakeDefl` (m, ±50).
+
 Still missing:
-- more sophisticated wake model (e.g. curled-wake for skewed inflow, Frandsen with yaw-induced deflection)
+- curled-wake model for skewed inflow (yaw-deflection is handled via Bastankhah linear form; curled-wake adds counter-rotating vortex pair detail)
 
 ## 3. Not Yet Modeled
 
@@ -501,7 +504,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 96 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset)
+- 97 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset + yaw-induced wake deflection)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -531,4 +534,5 @@ Implemented:
 12. ~~localized turbulence pockets~~ → done (#91, Gaussian spatial TI boost pockets)
 13. ~~Bastankhah-Porté-Agel Gaussian wake model~~ → done (#93, TI-dependent expansion + Ct-coupled deficit + sum-of-squares)
 14. ~~dynamic wake meandering (Larsen DWM)~~ → done (#95, AR(1) lateral wake centerline with σ_θ=0.3·TI, τ=25 s)
-15. deployment hardening (JWT auth, RBAC, Docker Compose)
+15. ~~yaw-induced wake deflection / wake steering (Bastankhah 2016)~~ → done (#97, θ_c initial skew + δ_y(x)=tan(θ_c)·x, `WMET_WakeDefl`)
+16. deployment hardening (JWT auth, RBAC, Docker Compose)

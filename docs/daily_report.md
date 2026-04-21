@@ -4,20 +4,22 @@
 
 ## 今日 Commit 摘要
 
-本次日報工作提交（分支 `claude/keen-hopper-iHBSU`）：
-- feat: add dynamic wake meandering with lateral wake-center AR(1) oscillation (#95)
+本次日報工作提交（分支 `claude/keen-hopper-5UKdM`）：
+- feat: add yaw-induced wake deflection (Bastankhah 2016 wake steering) (#97)
 
-近 24 小時合併/提交摘要（主幹 main）：
+近 24 小時主幹 `main` 合併摘要：
+- [ea9ffae] Merge PR #96 — 動態尾流蜿蜒文件同步
+- [bf24c3a] docs: update project docs and daily report for dynamic wake meandering (#95)
+- [1cb1a1b] feat: add dynamic wake meandering with lateral wake-center AR(1) oscillation (#95)
 - [8eaa075] Merge PR #94 — Bastankhah-Porté-Agel 尾流模型（#93）
 - [af902a0] feat: upgrade wake model to Bastankhah-Porté-Agel Gaussian (#93)
-- [45c2f20] Merge PR #92 — 局部亂流袋（#91）
 
 ## Issue 狀態
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 建立 | #95 | 動態尾流蜿蜒（Dynamic Wake Meandering）— 尾流中心軸低頻側向振盪 | #93 Bastankhah 模型的自然延伸；本日建立並實作 |
-| 關閉 | #95 | 動態尾流蜿蜒 | 已實作 Larsen-DWM AR(1) 側向振盪、`WMET_WakeMndr` 標籤、自測四項物理檢核全過 |
+| 建立 | #97 | 偏航引發之尾流側向偏轉（wake steering）— Bastankhah 2016 | 今日建立並實作 |
+| 實作 | #97 | 偏航引發之尾流側向偏轉 | `WMET_WakeDefl` 新標籤，7 項自測全過 |
 | 保持 | #67 | 完整保護繼電器協調 LVRT/OVRT | 電壓-時間保護曲線 |
 | 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 頻帶警報曲線仍待做 |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，前端 RUL 視覺化待做 |
@@ -29,12 +31,13 @@
 | 保持 | #26 | 部署強化 | Docker 已完成，JWT/RBAC 待做 |
 | 保持 | #24 | 歷史資料儲存架構 | 架構決策待定 |
 
-本日建立並關閉 1 個 issue（#95），符合「每次最多 3 個新 issue」規則。
+本日建立 1 個 issue（#97），符合「每次最多 3 個新 issue」規則。
 
 ## Open Issues 總覽
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
+| #97 | 偏航引發尾流偏轉 — Bastankhah 2016 | enhancement, physics, auto-detected | 2026-04-21 | 已實作 |
 | #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | 電壓-時間曲線 |
 | #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | 頻帶警報曲線待做 |
 | #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 前端 RUL 待做 |
@@ -51,8 +54,8 @@
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
 | `server/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
-| `simulator/` | 2026-04-21 | 0 | 無測試套件 | `engine.py` 傳入 `wake_meander_offset_m` |
-| `simulator/physics/` | 2026-04-21 | 0 | 無測試套件 | `wind_field.py` 新增 AR(1) 蜿蜒；`turbine_physics`、`scada_registry` 新增 `WMET_WakeMndr` |
+| `simulator/` | 2026-04-21 | 0 | 無測試套件 | `engine.py` 新增 yaw_error 回饋 + `wake_yaw_deflection_m` |
+| `simulator/physics/` | 2026-04-21 | 0 | 無測試套件 | `wind_field.py` 新增 Bastankhah 偏航初始傾斜角；`turbine_physics`、`scada_registry` 新增 `WMET_WakeDefl` |
 | `wind_model.py`（根目錄） | 2026-04-19 | 0 | 無測試套件 | 無變更 |
 | `frontend/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案 |
@@ -73,70 +76,77 @@
 - 測試套件：未建立（無 pytest）— 追蹤 issue #52
 - 安全漏洞：17 個（5 個套件），詳見 #48
 - TODO/FIXME/HACK：0 個（核心模組）
-- SCADA 標籤：**96 個**（+1：`WMET_WakeMndr`）
+- SCADA 標籤：**97 個**（+1：`WMET_WakeDefl`）
 
 ## 今日新增功能
 
-### 動態尾流蜿蜒 Dynamic Wake Meandering（#95）
+### 偏航引發之尾流側向偏轉 Yaw-induced Wake Deflection / Wake Steering（#97）
 
 **物理原理**
 
-#93 實作的 Bastankhah-Porté-Agel 高斯尾流給出了**時間平均**的尾流剖面，但真實的尾流中心軸並非靜止——大氣大尺度湍流（200–300 m 渦旋）會推動整條尾流做低頻側向振盪。Larsen et al. 2008 的 Dynamic Wake Meandering（DWM）給出統計描述：
+#93（Bastankhah-Porté-Agel 高斯尾流）假設風機完全對齊來流風向，但真實風場中：
 
-- 側向位移隨下游距離線性成長：`σ_y(x) ≈ 0.3 · σ_v · (x / U_∞)`
-- 角度當量：`σ_θ ≈ 0.3 · TI`（弧度/下游單位）
-- 時間尺度：`τ_m ≈ L_u / U ≈ 25 s`（大氣積分尺度）
+1. **瞬時偏航誤差**：`yaw_model.py` 設計 15° 死區 + 60 s 啟動延遲，風向變化時 `yaw_error` 可達 10–15°
+2. **`yaw_misalignment` 故障**：注入最多 20°·severity 的固定偏差
+3. **主動尾流導向**：現代風場控制策略會**故意**讓上游風機偏航 10–25° 以減少下游赤字
 
-→ 最適合的數值表示為一階自迴歸（AR(1)）過程：`θ_m(t+dt) = α·θ_m(t) + η`，其中 `α = exp(−dt/τ)`、`η ~ N(0, σ_θ·√(1−α²))`，穩態方差自動等於 `σ_θ²`。
+偏航時，轉子推力向量具備側向分量，尾流中心軸隨下游距離持續偏轉。
+
+Bastankhah & Porté-Agel (2016, JFM) 給出初始傾斜角解析解：
+
+```
+θ_c(γ, Ct) = 0.3 · γ · (1 − √(1 − Ct · cos γ)) / cos γ      (弧度)
+δ_y(x)     ≈ tan(θ_c) · x_down                              (近尾流線性)
+```
 
 **實作方式**
 
 1. `simulator/physics/wind_field.py::PerTurbineWind`：
-   - `__init__` 新增 `_meander_rng`（seed+4000）、`_meander_angles` 向量（每台風機一個弧度值）、`_meander_ref_distance_m = 3·D`（~212 m，做為 SCADA 報告用的參考下游距離）
-   - 新增 `_update_wake_meander(TI, dt)`：對每台風機做 AR(1)，steady-state variance 由 `noise_scale = σ_θ·√(1−α²)` 保證
-   - `step()` 於 `_update_wake_factors` 前先呼叫 `_update_wake_meander`
-   - `_update_wake_factors` 內部改為計算**帶符號**的側向距離（原本是 `|r|²−x_down²`）：
-     - `cross_dx = −wind_dy, cross_dy = wind_dx`（perpendicular-to-wind 的單位向量）
-     - `r_lat = dx·cross_dx + dy·cross_dy`
-     - 套用上游風機 j 的蜿蜒位移：`r_lat −= θ_m[j] · x_down`
-     - 代入 Gaussian `exp(−0.5·r_lat² / σ_m²)`
-   - 新增 `get_wake_meander_offset(idx)` 方法（回傳該台風機自身尾流於 3D 下游的側向位移 m）
+   - `__init__` 新增 `_yaw_misalignment_rad`、`_yaw_tan_theta_c` 向量
+   - `set_yaw_misalignments(angles_rad)`：引擎每步餵入 per-turbine yaw_error（弧度），clamp 至 ±45°
+   - `_update_wake_factors` 預先計算 `tan_theta_c[j]`，於內層 r_lat 計算中再加一項 `−tan_theta_c[j] · x_down`（與既有尾流蜿蜒 `−θ_m[j]·x_down` 共用同一個側向軸）
+   - `get_wake_yaw_deflection_offset(idx)`：回傳該台風機自身尾流於 3D 參考位置之側向偏轉（m）
 2. `simulator/physics/turbine_physics.py`：
-   - `step()` 新增 `wake_meander_offset_m: float = 0.0` kwarg（±80 m clamp，保護性 margin）
-   - `__init__` 與 `reset()` 初始化 `_wake_meander_offset_m`
-   - 於 SCADA 輸出字典新增 `"WMET_WakeMndr": round(self._wake_meander_offset_m, 2)`
-3. `simulator/physics/scada_registry.py`：
-   - 新增 `ScadaTag("WMET_WakeMndr", ..., "REAL32", "m", ..., -50, 50)`
+   - `step()` 新增 `wake_yaw_deflection_m: float = 0.0` kwarg（±80 m clamp 做保護）
+   - `__init__` 與 `reset()` 初始化 `_wake_yaw_deflection_m`
+   - SCADA 輸出新增 `"WMET_WakeDefl": round(self._wake_yaw_deflection_m, 2)`
+3. `simulator/physics/scada_registry.py`：新增 `ScadaTag("WMET_WakeDefl", ..., "REAL32", "m", ..., -50, 50)`
 4. `simulator/engine.py`：
-   - 每步 `get_wake_meander_offset(idx)` 並透過 `wake_meander_offset_m=` 傳給 `turbine.step`
+   - `_last_yaw_err_rad` 向量儲存上一步 yaw_error（rad）
+   - 下一步 `_per_turbine_wind.step()` 前呼叫 `set_yaw_misalignments(...)`
+   - 每步取 `get_wake_yaw_deflection_offset(idx)` 傳給 `turbine.step`
+   - 每台 `turbine.step` 後讀取 `scada_output["WYAW_YwVn1AlgnAvg5s"]`（度）轉弧度存入 `_last_yaw_err_rad[idx]`
 
 **物理效應（自測驗證）**
 
-3 台風機 E-W 線列（0、500、1000 m），rotor D=70.65 m，burn-in 400 s 後取樣 2000 s：
+3 台風機 E-W 線列（0、500、1000 m），rotor D=70.65 m，V=8 m/s、TI=0.08、burn-in 100 s + 取樣 400 s：
 
 | 檢核項目 | 預期 | 實測 |
 |----------|------|------|
-| σ_θ（TI=0.08，target 0.3·TI） | 0.0240 rad | 0.0240 / 0.0215 / 0.0234 rad（3 台）✓ |
-| AR(1) lag-25 s 自相關（target 1/e） | ~0.37 | 0.275（採樣變異範圍內）✓ |
-| T1 (500 m 下游) 赤字均值、標準差 | mean≈17%、std 0.5–2% | mean 16.57%、std 1.12% ✓ |
-| T2 (1000 m 下游) 赤字均值、標準差 | mean≈18%、std 0.5–2% | mean 18.28%、std 0.92% ✓ |
-| WMET_WakeMndr 振幅 | std = 3D·σ_θ = 5.09 m | std 5.10 m（±16.65 m 峰值）✓ |
-| 側風（風向 0°） | 全部 0% 赤字 | 全部 0.00% ✓ |
-| 高 TI=0.20 的尾流赤字均值 | 顯著下降 | 5.97%（對比 TI=0.08 的 16.57%）✓ |
+| γ=0° 偏轉量 | 0 m（不應影響 #93 基線） | 0.00 m（3 台全部）✓ |
+| γ=+15° 偏轉 @3D（Bastankhah 解析式） | 9.38 m | **9.38 m**（誤差 <0.5 m）✓ |
+| γ=+15° 下游 T1 赤字 | 顯著下降 | 16.84% → 14.66%（↓12.9%）✓ |
+| γ=+25° 偏轉 @3D | > 15 m（非線性單調增） | 15.12 m ✓ |
+| γ=+25° T1 赤字 | 再下降 | 11.71%（vs γ=0 的 16.84% ↓30.4%）✓ |
+| γ=−15° 偏轉鏡射 | −9.38 m | −9.38 m ✓ |
+| γ=−15° T1 赤字 | 亦下降 | 14.56% < 16.84% ✓ |
+| γ=60° 輸入 clamp | 45° | 45.00° ✓ |
+| 源風機 T0 無自尾流 | 0% | 0.00% ✓ |
 
 **影響範圍**
 
-- 下游風機 `WMET_WakeDef` 不再是穩態常數，於 30 s 時間尺度呈 ±1% std 變異（極端值可到 10–17%）——與真實離岸 LiDAR/SCADA 觀測一致
-- 新增 `WMET_WakeMndr` 可於歷史圖表觀察每台風機自身尾流的側向位移（±5 m std, 峰 ±15 m）
-- σ_θ = 0.3·TI 的 TI 耦合自動把 #91（局部亂流袋）與 #93（Bastankhah 赤字）綁在一起：高 TI 下尾流既恢復較快、也蜿蜒較劇烈
-- 疲勞模型 `WLOD_TwFADEL/EdgeDEL` 於下游風機可預期略有提升（等量更真實的 DEL 負載注入）——可於後續長時段跑批驗證
+- `yaw_misalignment` 故障（severity=1.0 → 20° 偏航）現在會**真實**地把尾流側推離下游風機，下游 `WMET_WakeDef` 會於數秒內下降並持續，故障清除後逐漸回到對齊狀態
+- 瞬時偏航（風向變化時的 `yaw_error`，典型 5–15°）會帶來 2–9 m 的下游尾流偏移 — 與實測 LiDAR 一致
+- 新 SCADA 標籤 `WMET_WakeDefl` 可於歷史圖表觀察每台風機的尾流自偏轉（±15 m 典型）
+- 與 #93（Bastankhah 赤字）、#95（蜿蜒）共用同一個 `r_lat` 側向軸：三者物理一致疊加
+- 未來主動尾流導向控制策略（wake steering control）有物理基礎可建立
 
 ## 建議行動
 
-1. **長時段資料品質驗證**：以 `examples/data_quality_analysis.py` 跑 2 h 混合工況，特別觀察下游風機 `WMET_WakeDef` 的功率譜密度，確認蜿蜒頻譜接近大氣大尺度譜。
-2. **前端視覺化整合（與 #93 建議合併）**：Dashboard 尾流熱圖以瞬時位置顯示（非時間平均），讓操作員直觀看到蜿蜒。
-3. **實作 #58 頻譜警報曲線**：前端顯示各頻帶警報閾值。
-4. **實作 #57 前端 RUL 視覺化**：後端已就緒，前端 Load/Fatigue 分頁補 RUL 顯示。
-5. **建立 pytest 測試套件（#52）**：Bastankhah 尾流 + DWM 蜿蜒的 AR(1) 統計檢核非常適合作為第一批物理模型 pytest 測試案例。
-6. **Lillgrund / Horns Rev 基準驗證**：在蜿蜒上線後重新比對下游赤字統計與業界 LES/LiDAR 量測，調整 σ_θ 比例係數（DWM 原論文為 0.3，部分文獻用 0.25–0.35）。
-7. **同步 `/api/farms` 4 個路由至 README.md**：仍未完成。
+1. **長時段資料品質驗證**：以 `examples/data_quality_analysis.py` 跑 2 h 混合工況，注入 `yaw_misalignment` 故障，觀察下游 `WMET_WakeDef` 的下降量是否 ~2–5%，並對應 `WMET_WakeDefl` 的時間軌跡
+2. **前端視覺化整合**：Dashboard 尾流熱圖同時顯示 DWM 蜿蜒 + 偏航偏轉的綜合瞬時中心線
+3. **實作 #58 頻譜警報曲線**：前端顯示各頻帶警報閾值
+4. **實作 #57 前端 RUL 視覺化**：後端已就緒
+5. **建立 pytest 測試套件（#52）**：Bastankhah 傾斜角 + δ_y(x)=tan(θ_c)·x 的解析檢核為理想首批物理測試案例
+6. **主動 wake steering 控制實驗**：在模擬器層開放 API 注入 intentional yaw offset，驗證風場總出力的 wake-steering gain（可對比 NREL FLORIS 基準）
+7. **同步 `/api/farms` 4 個路由至 README.md**：仍未完成
