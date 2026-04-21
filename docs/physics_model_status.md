@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-20 (wake model upgrade)
+Last updated: 2026-04-21 (dynamic wake meandering)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -350,6 +350,9 @@ Newly implemented:
 Newly implemented:
 - Bastankhah-Porté-Agel Gaussian wake model (#93): replaces the simplified Jensen top-hat. Implements ε/D near-wake offset, linear wake expansion σ(x)/D = k*·(x/D)+ε/D with TI-dependent k* (Niayifar & Porté-Agel 2016 k*≈0.38·TI+0.004), Ct-coupled max deficit C(x)=1−√(1−Ct/(8·(σ/D)²)), Gaussian radial profile, and sum-of-squares multi-wake superposition. Ct heuristically follows operating point (~0.82 in Region 2, drops with V² above rated). New SCADA tag `WMET_WakeDef` (wake velocity deficit %).
 
+Newly implemented:
+- Dynamic wake meandering (#95, Larsen DWM 2008): each turbine's wake centerline oscillates laterally as an AR(1) process with σ_θ ≈ 0.3·TI (radians) and τ ≈ 25 s (atmospheric integral timescale). The meander offset θ_m[source]·x_down is applied to the signed cross-stream distance inside the Bastankhah Gaussian deficit term, so downstream turbines now see time-varying deficit (±1% std at TI=0.08, 500 m spacing). New SCADA tag `WMET_WakeMndr` (wake lateral offset at 3D reference, m, ±50).
+
 Still missing:
 - more sophisticated wake model (e.g. curled-wake for skewed inflow, Frandsen with yaw-induced deflection)
 
@@ -498,7 +501,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 95 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit)
+- 96 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -527,4 +530,5 @@ Implemented:
 11. ~~gear tooth contact modeling~~ → done (#76, contact-ratio mesh stiffness + tooth wear)
 12. ~~localized turbulence pockets~~ → done (#91, Gaussian spatial TI boost pockets)
 13. ~~Bastankhah-Porté-Agel Gaussian wake model~~ → done (#93, TI-dependent expansion + Ct-coupled deficit + sum-of-squares)
-14. deployment hardening (JWT auth, RBAC, Docker Compose)
+14. ~~dynamic wake meandering (Larsen DWM)~~ → done (#95, AR(1) lateral wake centerline with σ_θ=0.3·TI, τ=25 s)
+15. deployment hardening (JWT auth, RBAC, Docker Compose)

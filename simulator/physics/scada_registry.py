@@ -162,6 +162,10 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "%", "Wake Velocity Deficit",
              "尾流風速赤字",
              0, 70),
+    ScadaTag("WMET_WakeMndr", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WakeMndr",
+             "WMET", "REAL32", "m", "Wake Meander Lateral Offset @ 3D",
+             "尾流蜿蜒側向位移(3D 參考)",
+             -50, 50),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle
