@@ -120,6 +120,7 @@ class WindFarmSimulator:
             local_direction = self._per_turbine_wind.get_local_direction(wind_direction, idx)
             local_ti_multiplier = self._per_turbine_wind.get_local_ti_multiplier(idx)
             wake_deficit = self._per_turbine_wind.get_wake_deficit(idx)
+            wake_meander_m = self._per_turbine_wind.get_wake_meander_offset(idx)
 
             model.active_faults = [
                 {
@@ -145,6 +146,7 @@ class WindFarmSimulator:
                 ambient_humidity_pct=ambient_humidity,
                 local_ti_multiplier=local_ti_multiplier,
                 wake_deficit=wake_deficit,
+                wake_meander_offset_m=wake_meander_m,
             )
 
             output = self._scada_to_output(tid, sim_time, scada_output, local_wind, wind_direction)

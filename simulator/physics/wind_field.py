@@ -374,6 +374,13 @@ class PerTurbineWind:
         self._pocket_sim_time = 0.0
         self._current_ti_multipliers = np.ones(turbine_count)
 
+        # Dynamic wake meandering (Larsen et al. 2008 DWM):
+        # lateral oscillation angle of each turbine's wake centerline.
+        # σ_θ ≈ 0.3·TI, AR(1) with τ ≈ 25 s (atmospheric integral timescale)
+        self._meander_rng = np.random.RandomState(seed + 4000)
+        self._meander_angles = np.zeros(turbine_count)  # radians, lateral
+        self._meander_ref_distance_m = 3.0 * rotor_diameter  # 3D reference
+
         # State
         self._current_speed_deltas = np.zeros(turbine_count)
         self._current_dir_deltas = np.zeros(turbine_count)
@@ -386,6 +393,9 @@ class PerTurbineWind:
         Must be called once per step BEFORE get_local_wind().
         """
         self._current_direction = wind_direction
+
+        # Advance wake meandering state before computing wake factors
+        self._update_wake_meander(turbulence_intensity, dt)
 
         # Update wake factors based on current wind direction, speed, and TI
         self._update_wake_factors(wind_direction, farm_wind, turbulence_intensity)
@@ -437,6 +447,31 @@ class PerTurbineWind:
         """Wake deficit fraction at a turbine (0.0 = free stream, 0.6 = deep wake)."""
         idx = min(turbine_index, self._count - 1)
         return float(self._wake_deficits[idx])
+
+    def get_wake_meander_offset(self, turbine_index: int) -> float:
+        """Lateral offset (m) of this turbine's own wake at the 3D reference point.
+
+        Positive = wake centerline deflected to the cross-stream "+y_perp" direction
+        (left when looking downstream). Used for SCADA reporting; the full
+        per-downstream offset is computed inside `_update_wake_factors`.
+        """
+        idx = min(turbine_index, self._count - 1)
+        return float(self._meander_angles[idx] * self._meander_ref_distance_m)
+
+    def _update_wake_meander(self, turbulence_intensity: float, dt: float):
+        """Advance per-turbine wake meander angle as an AR(1) process.
+
+        Larsen DWM statistics:
+            σ_y(x) ≈ 0.3 · σ_v · (x / U_∞)  =>  σ_θ ≈ 0.3 · TI   (radians)
+            τ_m ≈ L_u / U ≈ 25 s   (atmospheric integral timescale)
+        """
+        tau = 25.0
+        alpha = math.exp(-max(dt, 0.0) / tau)
+        sigma_theta = 0.3 * max(turbulence_intensity, 0.02)
+        noise_scale = sigma_theta * math.sqrt(max(0.0, 1.0 - alpha * alpha))
+        for i in range(self._count):
+            eta = self._meander_rng.normal(0.0, noise_scale) if noise_scale > 0 else 0.0
+            self._meander_angles[i] = alpha * self._meander_angles[i] + eta
 
     def _update_turbulence_pockets(self, farm_wind: float, dt: float):
         """Spawn / expire pockets and compute per-turbine TI multipliers."""
@@ -503,6 +538,10 @@ class PerTurbineWind:
         angle_rad = math.radians(wind_direction)
         wind_dx = -math.sin(angle_rad)  # wind blows FROM this direction
         wind_dy = -math.cos(angle_rad)
+        # Cross-stream unit vector (perpendicular to wind, horizontal plane):
+        # rotating wind vector +90° CCW → used as signed lateral axis.
+        cross_dx = -wind_dy
+        cross_dy = wind_dx
 
         n = self._count
         D = float(self._rotor_diameter)
@@ -548,8 +587,13 @@ class PerTurbineWind:
                     x_down = dx * wind_dx + dy * wind_dy
                     if x_down <= 0.5 * D:
                         continue  # upstream or abreast of j → no wake
-                    # Cross-stream (perpendicular to wind) squared distance
-                    r_sq = max(0.0, dx * dx + dy * dy - x_down * x_down)
+                    # Signed cross-stream offset of target i from source j's
+                    # wake centerline (projected onto the perpendicular-to-wind axis).
+                    r_lat = dx * cross_dx + dy * cross_dy
+                    # Apply wake meandering: source j's centerline drifts
+                    # laterally by θ_m[j] · x_down at this downstream distance.
+                    r_lat -= self._meander_angles[j] * x_down
+                    r_sq = r_lat * r_lat
 
                     # Wake half-width at x_down
                     sigma_over_D = k_star * (x_down / D) + eps_over_D
