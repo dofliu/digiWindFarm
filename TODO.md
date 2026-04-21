@@ -51,6 +51,8 @@
 - [x] 94 SCADA tags total (was 93): +1 local TI multiplier tag (`WMET_LocalTi`)
 - [x] Bastankhah-Porté-Agel Gaussian wake model (TI-dependent expansion k* = 0.38·TI+0.004, Ct-coupled max deficit, Gaussian radial profile, sum-of-squares multi-wake superposition) — see #93
 - [x] 95 SCADA tags total (was 94): +1 wake velocity deficit tag (`WMET_WakeDef`)
+- [x] Dynamic wake meandering (Larsen-DWM lateral AR(1) oscillation of wake centerline, σ_θ=0.3·TI, τ=25 s, applied per-source to Bastankhah Gaussian r_lat) — see #95
+- [x] 96 SCADA tags total (was 95): +1 wake meander lateral offset tag (`WMET_WakeMndr`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -182,6 +184,7 @@ These parts are implemented, but still first-generation models:
 - [x] Ambient humidity effect on air cooling: moist-air density factor + dew-point condensation penalty, seasonal/diurnal humidity profile — see #89
 - [x] Localized turbulence pockets: Gaussian spatial pockets with stochastic spawn (~1 per 10–15 min), per-turbine TI multiplier boost, exposed via `WMET_LocalTi` — see #91
 - [x] Wake model upgrade: Bastankhah-Porté-Agel Gaussian wake (replaces simplified Jensen top-hat); TI-dependent expansion, Ct-coupled deficit, sum-of-squares multi-wake superposition, exposed via `WMET_WakeDef` — see #93
+- [x] Dynamic wake meandering: Larsen-DWM AR(1) lateral oscillation applied per source (σ_θ=0.3·TI, τ=25 s), downstream `WMET_WakeDef` now has realistic time variability, new `WMET_WakeMndr` tag — see #95
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

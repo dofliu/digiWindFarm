@@ -235,6 +235,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 - ambient humidity effect on air cooling implemented (moist-air density + dew-point condensation penalty) — see #89
 - localized turbulence pockets implemented (Gaussian spatial TI boost pockets, per-turbine TI multiplier, `WMET_LocalTi` tag) — see #91
 - wake model upgraded to Bastankhah-Porté-Agel Gaussian (TI-dependent expansion, Ct-coupled deficit, sum-of-squares superposition, `WMET_WakeDef` tag) — see #93
+- dynamic wake meandering implemented (Larsen-DWM lateral AR(1) oscillation of wake centerline, σ_θ=0.3·TI, τ≈25 s, new `WMET_WakeMndr` SCADA tag) — see #95
 - full protection relay coordination not yet implemented
 - frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)
