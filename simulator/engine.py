@@ -111,6 +111,12 @@ class WindFarmSimulator:
         ti_mult = self.wind_model.get_turbulence_multiplier(sim_time, stability=atm_stability)
         effective_ti = max(0.0, self.wind_model.turbulence_intensity * ti_mult)
 
+        # Air density ρ(T, RH) from ideal gas law + Magnus vapor correction (#101).
+        # Shared by all turbines (physical fact: same airmass across the farm).
+        air_density = self.wind_model.get_air_density(
+            sim_time, ambient_temp=ambient_temp, humidity=ambient_humidity
+        )
+
         turb_component = self._turbulence_gen.step(
             base_wind, effective_ti, time_step
         )
@@ -170,6 +176,7 @@ class WindFarmSimulator:
                 wake_yaw_deflection_m=wake_yaw_defl_m,
                 wind_shear_exp_base=shear_alpha,
                 atm_stability=atm_stability,
+                air_density=air_density,
             )
 
             # Capture yaw_error (deg) for this step; fed back next step to drive

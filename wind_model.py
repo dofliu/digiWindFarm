@@ -409,3 +409,25 @@ class WindEnvironmentModel:
 
         rh = base + diurnal + weather + self._rng.normal(0, 0.8)
         return max(15.0, min(100.0, rh))
+
+    def get_air_density(self, timestamp: datetime,
+                        ambient_temp: Optional[float] = None,
+                        humidity: Optional[float] = None) -> float:
+        """Moist air density ρ (kg/m³) from ideal gas law + Magnus correction.
+
+        ρ_dry   = P / (R_d · T_K)                R_d = 287.058 J/(kg·K)
+        e_s(T)  = 611.2 · exp(17.67·T_C/(T_C+243.5))   (Pa, Buck/Magnus)
+        ρ_moist = ρ_dry · (1 − 0.378·e/P)        e = (RH/100)·e_s
+
+        Typical range: ~1.15 (32 °C / 95% RH) to ~1.34 (−10 °C / 50% RH).
+        Pass `ambient_temp` / `humidity` to avoid re-computing those upstream.
+        """
+        t_c = ambient_temp if ambient_temp is not None else self.get_ambient_temp(timestamp)
+        rh = humidity if humidity is not None else self.get_ambient_humidity(timestamp)
+        t_k = t_c + 273.15
+        e_s = 611.2 * math.exp(17.67 * t_c / (t_c + 243.5))
+        e = max(0.0, min(1.0, rh / 100.0)) * e_s
+        p_atm = 101325.0
+        rho_dry = p_atm / (287.058 * t_k)
+        rho = rho_dry * (1.0 - 0.378 * e / p_atm)
+        return max(0.95, min(1.35, rho))
