@@ -102,8 +102,17 @@ class WindFarmSimulator:
         grid_frequency = self.grid_model.get_frequency(sim_time)
         grid_voltage = self.grid_model.get_voltage(sim_time)
 
+        # Atmospheric stability couples diurnal cycle to shear α and TI (#99).
+        # Compute the stability score once; pass it to the shear / TI getters
+        # so we don't mutate the weather RNG state multiple times per step.
+        # Manual overrides return neutral values automatically.
+        atm_stability = self.wind_model.get_atmospheric_stability(sim_time)
+        shear_alpha = self.wind_model.get_shear_exponent(sim_time, stability=atm_stability)
+        ti_mult = self.wind_model.get_turbulence_multiplier(sim_time, stability=atm_stability)
+        effective_ti = max(0.0, self.wind_model.turbulence_intensity * ti_mult)
+
         turb_component = self._turbulence_gen.step(
-            base_wind, self.wind_model.turbulence_intensity, time_step
+            base_wind, effective_ti, time_step
         )
         farm_wind = max(0, base_wind + turb_component)
 
@@ -115,7 +124,7 @@ class WindFarmSimulator:
         # Advance wind field: per-turbine turbulence + event propagation
         self._per_turbine_wind.step(
             farm_wind, wind_direction,
-            self.wind_model.turbulence_intensity, time_step,
+            effective_ti, time_step,
         )
 
         # FaultEngine.step() advances severity progression and alarm tracking.
@@ -159,6 +168,8 @@ class WindFarmSimulator:
                 wake_deficit=wake_deficit,
                 wake_meander_offset_m=wake_meander_m,
                 wake_yaw_deflection_m=wake_yaw_defl_m,
+                wind_shear_exp_base=shear_alpha,
+                atm_stability=atm_stability,
             )
 
             # Capture yaw_error (deg) for this step; fed back next step to drive

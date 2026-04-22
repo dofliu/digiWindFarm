@@ -170,6 +170,14 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "m", "Wake Yaw-Induced Deflection @ 3D",
              "偏航引發尾流側向偏轉(3D 參考)",
              -50, 50),
+    ScadaTag("WMET_ShearAlpha", "WMET.Z72PLC__UI_Loc_WMET_Analogue_ShearAlpha",
+             "WMET", "REAL32", "-", "Wind Shear Exponent (power-law α)",
+             "風切指數 α",
+             0.0, 0.4),
+    ScadaTag("WMET_AtmStab", "WMET.Z72PLC__UI_Loc_WMET_Analogue_AtmStab",
+             "WMET", "REAL32", "-", "Atmospheric Stability Score (-1 stable..+1 unstable)",
+             "大氣穩定度分數(-1 穩定..+1 不穩定)",
+             -1.0, 1.0),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle
