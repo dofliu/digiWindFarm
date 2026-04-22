@@ -182,7 +182,10 @@ class TurbinePhysicsModel:
             "grid_ride_through_scale": 1.0 + self._rng.uniform(-0.22, 0.25),
             "grid_reconnect_delay": self._rng.uniform(-5.0, 8.0),
             "tower_shadow_amp": 0.12 + self._rng.uniform(-0.03, 0.03),
-            "wind_shear_exp": 0.2 + self._rng.uniform(-0.04, 0.06),
+            # Per-turbine permanent shear offset (±0.04–0.06) applied on top
+            # of the time-varying farm-level α from the atmospheric stability
+            # model (see #99). Legacy key `wind_shear_exp` removed.
+            "wind_shear_exp_offset": self._rng.uniform(-0.04, 0.06),
             "blade_mass_offsets": _blade_mass_offsets,
             "wind_veer_rate": 0.10 + self._rng.uniform(-0.03, 0.03),
         }
@@ -251,6 +254,10 @@ class TurbinePhysicsModel:
         self._wake_deficit = 0.0
         self._wake_meander_offset_m = 0.0
         self._wake_yaw_deflection_m = 0.0
+        # Atmospheric stability coupling (#99): α is farm-level time-varying,
+        # applied with per-turbine permanent offset from individuality.
+        self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
+        self._atm_stability = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -322,13 +329,21 @@ class TurbinePhysicsModel:
              local_ti_multiplier: float = 1.0,
              wake_deficit: float = 0.0,
              wake_meander_offset_m: float = 0.0,
-             wake_yaw_deflection_m: float = 0.0) -> Dict[str, float]:
+             wake_yaw_deflection_m: float = 0.0,
+             wind_shear_exp_base: float = 0.2,
+             atm_stability: float = 0.0) -> Dict[str, float]:
         """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._local_ti_multiplier = max(0.0, float(local_ti_multiplier))
         self._wake_deficit = max(0.0, min(0.70, float(wake_deficit)))
         self._wake_meander_offset_m = max(-80.0, min(80.0, float(wake_meander_offset_m)))
         self._wake_yaw_deflection_m = max(-80.0, min(80.0, float(wake_yaw_deflection_m)))
+        # Atmospheric stability: farm-level α base + per-turbine permanent offset (#99)
+        shear_offset = self._individuality.get("wind_shear_exp_offset", 0.0)
+        self._effective_shear_alpha = max(
+            0.04, min(0.35, float(wind_shear_exp_base) + float(shear_offset))
+        )
+        self._atm_stability = max(-1.0, min(1.0, float(atm_stability)))
         self._sim_time += dt
         self._update_grid_reference(dt, grid_frequency_ref, grid_voltage_ref)
         fault_physics = self._get_fault_physics()
@@ -382,7 +397,8 @@ class TurbinePhysicsModel:
 
         # Wind shear: 1P torque modulation from vertical wind profile (#71)
         # V(h) = V_hub × (h/h_hub)^α — blade sweeps different wind speeds
-        shear_exp = self._individuality.get("wind_shear_exp", 0.2)
+        # α is now farm-level time-varying (diurnal stability, #99) + per-turbine offset
+        shear_exp = self._effective_shear_alpha
         R = s.rotor_diameter / 2.0
         H = s.hub_height
         shear_torque_factor = 0.0
@@ -655,7 +671,7 @@ class TurbinePhysicsModel:
             is_starting=is_starting,
             is_emergency_stop=is_emergency_stop,
             rotor_azimuth_rad=self._rotor_azimuth,
-            wind_shear_exponent=self._individuality.get("wind_shear_exp", 0.2),
+            wind_shear_exponent=self._effective_shear_alpha,
             imbalance_force_kn=self._imbalance_force_kn,
             wind_veer_rate=self._individuality.get("wind_veer_rate", 0.10),
         )
@@ -715,6 +731,8 @@ class TurbinePhysicsModel:
             "WMET_WakeDef": round(self._wake_deficit * 100.0, 2),
             "WMET_WakeMndr": round(self._wake_meander_offset_m, 2),
             "WMET_WakeDefl": round(self._wake_yaw_deflection_m, 2),
+            "WMET_ShearAlpha": round(self._effective_shear_alpha, 4),
+            "WMET_AtmStab": round(self._atm_stability, 3),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
@@ -1058,6 +1076,10 @@ class TurbinePhysicsModel:
         self._wake_deficit = 0.0
         self._wake_meander_offset_m = 0.0
         self._wake_yaw_deflection_m = 0.0
+        # Atmospheric stability coupling (#99): α is farm-level time-varying,
+        # applied with per-turbine permanent offset from individuality.
+        self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
+        self._atm_stability = 0.0
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0

@@ -55,6 +55,8 @@
 - [x] 96 SCADA tags total (was 95): +1 wake meander lateral offset tag (`WMET_WakeMndr`)
 - [x] Yaw-induced wake deflection (Bastankhah 2016 θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ initial skew, δ_y(x)=tan(θ_c)·x applied per-source inside Bastankhah Gaussian r_lat, engine feeds per-turbine yaw_error back each step, ±45° clamp) — see #97
 - [x] 97 SCADA tags total (was 96): +1 yaw-induced wake deflection tag (`WMET_WakeDefl`)
+- [x] Atmospheric stability / diurnal shear-TI coupling (continuous score s=solar·wind_damping·cloud_damping, α=0.14−0.10·s clamped [0.04, 0.30], TI_mult=1+0.5·s clamped [0.5, 1.6], strong-wind mechanical mixing, override-neutral, per-turbine α offset renamed) — see #99
+- [x] 99 SCADA tags total (was 97): +2 atmospheric stability tags (`WMET_ShearAlpha`, `WMET_AtmStab`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -188,6 +190,7 @@ These parts are implemented, but still first-generation models:
 - [x] Wake model upgrade: Bastankhah-Porté-Agel Gaussian wake (replaces simplified Jensen top-hat); TI-dependent expansion, Ct-coupled deficit, sum-of-squares multi-wake superposition, exposed via `WMET_WakeDef` — see #93
 - [x] Dynamic wake meandering: Larsen-DWM AR(1) lateral oscillation applied per source (σ_θ=0.3·TI, τ=25 s), downstream `WMET_WakeDef` now has realistic time variability, new `WMET_WakeMndr` tag — see #95
 - [x] Yaw-induced wake deflection: Bastankhah 2016 initial skew θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ, δ_y(x)=tan(θ_c)·x coupled per-source; engine feeds per-turbine yaw_error back each step; new `WMET_WakeDefl` tag — see #97
+- [x] Atmospheric stability / diurnal shear-TI coupling: Monin-Obukhov-simplified continuous score s ∈ [−1, +1] from solar time × mechanical mixing × cloud damping; drives α (0.04–0.30) and TI multiplier (0.5–1.6); new `WMET_ShearAlpha` + `WMET_AtmStab` tags — see #99
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication

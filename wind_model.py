@@ -306,6 +306,80 @@ class WindEnvironmentModel:
 
         return base + diurnal + weather + self._rng.normal(0, 0.3)
 
+    # ─── Atmospheric stability (Monin-Obukhov diurnal coupling) ────────
+    #
+    # Realistic offshore/onshore boundary layers go through a strong diurnal
+    # stability cycle that drives both the vertical wind-shear exponent α and
+    # the turbulence intensity. We summarise it with a single continuous score
+    # s ∈ [−1, +1]:
+    #     −1 ⇒ strongly stable (nocturnal radiative cooling dominates)
+    #      0 ⇒ neutral
+    #     +1 ⇒ strongly unstable (daytime convective mixing)
+    #
+    # s = solar(t) · wind_damping(V) · cloud_damping(pressure)
+    #
+    #     solar(t)      = sin(π · (hour − 6)/12)       # +1 noon, 0 dawn/dusk, −1 midnight
+    #     wind_damping  = 1 / (1 + (V/8)²)              # high wind → mechanical mixing
+    #     cloud_damping = 1 − 0.5 · max(0, −pressure)   # low-pressure / fronts → clouds
+    #
+    # Manual override (profile / set_override) forces neutral to avoid
+    # surprising users who fix wind conditions during demos.
+
+    def get_atmospheric_stability(self, timestamp: datetime) -> float:
+        """Continuous atmospheric stability score in [-1, +1].
+
+        Negative = stable (night, clear sky, low wind → high α, low TI).
+        Positive = unstable (convective afternoon → low α, high TI).
+        Returns 0.0 (neutral) when any manual wind override is active.
+
+        Uses the weather model's current state (no side effects) so this can be
+        called multiple times per step without advancing RNG state.
+        """
+        if self._override_wind_speed is not None or self._active_profile is not None:
+            return 0.0
+
+        hour = timestamp.hour + timestamp.minute / 60.0
+        solar = math.sin((hour - 6.0) * math.pi / 12.0)
+
+        # Wind damping: use seasonal baseline × current weather multiplier
+        # (mirrors _get_auto_wind but without advancing weather.step).
+        month = timestamp.month
+        scale, shape = SEASONAL_PARAMS.get(month, (8.5, 2.1))
+        seasonal_mean = scale * math.gamma(1.0 + 1.0 / shape)
+        # pressure_state already reflects current synoptic state
+        weather_mult = 1.0 - self._weather._pressure_state * 0.4
+        v = max(0.5, seasonal_mean * weather_mult)
+        wind_damping = 1.0 / (1.0 + (v / 8.0) ** 2)
+
+        # Cloud damping: low pressure / fronts suppress both extremes
+        cloud_damping = 1.0 - 0.5 * max(0.0, -self._weather._pressure_state)
+
+        s = solar * wind_damping * cloud_damping
+        return max(-1.0, min(1.0, s))
+
+    def get_shear_exponent(self, timestamp: datetime,
+                           stability: Optional[float] = None) -> float:
+        """Farm-level wind shear exponent α (power-law V(h)=V_hub·(h/h_hub)^α).
+
+        α = clamp(0.14 − 0.10·s, 0.04, 0.30). Neutral value 0.14 follows
+        common offshore measurements (e.g. FINO1, Lillgrund).
+
+        Pass `stability` to avoid re-computing and re-mutating internal state.
+        """
+        s = stability if stability is not None else self.get_atmospheric_stability(timestamp)
+        return max(0.04, min(0.30, 0.14 - 0.10 * s))
+
+    def get_turbulence_multiplier(self, timestamp: datetime,
+                                  stability: Optional[float] = None) -> float:
+        """Multiplier applied on top of `turbulence_intensity` base (0.5 – 1.6).
+
+        At very stable night ≈ 0.5× base TI; at convective afternoon ≈ 1.5× base TI.
+
+        Pass `stability` to avoid re-computing and re-mutating internal state.
+        """
+        s = stability if stability is not None else self.get_atmospheric_stability(timestamp)
+        return max(0.5, min(1.6, 1.0 + 0.5 * s))
+
     def get_ambient_humidity(self, timestamp: datetime) -> float:
         """Relative humidity (%) with seasonal/diurnal/weather modulation.
 

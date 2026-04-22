@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-21 (yaw-induced wake deflection / wake steering)
+Last updated: 2026-04-22 (atmospheric stability / diurnal shear-TI coupling)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -356,6 +356,16 @@ Newly implemented:
 Newly implemented:
 - Yaw-induced wake deflection / wake steering (#97, Bastankhah & Porté-Agel 2016): for each source turbine j with yaw misalignment γ_j (=yaw_error, clamped ±45°), the initial skew angle is θ_c = 0.3·γ·(1−√(1−Ct·cos γ))/cos γ. Near-wake lateral deflection δ_y(x) = tan(θ_c)·x_down is added per-source to the signed cross-stream distance (alongside DWM meander). Engine captures per-turbine `WYAW_YwVn1AlgnAvg5s` each step and feeds it back to `PerTurbineWind.set_yaw_misalignments()` before the next wake update, so the `yaw_misalignment` fault and transient yaw lag both drive end-to-end wake steering. At γ=15°/Ct=0.82 the wake centerline deflects ~9.4 m @ 3D (exact closed-form match), ~22 m @ 500 m downstream. New SCADA tag `WMET_WakeDefl` (m, ±50).
 
+Newly implemented:
+- Atmospheric stability / diurnal shear-TI coupling (#99, Monin-Obukhov simplified): continuous stability score s ∈ [−1, +1] composed from solar(t) · wind_damping(V) · cloud_damping(pressure). Drives:
+  - wind shear exponent α = clamp(0.14 − 0.10·s, 0.04, 0.30) — nighttime 0.18–0.22, convective afternoon 0.08–0.11
+  - turbulence multiplier TI_mult = clamp(1.0 + 0.5·s, 0.5, 1.6) — applied to base TI in both the global and per-turbine turbulence generators
+  - Strong-wind regime (V > 15 m/s) damps |s| toward 0 (mechanical mixing)
+  - Low-pressure / frontal weather damps |s| toward 0 (cloud cover)
+  - Manual wind overrides force neutral s = 0
+  - per-turbine permanent α offset (±0.04–0.06) renamed to `wind_shear_exp_offset` and stacks on farm-level α
+  - New SCADA tags: `WMET_ShearAlpha` (α), `WMET_AtmStab` (s)
+
 Still missing:
 - curled-wake model for skewed inflow (yaw-deflection is handled via Bastankhah linear form; curled-wake adds counter-rotating vortex pair detail)
 
@@ -504,7 +514,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 97 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset + yaw-induced wake deflection)
+- 99 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset + yaw-induced wake deflection + atmospheric stability + shear α)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -535,4 +545,5 @@ Implemented:
 13. ~~Bastankhah-Porté-Agel Gaussian wake model~~ → done (#93, TI-dependent expansion + Ct-coupled deficit + sum-of-squares)
 14. ~~dynamic wake meandering (Larsen DWM)~~ → done (#95, AR(1) lateral wake centerline with σ_θ=0.3·TI, τ=25 s)
 15. ~~yaw-induced wake deflection / wake steering (Bastankhah 2016)~~ → done (#97, θ_c initial skew + δ_y(x)=tan(θ_c)·x, `WMET_WakeDefl`)
-16. deployment hardening (JWT auth, RBAC, Docker Compose)
+16. ~~atmospheric stability / diurnal shear-TI coupling~~ → done (#99, s ∈ [−1, +1] → α, TI_mult, `WMET_ShearAlpha`, `WMET_AtmStab`)
+17. deployment hardening (JWT auth, RBAC, Docker Compose)
