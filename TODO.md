@@ -57,6 +57,8 @@
 - [x] 97 SCADA tags total (was 96): +1 yaw-induced wake deflection tag (`WMET_WakeDefl`)
 - [x] Atmospheric stability / diurnal shear-TI coupling (continuous score s=solar·wind_damping·cloud_damping, α=0.14−0.10·s clamped [0.04, 0.30], TI_mult=1+0.5·s clamped [0.5, 1.6], strong-wind mechanical mixing, override-neutral, per-turbine α offset renamed) — see #99
 - [x] 99 SCADA tags total (was 97): +2 atmospheric stability tags (`WMET_ShearAlpha`, `WMET_AtmStab`)
+- [x] Air density coupling (ideal gas + Magnus moist-air correction; ρ fed per-step into PowerCurveModel; aero power P ∝ ρ·V³ and thrust F ∝ ρ·V² respond to ambient T / RH) — see #101
+- [x] 100 SCADA tags total (was 99): +1 air density tag (`WMET_AirDensity`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -191,6 +193,7 @@ These parts are implemented, but still first-generation models:
 - [x] Dynamic wake meandering: Larsen-DWM AR(1) lateral oscillation applied per source (σ_θ=0.3·TI, τ=25 s), downstream `WMET_WakeDef` now has realistic time variability, new `WMET_WakeMndr` tag — see #95
 - [x] Yaw-induced wake deflection: Bastankhah 2016 initial skew θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ, δ_y(x)=tan(θ_c)·x coupled per-source; engine feeds per-turbine yaw_error back each step; new `WMET_WakeDefl` tag — see #97
 - [x] Atmospheric stability / diurnal shear-TI coupling: Monin-Obukhov-simplified continuous score s ∈ [−1, +1] from solar time × mechanical mixing × cloud damping; drives α (0.04–0.30) and TI multiplier (0.5–1.6); new `WMET_ShearAlpha` + `WMET_AtmStab` tags — see #99
+- [x] Air density coupling: ρ(T, RH) = P/(R_d·T) · (1 − 0.378·e/P) with Magnus vapor pressure; fed per-step into `PowerCurveModel.air_density`; power and thrust vary ±10% between cold-dry and hot-humid conditions; new `WMET_AirDensity` tag — see #101
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
