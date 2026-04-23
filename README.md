@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 100 SCADA tags aligned to Bachmann Z72 definitions
+- 101 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation
@@ -239,6 +239,7 @@ Historical storage currently grows continuously and does not yet have a cleanup 
 - yaw-induced wake deflection implemented (Bastankhah 2016 θ_c initial skew, per-source δ_y(x)=tan(θ_c)·x coupled to yaw_error, new `WMET_WakeDefl` SCADA tag; driven by yaw_misalignment fault and transient yaw lag) — see #97
 - atmospheric stability / diurnal shear-TI coupling implemented (Monin-Obukhov-simplified continuous stability score s ∈ [−1, +1] from solar time × wind mechanical mixing × cloud damping; drives wind shear exponent α ∈ [0.04, 0.30] and turbulence intensity multiplier ∈ [0.5, 1.6]; new `WMET_ShearAlpha` + `WMET_AtmStab` SCADA tags) — see #99
 - air density coupling implemented (moist-air ρ from ideal gas law + Buck/Magnus vapor correction; updated every step from ambient temp + humidity and injected into `PowerCurveModel.air_density` so aerodynamic power P ∝ ρ·V³ and thrust F ∝ ρ·V² both respond; ±10% swing between cold-winter and hot-humid days; new `WMET_AirDensity` SCADA tag) — see #101
+- wake-added turbulence intensity implemented (Crespo-Hernández 1996: TI_w(x, r=0) = 0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32 with a = 0.5·(1−√(1−Ct)), near-field capped at x/D=5; shared Bastankhah Gaussian σ for radial decay; Frandsen sum-of-squares across upstream sources; combined with pocket TI in quadrature before AR(1) generator so downstream σ_v observably rises — T1 at ~7D sees 12% wake-added TI and +36% wind-speed std vs free-stream T0 in self-test; new `WMET_WakeTi` SCADA tag) — see #103
 - full protection relay coordination not yet implemented
 - frontend RUL visualization pending (fatigue alarm thresholds, RUL estimation, and alarm event integration implemented — see #57)
 - dependency security vulnerabilities pending upgrade (see #48)

@@ -59,6 +59,8 @@
 - [x] 99 SCADA tags total (was 97): +2 atmospheric stability tags (`WMET_ShearAlpha`, `WMET_AtmStab`)
 - [x] Air density coupling (ideal gas + Magnus moist-air correction; ρ fed per-step into PowerCurveModel; aero power P ∝ ρ·V³ and thrust F ∝ ρ·V² respond to ambient T / RH) — see #101
 - [x] 100 SCADA tags total (was 99): +1 air density tag (`WMET_AirDensity`)
+- [x] Wake-added turbulence intensity (Crespo-Hernández 1996: TI_w=0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32, a=0.5·(1−√(1−Ct)); shared Bastankhah Gaussian σ for radial decay; Frandsen sum-of-squares across upstream sources; combined with pocket TI in quadrature so AR(1) generator sees real downstream σ_v rise) — see #103
+- [x] 101 SCADA tags total (was 100): +1 wake-added TI tag (`WMET_WakeTi`)
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -194,6 +196,7 @@ These parts are implemented, but still first-generation models:
 - [x] Yaw-induced wake deflection: Bastankhah 2016 initial skew θ_c=0.3·γ·(1−√(1−Ct·cos γ))/cos γ, δ_y(x)=tan(θ_c)·x coupled per-source; engine feeds per-turbine yaw_error back each step; new `WMET_WakeDefl` tag — see #97
 - [x] Atmospheric stability / diurnal shear-TI coupling: Monin-Obukhov-simplified continuous score s ∈ [−1, +1] from solar time × mechanical mixing × cloud damping; drives α (0.04–0.30) and TI multiplier (0.5–1.6); new `WMET_ShearAlpha` + `WMET_AtmStab` tags — see #99
 - [x] Air density coupling: ρ(T, RH) = P/(R_d·T) · (1 − 0.378·e/P) with Magnus vapor pressure; fed per-step into `PowerCurveModel.air_density`; power and thrust vary ±10% between cold-dry and hot-humid conditions; new `WMET_AirDensity` tag — see #101
+- [x] Wake-added turbulence intensity (Crespo-Hernández 1996): TI_w = 0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32 with a = 0.5·(1−√(1−Ct)), near-field capped at x/D=5; shared Bastankhah σ for Gaussian radial decay (no new parameter); Frandsen sum-of-squares across upstream sources; combined with pocket TI (#91) in quadrature before AR(1) generator so downstream σ_v observably rises (+36% at T1 in 3-in-line self-test); new `WMET_WakeTi` tag — see #103
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
