@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-22 (air density coupling)
+Last updated: 2026-04-23 (wake-added turbulence intensity, Crespo-Hernández)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -370,6 +370,10 @@ Newly implemented:
 - Air density coupling (#101): moist-air ρ from ideal gas law + Buck/Magnus vapor correction,
   `ρ = P/(R_d·T_K) · (1 − 0.378·e/P)`, P=101325 Pa, R_d=287.058. `WindEnvironmentModel.get_air_density(ts, temp?, rh?)` shares the temp/humidity already computed for stability, so no extra RNG mutation per step. Engine passes ρ to every turbine (same airmass), and `turbine_physics.step()` writes it into `PowerCurveModel.air_density` each tick so aero power `P = Cp·0.5·ρ·A·V³` and thrust `F = 0.5·ρ·A·Ct·V²` both respond automatically. Verified: 15 °C / 0% RH → 1.2250 (ISA), −10 °C / 50% RH → 1.3406 (+9.4%), 32 °C / 95% RH → 1.1372 (−7.2%), cold/hot power ratio 1.123. Clamp [0.95, 1.35]. New SCADA tag `WMET_AirDensity`.
 
+Newly implemented:
+- Wake-added turbulence intensity (#103, Crespo-Hernández 1996 / IEC 61400-1 Annex E):
+  per source-target pair, `TI_added(x, r) = 0.73·a^0.8325·TI_amb^0.0325·(x/D)^-0.32 · gauss(r)` where `a = 0.5·(1−√(1−Ct))` is the axial induction factor. Multi-source contributions combine as sum-of-squares; the result is then quadratically combined with the localized-pocket TI multiplier (#91) — `TI_eff² = (TI_amb·pocket_mult)² + TI_w²` — and fed back into the per-turbine AR(1) wind generator so downstream wind_speed σ rises naturally (downstream/upstream σ ratio measured at 2.12× in self-test). Reuses the Bastankhah Gaussian envelope (#93) and the meander/yaw deflection geometry (#95/#97), so no new pair-distance loop. Self-test: isolated → 0%, 5D downstream → ~14%, 12D → ~10%, multi-row sum-of-squares accumulating, Region 2 (Ct≈0.82) > Region 3 (Ct≈0.31). New SCADA tag `WMET_WakeTi` (REAL32, %, 0–40).
+
 Still missing:
 - curled-wake model for skewed inflow (yaw-deflection is handled via Bastankhah linear form; curled-wake adds counter-rotating vortex pair detail)
 
@@ -518,7 +522,7 @@ Implemented:
 - spectral vibration bands with fault-specific signatures
 - vibration alarm thresholds with ISO 10816-inspired zones
 - fatigue / load modeling (tower + blade moments, DEL, Miner's damage, alarm thresholds, RUL, tower SDOF dynamics)
-- 100 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset + yaw-induced wake deflection + atmospheric stability + shear α + air density)
+- 101 SCADA tags (electrical + vibration + structural load + alarm/RUL + bearing diagnostics + gear mesh sidebands + crest/kurtosis alarms + gearbox oil temp + tooth wear + outside humidity + local TI multiplier + Bastankhah wake deficit + wake meander offset + yaw-induced wake deflection + atmospheric stability + shear α + air density + wake-added TI)
 
 ### Still Weak
 - spectral alarm threshold curves — see #58 (crest factor/kurtosis anomaly alarms now completed)
@@ -551,4 +555,5 @@ Implemented:
 15. ~~yaw-induced wake deflection / wake steering (Bastankhah 2016)~~ → done (#97, θ_c initial skew + δ_y(x)=tan(θ_c)·x, `WMET_WakeDefl`)
 16. ~~atmospheric stability / diurnal shear-TI coupling~~ → done (#99, s ∈ [−1, +1] → α, TI_mult, `WMET_ShearAlpha`, `WMET_AtmStab`)
 17. ~~air density coupling~~ → done (#101, moist-air ρ(T,RH) → PowerCurveModel per step, `WMET_AirDensity`)
-18. deployment hardening (JWT auth, RBAC, Docker Compose)
+18. ~~wake-added turbulence intensity (Crespo-Hernández)~~ → done (#103, IEC 61400-1 Annex E, sum-of-squares per source × Bastankhah Gaussian envelope, `WMET_WakeTi`)
+19. deployment hardening (JWT auth, RBAC, Docker Compose)

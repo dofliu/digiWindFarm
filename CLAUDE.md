@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 100 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 101 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -35,6 +35,7 @@ Primary focus (next improvements):
 - yaw-induced wake deflection (wake steering) — fixed: Bastankhah 2016 θ_c = 0.3·γ·(1−√(1−Ct·cos γ))/cos γ coupled to per-turbine yaw_error, new `WMET_WakeDefl` tag — see #97
 - atmospheric stability / diurnal shear-TI coupling — fixed: continuous score s=solar·wind_damping·cloud_damping drives α ∈ [0.04, 0.30] and TI multiplier ∈ [0.5, 1.6], new `WMET_ShearAlpha` / `WMET_AtmStab` tags — see #99
 - air density coupling — fixed: ρ(T, RH) from ideal gas law + Magnus moist-air correction, updated every step and fed into PowerCurveModel so P ∝ ρ·V³ and F ∝ ρ·V² vary with temperature and humidity; new `WMET_AirDensity` tag — see #101
+- wake-added turbulence intensity — fixed: Crespo-Hernández `TI_added=0.73·a^0.8325·TI_amb^0.0325·(x/D)^-0.32` per source, sum-of-squares multi-wake superposition reusing Bastankhah Gaussian envelope; downstream AR(1) σ rises 2.1× in 5D self-test; new `WMET_WakeTi` tag — see #103
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -79,6 +80,7 @@ Still pending or incomplete:
 - yaw-induced wake deflection — done: Bastankhah 2016 skew angle coupled to per-turbine yaw_error, new `WMET_WakeDefl` tag (#97)
 - atmospheric stability / diurnal shear-TI coupling — done: Monin-Obukhov-simplified score s drives α ∈ [0.04, 0.30] and TI multiplier ∈ [0.5, 1.6], new `WMET_ShearAlpha` + `WMET_AtmStab` tags (#99)
 - air density coupling — done: moist-air ρ(T, RH) via ideal gas + Magnus, fed per-step to PowerCurveModel; aero power and thrust now vary ±10% with temperature/humidity; new `WMET_AirDensity` tag (#101)
+- wake-added turbulence intensity — done: Crespo-Hernández (1996) / IEC 61400-1 Annex E, per-source contribution combined as sum-of-squares with localized-pocket TI; downstream wind_speed σ ratio measured 2.1× at 5D in self-test; new `WMET_WakeTi` tag (#103)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52
