@@ -258,6 +258,8 @@ class TurbinePhysicsModel:
         # applied with per-turbine permanent offset from individuality.
         self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
         self._atm_stability = 0.0
+        # Air density ρ(T, RH) — updated per step from ambient temp + humidity (#101)
+        self._air_density = self.spec.air_density
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0
@@ -331,7 +333,8 @@ class TurbinePhysicsModel:
              wake_meander_offset_m: float = 0.0,
              wake_yaw_deflection_m: float = 0.0,
              wind_shear_exp_base: float = 0.2,
-             atm_stability: float = 0.0) -> Dict[str, float]:
+             atm_stability: float = 0.0,
+             air_density: float = 1.225) -> Dict[str, float]:
         """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._local_ti_multiplier = max(0.0, float(local_ti_multiplier))
@@ -344,6 +347,9 @@ class TurbinePhysicsModel:
             0.04, min(0.35, float(wind_shear_exp_base) + float(shear_offset))
         )
         self._atm_stability = max(-1.0, min(1.0, float(atm_stability)))
+        # Air density ρ(T, RH) drives aero power (P ∝ ρ·V³) and thrust (F ∝ ρ·V²) (#101)
+        self._air_density = max(0.95, min(1.35, float(air_density)))
+        self.power_curve.air_density = self._air_density
         self._sim_time += dt
         self._update_grid_reference(dt, grid_frequency_ref, grid_voltage_ref)
         fault_physics = self._get_fault_physics()
@@ -733,6 +739,7 @@ class TurbinePhysicsModel:
             "WMET_WakeDefl": round(self._wake_yaw_deflection_m, 2),
             "WMET_ShearAlpha": round(self._effective_shear_alpha, 4),
             "WMET_AtmStab": round(self._atm_stability, 3),
+            "WMET_AirDensity": round(self._air_density, 4),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
@@ -1080,6 +1087,8 @@ class TurbinePhysicsModel:
         # applied with per-turbine permanent offset from individuality.
         self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
         self._atm_stability = 0.0
+        # Air density ρ(T, RH) — updated per step from ambient temp + humidity (#101)
+        self._air_density = self.spec.air_density
         self._sim_time = 0.0
         self._generated_power_kw = 0.0
         self._generator_speed = 0.0

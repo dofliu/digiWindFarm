@@ -178,6 +178,10 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "-", "Atmospheric Stability Score (-1 stable..+1 unstable)",
              "大氣穩定度分數(-1 穩定..+1 不穩定)",
              -1.0, 1.0),
+    ScadaTag("WMET_AirDensity", "WMET.Z72PLC__UI_Loc_WMET_Analogue_AirDensity",
+             "WMET", "REAL32", "kg/m3", "Moist Air Density (ideal gas + Magnus)",
+             "濕空氣密度(理想氣體+Magnus 修正)",
+             0.95, 1.35),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle
