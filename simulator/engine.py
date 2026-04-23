@@ -147,6 +147,7 @@ class WindFarmSimulator:
             wake_deficit = self._per_turbine_wind.get_wake_deficit(idx)
             wake_meander_m = self._per_turbine_wind.get_wake_meander_offset(idx)
             wake_yaw_defl_m = self._per_turbine_wind.get_wake_yaw_deflection_offset(idx)
+            wake_added_ti = self._per_turbine_wind.get_wake_added_ti(idx)
 
             model.active_faults = [
                 {
@@ -174,6 +175,7 @@ class WindFarmSimulator:
                 wake_deficit=wake_deficit,
                 wake_meander_offset_m=wake_meander_m,
                 wake_yaw_deflection_m=wake_yaw_defl_m,
+                wake_added_ti=wake_added_ti,
                 wind_shear_exp_base=shear_alpha,
                 atm_stability=atm_stability,
                 air_density=air_density,
