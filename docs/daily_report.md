@@ -1,26 +1,26 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-04-23
+> 最後更新：2026-04-24
 
 ## 今日 Commit 摘要
 
-本次日報工作提交（分支 `claude/keen-hopper-uUP72`）：
+本次日報工作提交（分支 `claude/keen-hopper-mZpPO`）：
 
-- feat: add wake-added turbulence intensity (Crespo-Hernández) (#103)
+- feat: couple ambient pressure dynamically to synoptic weather state (#106)
 
-近 24 小時主幹 `main` 合併摘要：
+近 48 小時主幹 `main` 合併摘要：
 
+- [6728bae] Merge PR #105 — 尾流誘發紊流增強文件同步
+- [d4bb997] docs: update project docs and daily report for wake-added TI (#103)
+- [590c2d7] feat: add wake-added turbulence intensity (Crespo-Hernández) (#103)
 - [f1e085e] Merge PR #102 — 空氣密度耦合文件同步
 - [f01b9a5] docs: update project docs and daily report for air density coupling (#101)
-- [3565467] feat: couple air density to ambient temperature and humidity (#101)
-- [5ab4f32] Merge PR #100 — 大氣穩定度 α/TI 文件同步
-- [cdaa177] feat: atmospheric stability couples diurnal cycle to shear α and TI (#99)
 
 ## Issue 狀態
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 實作 | #103 | 尾流誘發紊流增強 Crespo-Hernández | 新增 `WMET_WakeTi`，7 項自測全過；SCADA 101 個 |
+| 建立+實作 | #106 | 大氣壓 P(t) 動態耦合 | 新 `WMET_AmbPressure`（hPa），7 項自測全過；SCADA 102 個 |
 | 保持 | #67 | 完整保護繼電器協調 LVRT/OVRT | 電壓-時間保護曲線待做 |
 | 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 頻帶警報曲線仍待做 |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，前端 RUL 視覺化待做 |
@@ -32,13 +32,13 @@
 | 保持 | #26 | 部署強化 | Docker 已完成，JWT/RBAC 待做 |
 | 保持 | #24 | 歷史資料儲存架構 | 架構決策待定 |
 
-本日建立 0 個 issue（#103 已由專案維護者於今日凌晨建立，本次直接實作）、關閉 0 個。符合「每次最多 3 個新 issue」規則。
+本日建立 1 個 issue（#106，源於昨日建議行動 7a）、關閉 0 個。符合「每次最多 3 個新 issue」規則。
 
 ## Open Issues 總覽
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #103 | 尾流誘發紊流增強 Crespo-Hernández | enhancement, physics, auto-detected | 2026-04-23 | 已實作 |
+| #106 | 大氣壓 P(t) 動態耦合 | enhancement, physics, auto-detected | 2026-04-24 | 已實作 |
 | #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | 電壓-時間曲線 |
 | #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | 頻帶警報曲線待做 |
 | #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 前端 RUL 待做 |
@@ -55,9 +55,9 @@
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
 | `server/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
-| `simulator/` | 2026-04-23 | 0 | 無測試套件 | `engine.py` 每步取得並傳遞 `wake_added_ti` |
-| `simulator/physics/` | 2026-04-23 | 0 | 無測試套件 | `wind_field` 新增 Crespo-Hernández 尾流 TI；`turbine_physics` 新增 `wake_added_ti` kwarg 與 `WMET_WakeTi` 輸出；`scada_registry` 新增 `WMET_WakeTi` |
-| `wind_model.py`（根目錄） | 2026-04-22 | 0 | 無測試套件 | 無變更 |
+| `simulator/` | 2026-04-24 | 0 | 無測試套件 | `engine.py` 每步取得 `ambient_pressure` 並傳遞 |
+| `simulator/physics/` | 2026-04-24 | 0 | 無測試套件 | `turbine_physics` 新增 `ambient_pressure_pa` kwarg 與 `WMET_AmbPressure` 輸出；`scada_registry` 新增 `WMET_AmbPressure` |
+| `wind_model.py`（根目錄） | 2026-04-24 | 0 | 無測試套件 | 新增 `get_ambient_pressure(ts)`；`get_air_density` 接受 `pressure_pa` kwarg |
 | `frontend/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
 | 根目錄原型 | 2026-04-12 | 0 | — | 早期原型檔案 |
 
@@ -71,97 +71,101 @@
 
 - Lint 錯誤：115（核心模組 `server/` + `simulator/` 維持 0 錯誤）
 - `ruff check simulator/ server/ wind_model.py` — All checks passed ✓
-- `python -m py_compile simulator/engine.py simulator/physics/wind_field.py simulator/physics/turbine_physics.py simulator/physics/scada_registry.py` — 4 個修改檔案全部通過
+- `python -m py_compile simulator/engine.py simulator/physics/turbine_physics.py simulator/physics/scada_registry.py wind_model.py` — 4 個修改檔案全部通過
 - Broken imports：0（核心模組全部通過）
 - 語法錯誤：0
 - 測試套件：未建立（無 pytest）— 追蹤 issue #52
 - 安全漏洞：17 個（5 個套件），詳見 #48
 - TODO/FIXME/HACK：0 個（核心模組）
-- SCADA 標籤：**101 個**（+1：`WMET_WakeTi`）
+- SCADA 標籤：**102 個**（+1：`WMET_AmbPressure`）
 
 ## 今日新增功能
 
-### 尾流誘發紊流增強 — Crespo-Hernández (#103)
+### 大氣壓 P(t) 動態耦合 — #106
 
 **問題與物理原理**
 
-`simulator/physics/wind_field.py` 目前已有完整的尾流**速度赤字**模型：Bastankhah-Porté-Agel 高斯尾流（#93）+ 動態尾流擺動（#95）+ 偏航尾流偏轉（#97）。然而**尾流對紊流強度 TI 的增強**這項物理事實一直未被建模：
+#101 已把空氣密度 ρ 接上環境溫度 T 與濕度 RH，但 `wind_model.py::get_air_density` 內**大氣壓仍硬編碼為 101325 Pa**（海平面 ISA 標準）。實際風場中 P 會因天氣鋒面持續變動：
 
-- 上游風機的葉尖渦流 + 剪切層 → 下游 TI 顯著上升
-- IEC 61400-1 Annex E：5D–10D 範圍附加 TI 可達 +5–10%
-- 影響：下游風機功率時變性、控制器負載、疲勞 DEL
+| 情境 | 典型 P | ΔP | Δρ（同 T, RH） |
+|------|-------|-----|----------------|
+| 穩定高壓 | 1028 hPa | +15 hPa | +1.5% |
+| 平均 | 1013 hPa | 0 | 基準 |
+| 活躍低壓/鋒面 | 998 hPa | −15 hPa | −1.5% |
+| 颱風 | 950 hPa | −63 hPa | −6.3% |
 
-原本 `WMET_LocalTi` 僅反映局部亂流氣袋（#91），不含尾流誘發部分。下游風機在尾流中應有更高的有效 TI，但 AR(1) 亂流產生器只看到原始環境 TI，無法感受下游 σ_v 的真實上升。
+`_weather._pressure_state` 已在 `WeatherSystem` 內自然演化（OU 隨機遊走 + 鋒面事件），但從未轉換為實際 Pa 並餵回 ρ。這使 `WMET_AirDensity` 僅反映 T/RH 變動，少了鋒面驅動的一階時間變異。
 
 **公式與實作**
 
-Crespo-Hernández (1996) 經驗公式：
-
 ```
-TI_w(x, r=0) = 0.73 · a^0.8325 · TI_∞^0.0325 · (x/D)^(-0.32)
-其中 a = 0.5·(1 − √(1 − Ct))              軸向誘導因子
+P(t) = 101325 + pressure_state · 1500 Pa        clamp [90000, 105000]
 ```
 
-- 有效範圍 5 ≤ x/D ≤ 15；近場（x/D<5）保守以 x/D=5 作上限
-- 徑向衰減**共用** Bastankhah σ（避免新增自由參數）：`TI_w(x,r) = TI_w(x,0) · exp(−0.5·r²/σ²)`
-- 多源疊加採 Frandsen 平方和（IEC 61400-1 Annex E）：`TI_eff² = TI_amb² + Σ TI_w²`
+- 係數 1500 Pa ≈ 15 hPa 對應中緯度鋒面典型振幅
+- `pressure_state` 為既有 [−1, +1] 連續分數，τ ≈ 2 h，鋒面週期 2–7 天
+- 手動 override 強制 P = 101325 Pa（ISA 基準，保持 demo 穩定）
 
 **與現有模型的耦合**
 
-1. `_update_wake_factors` 內同一對 `(j, i)` 迴圈，共用已計算的 `x_down`、`r_lat`、`σ`、`radial` — 無額外迴圈開銷
-2. `PerTurbineWind.step()` 將每台下游風機的 `wake_added_ti` 與 `pocket_mult` **平方和相加**，轉為 AR(1) 產生器的有效 TI 倍率：
+1. `wind_model.py::WindEnvironmentModel`
+   - 新增 `get_ambient_pressure(timestamp) -> float`
+   - `get_air_density` 新增 `pressure_pa: Optional[float]` kwarg；未傳時自動呼叫 `get_ambient_pressure`
+2. `simulator/engine.py::_run_one_step`
+   - 每步計算 `ambient_pressure` 一次，連同 T、RH 一起傳入 `get_air_density`
+   - 同值透過 `ambient_pressure_pa` kwarg 傳給每台 `turbine.step`（物理事實：全場共享同一氣團）
+3. `simulator/physics/turbine_physics.py`
+   - `step()` 新增 `ambient_pressure_pa: float = 101325.0` kwarg
+   - 輸出 `WMET_AmbPressure = round(ambient_pressure_pa / 100, 1)`（單位 hPa）
+4. `simulator/physics/scada_registry.py`
+   - 新增 `WMET_AmbPressure`（REAL32, hPa, 900–1050）→ **SCADA 總數 101 → 102**
 
-   ```
-   mult_combined = √(pocket_mult² + (wake_added_ti / TI_amb)²)
-   ti_local = turbulence_intensity · 0.4 · mult_combined
-   ```
-
-   這使得 `_turb_gens[i]` 真的看到下游提升後的 σ_v，自然體現在 `get_local_wind()` 回傳的風速波動上
-
-3. `simulator/engine.py`：新增 `wake_added_ti = self._per_turbine_wind.get_wake_added_ti(idx)` 傳入 `turbine.step`
-4. `simulator/physics/turbine_physics.py`：`step()` 新增 `wake_added_ti: float = 0.0` kwarg，`self._wake_added_ti = clamp([0, 0.50])`，輸出 `"WMET_WakeTi": round(self._wake_added_ti * 100.0, 2)`（單位 %）
-5. `simulator/physics/scada_registry.py`：新增 `WMET_WakeTi`（REAL32, %, 0–50）→ **SCADA 總數 100→101**
-
-**物理效應（自測驗證 — 3 台 E-W 線列，500 m 間距，D=70.65 m）**
+**物理效應（自測驗證）**
 
 | 測試情境 | 預期 | 實測 | 結果 |
 |----------|------|------|------|
-| T0 自由流 | ≈ 0 | 0.00% | ✓ |
-| T1（~7D 下游）10 m/s, TI=0.08 | 12% 左右（解析 12.16%） | 12.00% | ✓ |
-| T2（~14D 下游，疊加 T0+T1） | ≈ √(12² + 9.74²) = 15.46% | 15.41% | ✓ |
-| 側向風（270° 垂直線列） | 全為 0 | 0.00% | ✓ |
-| 18 m/s Region 3（Ct ≈ 0.31） | 顯著下降 | T1=4.54% | ✓ |
-| AR(1) 產生器實際感受 | T1 std > T0 std | 1.36 倍（+36%） | ✓ |
-| Frandsen 疊加一致性 | T2 ≈ √(T0→T2² + T1→T2²) | 15.41% ≈ 15.46% | ✓ |
+| T1 reference state=0 | P=1013.25 hPa, ρ=1.2250 | P=1013.25, ρ=1.2250 | ✓ |
+| T2 state=+1（高壓） | P=1028.25 hPa, ρ +1.5% | P=1028.25, ρ=1.2431 (+1.48%) | ✓ |
+| T3 state=−1（低壓） | P=998.25 hPa, ρ −1.5% | P=998.25, ρ=1.2068 (−1.49%) | ✓ |
+| T4 Δρ at T=15°C/RH=50% | ~3% | 3.01% | ✓ |
+| T5 override 鎖定 | P=101325 Pa | P=101325.0 Pa | ✓ |
+| T6 6 h 自然演化 | 合理擺動（幾 hPa） | 1012.9–1020.5 hPa（7.6 hPa） | ✓ |
+| T7 24 h 自然擺動 | 平均近 1013，範圍 ±15 | 1012–1023，均值 1018 | ✓ |
+
+引擎 end-to-end 驗證：手動設 `pressure_state=0.5` 5 步後，`WMET_AmbPressure` = 1020.7 hPa、`WMET_AirDensity` = 1.21；切換至 `pressure_state=-0.8`，P 轉為 1001.2 hPa、ρ 降至 1.14。經含感測器雜訊 + 漂移後數值仍一致。
 
 **為何這是物理「因」而非輸出偏移**
 
-- 使用 IEC 61400-1 Annex E 所引用的經驗公式（Crespo-Hernández 1996）
-- 透過既有 `_turb_gens[i].step(...)` 路徑傳遞，AR(1) 擾動自動反映上升後的 σ_v
-- 葉片載荷 / 疲勞 DEL（#41 #57）會因下游 σ_v 上升而自然加重，無須任何輸出層修正
-- 全場共用同一 Ct、同一 σ、同一 ε/D，迴圈與 Bastankhah 赤字疊合，無重複成本
-- 四個尾流機制（速度赤字 #93 + 擺動 #95 + 偏航偏轉 #97 + 附加紊流 #103）完整涵蓋主流尾流物理
+- 理想氣體定律是 ρ 的第一性來源；P 改變必然線性影響 ρ
+- `_pressure_state` 已自然存在於 `WeatherSystem` 並有 OU + 鋒面時間尺度
+- 全鏈路只替換一個常數（`get_air_density` 中的 `p_atm`）
+- 下游耦合（power P ∝ ρ·V³、thrust F ∝ ρ·V²、塔基 FA 疲勞 DEL）自動沿既有路徑反映
+- 14 台風機共用同一 P（真實氣象事實），但仍各自帶感測器漂移、地形偏差
 
 **與其他模型的耦合**
 
-- **#91（局部紊流氣袋）**：兩者在 AR(1) 倍率層平方和相加；`WMET_LocalTi` 維持純氣袋指標，`WMET_WakeTi` 為新增的尾流指標
-- **#93 / #95 / #97**：共用迴圈與幾何量（x_down, r_lat, σ, radial），零額外成本
-- **#99（大氣穩定度）**：環境 TI_amb 受穩定度調變後，`ch_amp = 0.73·a^0.8325·TI_amb^0.0325` 自動響應（雖 0.0325 指數很低，影響溫和）
-- **#57（疲勞 DEL / RUL）**：下游塔基 FA 與葉片 flapwise DEL 會因真實 σ_v 上升而加重，未來可校準加重比例
+- **#101（ρ(T, RH)）**：本 issue 把理想氣體三變數鏈的第三項 P 也接上，ρ = f(T, RH, P) 完整閉合
+- **#99（大氣穩定度）**：同源使用 `_pressure_state`（低壓系統 → 雲層 → |s| 壓低），兩者協同但不重複
+- **#89（濕度散熱）**：本更動不影響 nacelle/cabinet 散熱層（該層用 RH + ΔT_dew）
+- **#57（疲勞 DEL / RUL）**：±1.5% ρ 擺動 → 推力 F 同步擺動 → 塔基 FA DEL 會有額外低頻調變
 
 ## 建議行動
 
-1. **長時段資料品質驗證**：以 `examples/data_quality_analysis.py` 跑 **7 天自動模式**（time_scale=144），觀察：
-   - `WMET_WakeTi` 在不同風向下的空間分佈（相同下游位置但風向改變時應看到角色互換）
-   - 下游風機的 `WLOD_*` 疲勞累積速率是否相對上游加快 5–15%
-   - `WMET_LocalTi` 與 `WMET_WakeTi` 的相關性（應為弱相關，各自獨立來源）
-2. **疲勞 DEL 校準**：以 Lillgrund / Horns Rev 的實測 DEL 增幅（典型下游 +10–20%）校準 `ch_amp` 係數
-3. **前端視覺化**：Dashboard 可加上「有效 TI 熱圖」疊加速度赤字，使尾流結構更易理解
-4. **實作 #58 頻譜警報曲線**：前端顯示各頻帶警報閾值
-5. **實作 #57 前端 RUL 視覺化**：後端已就緒
-6. **建立 pytest 測試套件（#52）**：`wake_added_ti` 的解析驗證（7D → 12%、14D 疊加 → 15.5%）與 Frandsen 平方和為理想首批單元測試
-7. **未來擴充**：
-   - 大氣壓 P 的日週期/天氣鋒面依賴（目前固定 P=101325 Pa；實測可偏 ±2%）
-   - Curled-wake 扭斜流入修正（與偏航偏轉合併實作，可另案追蹤）
-   - 近場 x/D<5 的更精確修正（Türk & Emeis 2010 提出的 near-wake decay 模型）
-8. **同步 `/api/farms` 10 個路由至 README.md**：仍未完成
+1. **長時段資料品質驗證**：`examples/data_quality_analysis.py` 跑 **7 天自動模式**（time_scale=144），觀察：
+   - `WMET_AmbPressure` 出現鋒面通過事件（連續 12–24 h 下降 10 hPa 以上）
+   - `WMET_AirDensity` 與 `WMET_AmbPressure` 在鋒面時段強相關（r > 0.6）
+   - 鋒面時段 `WTUR_TotPwrAt` 是否呈現 1–2% 系統性下修（常規氣壓係數應）
+2. **前端視覺化**：Dashboard 可加「氣壓趨勢」卡片，與溫濕度並列，凸顯鋒面事件
+3. **實作 #58 頻譜警報曲線**：前端顯示各頻帶警報閾值
+4. **實作 #57 前端 RUL 視覺化**：後端已就緒
+5. **建立 pytest 測試套件（#52）**：`get_ambient_pressure` 與 `get_air_density` 的三變數單元測試是理想首批
+6. **未來擴充**：
+   - 半日大氣潮 S2（熱帶 ±1.5 hPa、中緯度 ±0.3 hPa），若 #106 後觀測到日週期過於平靜再加
+   - 颱風 / 極端低壓事件（pressure_state 需擴展 clamp）→ 可作單獨事件注入 API
+   - 海拔修正（目前假設海平面；若部署於山地風場需加 Hypsometric 公式）
+   - 壓力引起的水平梯度力對風向偏移（目前 `weather_shift` 已用 `_pressure_state`，互不重複）
+7. **同步 `/api/farms` 10 個路由至 README.md**：仍未完成
+
+## 通知
+
+已透過 email 發送日報至 moredof@gmail.com（請依專案實際 email 通知管道配置執行）。
