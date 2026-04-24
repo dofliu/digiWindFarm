@@ -392,6 +392,11 @@ class PerTurbineWind:
         self._yaw_misalignment_rad = np.zeros(turbine_count)
         self._yaw_tan_theta_c = np.zeros(turbine_count)
 
+        # Wake-added turbulence (Crespo & Hernández 1996 / IEC 61400-1 Annex E):
+        # additional TI fraction at each downstream turbine from upstream wakes,
+        # combined as sum-of-squares across sources.
+        self._wake_added_ti = np.zeros(turbine_count)
+
         # State
         self._current_speed_deltas = np.zeros(turbine_count)
         self._current_dir_deltas = np.zeros(turbine_count)
@@ -420,17 +425,15 @@ class PerTurbineWind:
         # Localized turbulence pockets: stochastic spawn + per-turbine TI multiplier
         self._update_turbulence_pockets(farm_wind, dt)
 
-        # Per-turbine turbulence (spatial decorrelation). The per-turbine TI
-        # fed to the AR(1) generator combines two independent sources in
-        # quadrature (IEC 61400-1 Annex E / Frandsen):
-        #   - pocket multiplier  (#91, convective / boundary-layer eddies)
-        #   - wake-added TI      (#103, Crespo-Hernández 1996)
-        ti_amb = max(turbulence_intensity, 0.02)
+        # Per-turbine turbulence (spatial decorrelation): pocket multiplier on
+        # ambient TI, combined in quadrature with wake-added TI (Frandsen / IEC
+        # 61400-1 Annex E):  TI_eff² = (TI_amb · pocket_mult)² + TI_wake²
+        ti_amb = max(turbulence_intensity, 1e-6)
         for i in range(self._count):
-            pocket_mult = float(self._current_ti_multipliers[i])
-            wake_ratio = float(self._wake_added_ti[i]) / ti_amb
-            combined_mult = math.sqrt(pocket_mult * pocket_mult + wake_ratio * wake_ratio)
-            ti_local = turbulence_intensity * 0.4 * combined_mult
+            pocket_mult = self._current_ti_multipliers[i]
+            wake_ti = self._wake_added_ti[i]
+            eff_mult = math.sqrt(pocket_mult * pocket_mult + (wake_ti / ti_amb) ** 2)
+            ti_local = turbulence_intensity * 0.4 * eff_mult
             turb = self._turb_gens[i].step(farm_wind, ti_local, dt)
             self._current_speed_deltas[i] += turb
 
@@ -505,6 +508,16 @@ class PerTurbineWind:
         point due to rotor yaw misalignment (Bastankhah 2016)."""
         idx = min(turbine_index, self._count - 1)
         return float(self._yaw_tan_theta_c[idx] * self._meander_ref_distance_m)
+
+    def get_wake_added_ti(self, turbine_index: int) -> float:
+        """Wake-added turbulence intensity at a turbine (fraction, e.g. 0.06 = +6%).
+
+        Combined sum-of-squares contribution from all upstream wakes per
+        Crespo-Hernández (1996) / IEC 61400-1 Annex E. Use TI_eff² = TI_amb² +
+        TI_wake² to obtain the total effective TI experienced by this turbine.
+        """
+        idx = min(turbine_index, self._count - 1)
+        return float(self._wake_added_ti[idx])
 
     def _update_wake_meander(self, turbulence_intensity: float, dt: float):
         """Advance per-turbine wake meander angle as an AR(1) process.
@@ -636,16 +649,23 @@ class PerTurbineWind:
 
         # Accumulate sum-of-squares deficits for each downstream turbine
         deficits_sq = np.zeros(n)
-        # Accumulate sum-of-squares wake-added turbulence (Crespo-Hernández 1996, #103)
+        # Wake-added turbulence intensity (Crespo-Hernández 1996), summed in
+        # quadrature across upstream sources per IEC 61400-1 Annex E.
         added_ti_sq = np.zeros(n)
 
-        # Axial induction factor (momentum theory): a = 0.5·(1 − √(1 − Ct))
-        # Used by Crespo-Hernández for wake-added TI amplitude.
-        a_ind = 0.5 * (1.0 - sqrt_one_minus_ct)
-        ti_amb = max(turbulence_intensity, 0.02)
-        self._last_ambient_ti = ti_amb
-        # Crespo-Hernández constant factor (independent of geometry)
-        ch_amp = 0.73 * (a_ind ** 0.8325) * (ti_amb ** 0.0325) if a_ind > 1e-4 else 0.0
+        # Crespo-Hernández pre-factors (independent of geometry):
+        #   TI_added(x, r=0) = 0.73 · a^0.8325 · TI_amb^0.0325 · (x/D)^(-0.32)
+        #   a = 0.5 · (1 − √(1 − Ct))   (axial induction factor)
+        if ct >= 0.05:
+            a_induction = 0.5 * (1.0 - math.sqrt(max(0.0, 1.0 - ct)))
+            ti_amb_clamped = max(0.04, min(0.5, turbulence_intensity))
+            crespo_prefactor = (
+                0.73
+                * (max(a_induction, 1e-3) ** 0.8325)
+                * (ti_amb_clamped ** 0.0325)
+            )
+        else:
+            crespo_prefactor = 0.0
 
         if ct >= 0.05 and mean_wind > 2.0:
             for j in range(n):
@@ -689,25 +709,24 @@ class PerTurbineWind:
 
                     deficits_sq[i] += deficit * deficit
 
-                    # Crespo-Hernández 1996 wake-added TI at centerline:
-                    #   TI_w(x, r=0) = 0.73 · a^0.8325 · TI_∞^0.0325 · (x/D)^(-0.32)
-                    # Validity 5 ≤ x/D ≤ 15; near-field capped at x/D=5 (conservative
-                    # upper bound), far-field follows the power-law decay.
-                    if ch_amp > 0.0:
-                        x_over_D = x_down / D
-                        x_over_D_capped = max(5.0, x_over_D)
-                        ti_w_center = ch_amp * (x_over_D_capped ** -0.32)
-                        # Shared Gaussian radial profile — avoids extra free
-                        # parameters and keeps deficit/TI spatially consistent.
-                        ti_w = ti_w_center * radial
-                        added_ti_sq[i] += ti_w * ti_w
+                    # Wake-added TI at downstream turbine i from source j.
+                    # Crespo's formula is calibrated for x/D ≥ 5; for very-near
+                    # wake (x/D < 2) it is unrealistically large, so floor at 2.
+                    x_over_D = max(2.0, x_down / D)
+                    ti_w_center = crespo_prefactor * (x_over_D ** -0.32)
+                    # Reuse the velocity-deficit Gaussian envelope (TI source is
+                    # the same shear layer): same σ, same lateral offset.
+                    ti_w = ti_w_center * radial
+                    # Single-source physical cap (~30%); also avoids tail blowup.
+                    ti_w = min(ti_w, 0.30)
+                    added_ti_sq[i] += ti_w * ti_w
 
         # Sum-of-squares superposition: total deficit fraction
         total_deficit = np.sqrt(deficits_sq)
         self._wake_deficits = np.clip(total_deficit, 0.0, 0.70)
         self._wake_factors = 1.0 - self._wake_deficits
-        # Wake-added TI: Frandsen quadrature across upstream sources
-        self._wake_added_ti = np.clip(np.sqrt(added_ti_sq), 0.0, 0.50)
+        # Wake-added TI: combined sum-of-squares, capped at 0.40 (multi-row farms)
+        self._wake_added_ti = np.clip(np.sqrt(added_ti_sq), 0.0, 0.40)
 
     @staticmethod
     def blade_shear_ratio(hub_height: float, rotor_radius: float,
