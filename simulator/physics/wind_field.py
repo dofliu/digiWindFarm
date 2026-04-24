@@ -361,6 +361,11 @@ class PerTurbineWind:
         self._offsets = self._rng.normal(0, 0.35, turbine_count)
         self._wake_factors = np.ones(turbine_count)
         self._wake_deficits = np.zeros(turbine_count)  # reported fraction 0..1
+        # Wake-added turbulence intensity (absolute TI, e.g. 0.06 = +6% TI)
+        # accumulated from upstream wakes via Crespo-Hernández (1996), #103.
+        self._wake_added_ti = np.zeros(turbine_count)
+        # Cache of ambient TI used in the most recent wake update (for SCADA mult)
+        self._last_ambient_ti = 0.08
 
         # Per-turbine turbulence generators for spatial decorrelation
         self._turb_gens = [TurbulenceGenerator(seed=seed + 1000 + i) for i in range(turbine_count)]
@@ -464,6 +469,16 @@ class PerTurbineWind:
         """Wake deficit fraction at a turbine (0.0 = free stream, 0.6 = deep wake)."""
         idx = min(turbine_index, self._count - 1)
         return float(self._wake_deficits[idx])
+
+    def get_wake_added_ti(self, turbine_index: int) -> float:
+        """Wake-added turbulence intensity at a turbine (absolute, 0.0–~0.15).
+
+        Sum-of-squares of upstream Crespo-Hernández contributions with Gaussian
+        radial falloff reusing the Bastankhah σ. Free-stream ≈ 0.0; a turbine
+        sitting ~5–7 D directly downwind in high-Ct conditions sees ~0.05–0.08.
+        """
+        idx = min(turbine_index, self._count - 1)
+        return float(self._wake_added_ti[idx])
 
     def get_wake_meander_offset(self, turbine_index: int) -> float:
         """Lateral offset (m) of this turbine's own wake at the 3D reference point.
@@ -687,7 +702,7 @@ class PerTurbineWind:
                     else:
                         c_max = 1.0 - math.sqrt(discriminant)
 
-                    # Gaussian radial profile
+                    # Gaussian radial profile (shared by deficit and added TI)
                     sigma_m_sq = sigma_sq_over_D_sq * D * D
                     radial = math.exp(-0.5 * r_sq / max(sigma_m_sq, 1.0))
                     deficit = c_max * radial
