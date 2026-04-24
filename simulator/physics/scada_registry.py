@@ -186,6 +186,10 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "kg/m3", "Moist Air Density (ideal gas + Magnus)",
              "濕空氣密度(理想氣體+Magnus 修正)",
              0.95, 1.35),
+    ScadaTag("WMET_AmbPressure", "WMET.Z72PLC__UI_Loc_WMET_Analogue_AmbPressure",
+             "WMET", "REAL32", "hPa", "Ambient Atmospheric Pressure",
+             "環境大氣壓力",
+             900, 1050),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle

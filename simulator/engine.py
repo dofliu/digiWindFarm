@@ -111,10 +111,14 @@ class WindFarmSimulator:
         ti_mult = self.wind_model.get_turbulence_multiplier(sim_time, stability=atm_stability)
         effective_ti = max(0.0, self.wind_model.turbulence_intensity * ti_mult)
 
-        # Air density ρ(T, RH) from ideal gas law + Magnus vapor correction (#101).
+        # Air density ρ(T, RH, P) from ideal gas law + Magnus vapor correction
+        # (#101, #106). Ambient pressure varies with synoptic weather state
+        # (frontal passages ±15 hPa), adding another ±1.5% ρ time variability.
         # Shared by all turbines (physical fact: same airmass across the farm).
+        ambient_pressure = self.wind_model.get_ambient_pressure(sim_time)
         air_density = self.wind_model.get_air_density(
-            sim_time, ambient_temp=ambient_temp, humidity=ambient_humidity
+            sim_time, ambient_temp=ambient_temp, humidity=ambient_humidity,
+            pressure_pa=ambient_pressure,
         )
 
         turb_component = self._turbulence_gen.step(
@@ -179,6 +183,7 @@ class WindFarmSimulator:
                 wind_shear_exp_base=shear_alpha,
                 atm_stability=atm_stability,
                 air_density=air_density,
+                ambient_pressure_pa=ambient_pressure,
             )
 
             # Capture yaw_error (deg) for this step; fed back next step to drive
