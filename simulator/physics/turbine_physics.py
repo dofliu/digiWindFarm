@@ -254,7 +254,8 @@ class TurbinePhysicsModel:
         self._wake_deficit = 0.0
         self._wake_meander_offset_m = 0.0
         self._wake_yaw_deflection_m = 0.0
-        self._wake_added_ti = 0.0  # #103, absolute added TI (0.0–~0.15)
+        # Wake-added TI fraction (Crespo-Hernández) — combined upstream contribution (#103)
+        self._wake_added_ti = 0.0
         # Atmospheric stability coupling (#99): α is farm-level time-varying,
         # applied with per-turbine permanent offset from individuality.
         self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
@@ -343,7 +344,8 @@ class TurbinePhysicsModel:
         self._wake_deficit = max(0.0, min(0.70, float(wake_deficit)))
         self._wake_meander_offset_m = max(-80.0, min(80.0, float(wake_meander_offset_m)))
         self._wake_yaw_deflection_m = max(-80.0, min(80.0, float(wake_yaw_deflection_m)))
-        self._wake_added_ti = max(0.0, min(0.50, float(wake_added_ti)))
+        # Wake-added TI fraction from upstream sources (Crespo-Hernández, #103)
+        self._wake_added_ti = max(0.0, min(0.40, float(wake_added_ti)))
         # Atmospheric stability: farm-level α base + per-turbine permanent offset (#99)
         shear_offset = self._individuality.get("wind_shear_exp_offset", 0.0)
         self._effective_shear_alpha = max(
@@ -1087,7 +1089,8 @@ class TurbinePhysicsModel:
         self._wake_deficit = 0.0
         self._wake_meander_offset_m = 0.0
         self._wake_yaw_deflection_m = 0.0
-        self._wake_added_ti = 0.0  # #103, absolute added TI (0.0–~0.15)
+        # Wake-added TI fraction (Crespo-Hernández) — combined upstream contribution (#103)
+        self._wake_added_ti = 0.0
         # Atmospheric stability coupling (#99): α is farm-level time-varying,
         # applied with per-turbine permanent offset from individuality.
         self._effective_shear_alpha = 0.2 + self._individuality.get("wind_shear_exp_offset", 0.0)
