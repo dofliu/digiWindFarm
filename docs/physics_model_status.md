@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-24 (dynamic atmospheric pressure coupling, #106)
+Last updated: 2026-04-24 (atmospheric-stability × wake-expansion coupling, #109; F811 dedup, #108)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -376,6 +376,12 @@ Newly implemented:
 
 Newly implemented:
 - Dynamic atmospheric pressure coupling (#106, extends #101): the existing synoptic weather state `_pressure_state ∈ [−1, +1]` (OU random walk, τ≈2 h, frontal cycle 2–7 days) is mapped to real pressure via `P(t) = 101325 + s·1500 Pa`, bounded to [90000, 105000] Pa. Mid-latitude amplitude ±15 hPa matches temperate-zone frontal statistics (1 σ ≈ 8 hPa, 2 σ ≈ 15 hPa). `WindEnvironmentModel.get_air_density(ts, ..., pressure_pa=...)` now accepts the per-step P so ρ responds to synoptic swings on top of T/RH. With identical T=15 °C / RH=50%, high-P (+15 hPa) vs low-P (−15 hPa) gives ρ=1.2392 vs 1.2030 (Δρ = 3.01%). `WindFarmSimulator._run_one_step` computes P once and hands it to both `get_air_density` and every `turbine.step(..., ambient_pressure_pa=...)` so the whole farm shares the same airmass P. Manual overrides lock P at ISA reference (101325 Pa) to keep demos predictable. New SCADA tag `WMET_AmbPressure` (hPa, 900–1050).
+
+Newly implemented:
+- Atmospheric-stability × wake-expansion coupling (#109, connects #99 × #93, Abkar & Porté-Agel 2015 / Peña et al. 2016): the Bastankhah wake expansion rate `k* = 0.38·TI + 0.004` is now modulated by the existing #99 stability score `s ∈ [−1, +1]`: `k*_eff = k*_neutral · clamp(1 + 0.30·s, 0.55, 1.45)`, clamped to `[0.015, 0.08]`. Stable ABL (s<0, nocturnal / low wind / clear sky) suppresses vertical mixing → smaller k* → wake persists farther. Convective ABL (s>0, afternoon surface heating) enhances mixing → larger k* → wake recovers faster. Self-test on a 3-turbine row at 6 D spacing, V=10 m/s, TI=8 %: stable s=−1 → wake deficit +33.8 %; convective s=+1 → deficit −22.0 %. No new SCADA tag is introduced — the effect is directly observable via correlation between existing `WMET_WakeDef` (per-turbine deficit) and `WMET_AtmStab` (farm-level s). `simulator/engine.py::_run_one_step` passes `atm_stability` into `PerTurbineWind.step(..., atm_stability=...)` which forwards to `_update_wake_factors(..., stability=...)`.
+
+Bug fixes:
+- #108: removed duplicate `PerTurbineWind.get_wake_added_ti` definition in `wind_field.py` (F811 lint error introduced by PR merge conflict of #103 and #106; both bodies were identical so the fix is purely cleanup — no behavior change).
 
 Still missing:
 - curled-wake model for skewed inflow (yaw-deflection is handled via Bastankhah linear form; curled-wake adds counter-rotating vortex pair detail)

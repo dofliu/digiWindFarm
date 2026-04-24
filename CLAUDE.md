@@ -37,6 +37,8 @@ Primary focus (next improvements):
 - air density coupling — fixed: ρ(T, RH) from ideal gas law + Magnus moist-air correction, updated every step and fed into PowerCurveModel so P ∝ ρ·V³ and F ∝ ρ·V² vary with temperature and humidity; new `WMET_AirDensity` tag — see #101
 - wake-added turbulence intensity — fixed: Crespo-Hernández (1996) TI_w = 0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32, shared Bastankhah Gaussian radial + Frandsen quadrature; combined with pocket TI (#91) in the AR(1) generator so downstream σ_v actually rises; new `WMET_WakeTi` tag — see #103
 - dynamic atmospheric pressure coupling — fixed: `_pressure_state → P(t) = 101325 + s·1500 Pa` mapped synoptic state to Pa, fed into `get_air_density` so ρ gains another ±1.5% time variability from weather fronts; new `WMET_AmbPressure` tag — see #106
+- atmospheric stability × wake expansion coupling — fixed: Bastankhah `k* = k_neutral · clamp(1 + 0.30·s, 0.55, 1.45)` (Abkar & Porté-Agel 2015 / Peña 2016); stable night → longer wake (≈+34% deficit at 6 D), convective afternoon → shorter wake (≈−22% deficit); no new SCADA tag, observable via `WMET_WakeDef × WMET_AtmStab` correlation — see #109
+- duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
@@ -83,6 +85,7 @@ Still pending or incomplete:
 - air density coupling — done: moist-air ρ(T, RH) via ideal gas + Magnus, fed per-step to PowerCurveModel; aero power and thrust now vary ±10% with temperature/humidity; new `WMET_AirDensity` tag (#101)
 - wake-added turbulence intensity — done: Crespo-Hernández 1996, shared Bastankhah σ for radial decay, Frandsen quadrature for multi-source, combined with pocket TI in the AR(1) generator so downstream σ_v observably rises; new `WMET_WakeTi` tag (#103)
 - dynamic atmospheric pressure P(t) — done: `_pressure_state` (OU random walk, τ≈2 h, frontal cycle 2–7 days) scaled to ±1500 Pa around 101325, fed through `get_air_density` so ρ gains another ±1.5% frontal swing on top of T/RH; new `WMET_AmbPressure` tag (#106)
+- atmospheric-stability × Bastankhah k* coupling — done: k* = k_neutral·(1 + 0.30·s) clamped to [0.55, 1.45]×; stable ABL yields ~+34% wake deficit at 6 D, convective ~−22%; no new SCADA tag (uses existing `WMET_WakeDef × WMET_AtmStab`) (#109)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

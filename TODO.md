@@ -63,6 +63,8 @@
 - [x] 101 SCADA tags total (was 100): +1 wake-added TI tag (`WMET_WakeTi`)
 - [x] Dynamic atmospheric pressure P(t) (synoptic `_pressure_state` ∈ [−1, +1] scaled to ±1500 Pa around 101325 Pa; fed through `get_air_density` so ρ gains another ±1.5% frontal swing on top of T/RH; override rejects to ISA reference) — see #106
 - [x] 102 SCADA tags total (was 101): +1 ambient pressure tag (`WMET_AmbPressure`)
+- [x] Atmospheric-stability × Bastankhah wake-expansion coupling (k* = k_neutral · clamp(1 + 0.30·s, 0.55, 1.45); stable ABL → longer wake, convective ABL → shorter wake; no new tag, observable via `WMET_WakeDef × WMET_AtmStab`) — see #109
+- [x] Removed duplicate `get_wake_added_ti` definition in `PerTurbineWind` (F811 fix after #103/#106 merge) — see #108
 
 ### Backend
 - [x] FastAPI REST APIs
@@ -200,6 +202,7 @@ These parts are implemented, but still first-generation models:
 - [x] Air density coupling: ρ(T, RH) = P/(R_d·T) · (1 − 0.378·e/P) with Magnus vapor pressure; fed per-step into `PowerCurveModel.air_density`; power and thrust vary ±10% between cold-dry and hot-humid conditions; new `WMET_AirDensity` tag — see #101
 - [x] Wake-added turbulence intensity (Crespo-Hernández 1996): TI_w = 0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32 with a = 0.5·(1−√(1−Ct)), near-field capped at x/D=5; shared Bastankhah σ for Gaussian radial decay (no new parameter); Frandsen sum-of-squares across upstream sources; combined with pocket TI (#91) in quadrature before AR(1) generator so downstream σ_v observably rises (+36% at T1 in 3-in-line self-test); new `WMET_WakeTi` tag — see #103
 - [x] Dynamic atmospheric pressure P(t): `_pressure_state ∈ [−1, +1]` → `P(t) = 101325 + s·1500 Pa` (mid-latitude ±15 hPa amplitude); fed into `get_air_density(ts, ..., pressure_pa=...)`, so ρ gains another ±1.5% time variability from synoptic weather fronts on top of #101's T/RH coupling; manual override locks P at ISA reference; new `WMET_AmbPressure` tag (hPa) — see #106
+- [x] Atmospheric-stability × wake-expansion coupling: Bastankhah k* modulated by the existing #99 continuous stability score s; `k* = k_neutral · clamp(1 + 0.30·s, 0.55, 1.45)`, clamp [0.015, 0.08]. Stable ABL (s<0) slows wake recovery (longer wake, larger deficit at same spacing); convective ABL (s>0) speeds it up. At V=10 m/s, TI=8%, 6 D downstream: stable s=−1 ≈ +34% deficit vs neutral; convective s=+1 ≈ −22%. No new SCADA tag — observable via `WMET_WakeDef × WMET_AtmStab` correlation (expected r < −0.4 at downstream turbines during diurnal cycling) — see #109
 
 ### Deployment (low priority — lab-only use currently)
 - [ ] JWT authentication
