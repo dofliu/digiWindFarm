@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-24 (atmospheric-stability × wake-expansion coupling, #109; F811 dedup, #108)
+Last updated: 2026-04-25 (atmospheric-stability × wind-veer coupling, #111)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -342,7 +342,7 @@ Newly implemented:
 - wind shear profile: power-law vertical wind profile with configurable exponent (default α=0.2, per-turbine variation ±0.04-0.06), azimuth-dependent blade loading in fatigue model (see #71)
 
 Newly implemented:
-- wind veer (directional shear with height): linear Ekman spiral model, per-turbine veer rate (0.07–0.13 °/m), azimuth-dependent blade direction offset, lateral force coupling to tower SS and blade flapwise moments (see #79)
+- wind veer (directional shear with height): linear Ekman spiral model, per-turbine veer rate (0.07–0.13 °/m), azimuth-dependent blade direction offset, lateral force coupling to tower SS and blade flapwise moments (see #79). The per-turbine `wind_veer_rate` is now the *baseline* component; the actual rate fed to the aero / fatigue paths is dynamically modulated by atmospheric stability (#111).
 
 Newly implemented:
 - localized turbulence pockets (#91): Gaussian spatial pockets (R=180–380 m), stochastic spawn (~1 per 10–15 min at 10 m/s), TI multiplier 1.4–2.0× at pocket center with Gaussian falloff, rise/hold/fall envelope; applies per-turbine TI boost to `TurbulenceGenerator`; new SCADA tag `WMET_LocalTi` (local TI multiplier %)
@@ -379,6 +379,9 @@ Newly implemented:
 
 Newly implemented:
 - Atmospheric-stability × wake-expansion coupling (#109, connects #99 × #93, Abkar & Porté-Agel 2015 / Peña et al. 2016): the Bastankhah wake expansion rate `k* = 0.38·TI + 0.004` is now modulated by the existing #99 stability score `s ∈ [−1, +1]`: `k*_eff = k*_neutral · clamp(1 + 0.30·s, 0.55, 1.45)`, clamped to `[0.015, 0.08]`. Stable ABL (s<0, nocturnal / low wind / clear sky) suppresses vertical mixing → smaller k* → wake persists farther. Convective ABL (s>0, afternoon surface heating) enhances mixing → larger k* → wake recovers faster. Self-test on a 3-turbine row at 6 D spacing, V=10 m/s, TI=8 %: stable s=−1 → wake deficit +33.8 %; convective s=+1 → deficit −22.0 %. No new SCADA tag is introduced — the effect is directly observable via correlation between existing `WMET_WakeDef` (per-turbine deficit) and `WMET_AtmStab` (farm-level s). `simulator/engine.py::_run_one_step` passes `atm_stability` into `PerTurbineWind.step(..., atm_stability=...)` which forwards to `_update_wake_factors(..., stability=...)`.
+
+Newly implemented:
+- Atmospheric-stability × wind-veer coupling (#111, connects #99 × #79, Holton *Atmospheric Dynamics* §5.3 / Stull *Boundary Layer Met* §8.5 / van der Laan et al. 2017 *Wind Energy* 20, 1191–1208): the per-turbine `wind_veer_rate` (#79 baseline 0.10 ± 0.03 °/m) is now multiplied by `factor = clamp(1 − 1.0·s, 0.3, 2.5)` driven by the existing #99 stability score `s ∈ [−1, +1]`. Stable ABL (s<0, nocturnal) preserves the Ekman spiral → strong veer; convective ABL (s>0, afternoon mixing) mixes the directional gradient out → weak veer. Mapping: s=−1 → veer ≈ 0.20 °/m; s=0 → 0.10 °/m (neutral baseline); s=+1 → 0.03 °/m (clamped). Self-test (12 m/s steady, 200 s warm-up): tower side-side moment 255.9 kNm at s=−1 vs 137.2 kNm at s=+1 (+37 % / −26 % vs 186.2 kNm neutral); aero power loss differs by ~13 kW between extremes. Per-turbine `wind_veer_rate` is retained as site/manufacturing variance on top of the atmospheric trend. The effective `veer_rate` is computed once per step in `turbine_physics.step()` (block #79 aero power-loss) and the same value is passed to `fatigue_model.step(wind_veer_rate=...)` so structural loads and aero power stay numerically consistent. No new SCADA tag — observable via `WMET_AtmStab × WLOD_TwrSsMom` correlation; expected r < −0.4 at producing turbines during diurnal cycling.
 
 Bug fixes:
 - #108: removed duplicate `PerTurbineWind.get_wake_added_ti` definition in `wind_field.py` (F811 lint error introduced by PR merge conflict of #103 and #106; both bodies were identical so the fix is purely cleanup — no behavior change).
@@ -566,6 +569,6 @@ Implemented:
 17. ~~air density coupling~~ → done (#101, moist-air ρ(T,RH) → PowerCurveModel per step, `WMET_AirDensity`)
 18. ~~wake-added turbulence intensity (Crespo-Hernández)~~ → done (#103, TI_w = 0.73·a^0.8325·TI_∞^0.0325·(x/D)^-0.32, shared Bastankhah σ, Frandsen quadrature, AR(1) σ_v uplift, `WMET_WakeTi`)
 19. ~~dynamic atmospheric pressure P(t) coupling~~ → done (#106, `_pressure_state → P = 101325 + s·1500 Pa`, passed through `get_air_density(ts, ..., pressure_pa=...)`, adds ±1.5% ρ swing from synoptic fronts, `WMET_AmbPressure`)
-20. deployment hardening (JWT auth, RBAC, Docker Compose)
-18. ~~wake-added turbulence intensity (Crespo-Hernández)~~ → done (#103, IEC 61400-1 Annex E, sum-of-squares per source × Bastankhah Gaussian envelope, `WMET_WakeTi`)
-19. deployment hardening (JWT auth, RBAC, Docker Compose)
+20. ~~atmospheric-stability × Bastankhah k\* coupling~~ → done (#109, `k* = k_neutral · clamp(1 + 0.30·s, 0.55, 1.45)`, stable +34 % deficit @ 6 D / convective −22 %, no new tag)
+21. ~~atmospheric-stability × wind-veer coupling~~ → done (#111, `veer_rate_eff = veer_base · clamp(1 − s, 0.3, 2.5)`, stable ~0.20 °/m / convective ~0.03 °/m, +37 % / −26 % TwrSS, no new tag)
+22. deployment hardening (JWT auth, RBAC, Docker Compose)

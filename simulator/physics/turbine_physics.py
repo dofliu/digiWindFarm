@@ -427,7 +427,14 @@ class TurbinePhysicsModel:
         aero_out.thrust_kn *= shear_torque_factor
 
         # Wind veer: direction offset with height → equivalent yaw error per blade (#79)
-        veer_rate = self._individuality.get("wind_veer_rate", 0.10)
+        # Stability × Ekman coupling (#111): veer rate scales with atmospheric
+        # stability (Holton 5.3, Stull 8.5, van der Laan 2017). Stable ABL
+        # (s<0) preserves the Ekman spiral → strong veer; convective ABL (s>0)
+        # mixes it out → weak veer. Per-turbine offset stays as site/manufacturing
+        # variance on top of the atmospheric trend.
+        veer_base = self._individuality.get("wind_veer_rate", 0.10)
+        veer_factor = max(0.3, min(2.5, 1.0 - 1.0 * self._atm_stability))
+        veer_rate = veer_base * veer_factor
         if is_producing and omega_rad > 0.1 and veer_rate > 0:
             veer_power_loss = 0.0
             for i in range(3):
@@ -688,7 +695,7 @@ class TurbinePhysicsModel:
             rotor_azimuth_rad=self._rotor_azimuth,
             wind_shear_exponent=self._effective_shear_alpha,
             imbalance_force_kn=self._imbalance_force_kn,
-            wind_veer_rate=self._individuality.get("wind_veer_rate", 0.10),
+            wind_veer_rate=veer_rate,
         )
 
         # IGCT water pressure now driven by cooling system pump (#29)
