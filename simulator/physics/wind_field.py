@@ -403,18 +403,29 @@ class PerTurbineWind:
         self._current_direction = 270.0
 
     def step(self, farm_wind: float, wind_direction: float,
-             turbulence_intensity: float, dt: float):
+             turbulence_intensity: float, dt: float,
+             atm_stability: float = 0.0):
         """Advance wind field by one timestep.
 
         Must be called once per step BEFORE get_local_wind().
+
+        `atm_stability` ∈ [−1, +1] follows the #99 convention
+        (positive = unstable / convective, negative = stable / nocturnal).
+        It modulates the Bastankhah wake expansion rate k* so stable air
+        produces a longer-persisting wake and convective air a shorter one
+        (Abkar & Porté-Agel 2015, Peña et al. 2016).
         """
         self._current_direction = wind_direction
 
         # Advance wake meandering state before computing wake factors
         self._update_wake_meander(turbulence_intensity, dt)
 
-        # Update wake factors based on current wind direction, speed, and TI
-        self._update_wake_factors(wind_direction, farm_wind, turbulence_intensity)
+        # Update wake factors based on current wind direction, speed, TI,
+        # and atmospheric stability.
+        self._update_wake_factors(
+            wind_direction, farm_wind, turbulence_intensity,
+            stability=atm_stability,
+        )
 
         # Generate natural wind events stochastically
         self._propagation.generate_natural_events(farm_wind, dt)
@@ -509,16 +520,6 @@ class PerTurbineWind:
         idx = min(turbine_index, self._count - 1)
         return float(self._yaw_tan_theta_c[idx] * self._meander_ref_distance_m)
 
-    def get_wake_added_ti(self, turbine_index: int) -> float:
-        """Wake-added turbulence intensity at a turbine (fraction, e.g. 0.06 = +6%).
-
-        Combined sum-of-squares contribution from all upstream wakes per
-        Crespo-Hernández (1996) / IEC 61400-1 Annex E. Use TI_eff² = TI_amb² +
-        TI_wake² to obtain the total effective TI experienced by this turbine.
-        """
-        idx = min(turbine_index, self._count - 1)
-        return float(self._wake_added_ti[idx])
-
     def _update_wake_meander(self, turbulence_intensity: float, dt: float):
         """Advance per-turbine wake meander angle as an AR(1) process.
 
@@ -582,7 +583,8 @@ class PerTurbineWind:
 
     def _update_wake_factors(self, wind_direction: float,
                              mean_wind: float = 10.0,
-                             turbulence_intensity: float = 0.08):
+                             turbulence_intensity: float = 0.08,
+                             stability: float = 0.0):
         """Compute direction-aware wake factors using Bastankhah-Porté-Agel.
 
         Gaussian wake model (Bastankhah & Porté-Agel, Renew. Energy 70, 2014):
@@ -592,7 +594,13 @@ class PerTurbineWind:
             ΔU/U   = C(x) · exp(−0.5·(r/σ)²)
 
         Wake expansion rate (Niayifar & Porté-Agel 2016):
-            k* ≈ 0.38 · TI + 0.004  (≈0.04 at TI=0.1, typical offshore)
+            k*_neutral ≈ 0.38 · TI + 0.004  (≈0.04 at TI=0.1, typical offshore)
+
+        Atmospheric-stability correction (Abkar & Porté-Agel 2015,
+        Peña et al. 2016):
+            k* = k*_neutral · clamp(1 + 0.30·s,  0.55, 1.45)
+        where s follows the #99 convention (−1 stable, +1 unstable).
+        Stable ABL → smaller k* → longer wake; convective ABL → larger k*.
 
         Multiple wakes are superposed via sum-of-squares of deficits.
         """
@@ -626,8 +634,12 @@ class PerTurbineWind:
             (1.0 + sqrt_one_minus_ct) / (2.0 * sqrt_one_minus_ct)
         )
 
-        # TI-dependent wake expansion rate (Niayifar & Porté-Agel 2016)
-        k_star = max(0.02, 0.38 * max(turbulence_intensity, 0.02) + 0.004)
+        # TI-dependent wake expansion rate (Niayifar & Porté-Agel 2016),
+        # then stability-modulated (Abkar & Porté-Agel 2015 / Peña 2016):
+        # stable ABL (s<0) → smaller k* → longer wake; convective (s>0) bigger.
+        k_star_neutral = max(0.02, 0.38 * max(turbulence_intensity, 0.02) + 0.004)
+        stability_factor = max(0.55, min(1.45, 1.0 + 0.30 * stability))
+        k_star = max(0.015, min(0.08, k_star_neutral * stability_factor))
 
         # Pre-compute Ct/8 for deficit discriminant
         ct_over_8 = ct / 8.0

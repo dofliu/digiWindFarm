@@ -131,10 +131,13 @@ class WindFarmSimulator:
         # per-turbine wake factors this step.
         self._per_turbine_wind.set_yaw_misalignments(self._last_yaw_err_rad)
 
-        # Advance wind field: per-turbine turbulence + event propagation
+        # Advance wind field: per-turbine turbulence + event propagation.
+        # `atm_stability` modulates Bastankhah k* (#109) so the wake persists
+        # longer on stable nights and recovers faster on convective afternoons.
         self._per_turbine_wind.step(
             farm_wind, wind_direction,
             effective_ti, time_step,
+            atm_stability=atm_stability,
         )
 
         # FaultEngine.step() advances severity progression and alarm tracking.
