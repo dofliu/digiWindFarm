@@ -39,6 +39,7 @@ Primary focus (next improvements):
 - dynamic atmospheric pressure coupling — fixed: `_pressure_state → P(t) = 101325 + s·1500 Pa` mapped synoptic state to Pa, fed into `get_air_density` so ρ gains another ±1.5% time variability from weather fronts; new `WMET_AmbPressure` tag — see #106
 - atmospheric stability × wake expansion coupling — fixed: Bastankhah `k* = k_neutral · clamp(1 + 0.30·s, 0.55, 1.45)` (Abkar & Porté-Agel 2015 / Peña 2016); stable night → longer wake (≈+34% deficit at 6 D), convective afternoon → shorter wake (≈−22% deficit); no new SCADA tag, observable via `WMET_WakeDef × WMET_AtmStab` correlation — see #109
 - atmospheric stability × wind veer coupling — fixed: `veer_rate_eff = veer_base · clamp(1 − s, 0.3, 2.5)` (Holton §5.3, Stull §8.5, van der Laan 2017); stable night ABL preserves Ekman spiral (~0.20 °/m, +37% TwrSS moment vs neutral), convective afternoon mixes it out (~0.03 °/m, −26%); no new SCADA tag, observable via `WMET_AtmStab × WLOD_TwrSsMom` correlation — see #111
+- atmospheric stability × wake meander timescale coupling — fixed: `τ_m_eff = 25 · clamp(1 − 0.6·s, 0.4, 2.0)` s (Counihan 1975 / Larsen DWM 2008); stable ABL → 40 s slow meander (lag-25 s autocorr ≈ 0.45), convective ABL → 10 s fast turnover (autocorr ≈ 0.01); σ_θ stays 0.3·TI, only timescale modulated; no new SCADA tag, observable via `WMET_WakeMndr × WMET_AtmStab` autocorrelation — see #113
 - duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
 
 Secondary focus:
@@ -88,6 +89,7 @@ Still pending or incomplete:
 - dynamic atmospheric pressure P(t) — done: `_pressure_state` (OU random walk, τ≈2 h, frontal cycle 2–7 days) scaled to ±1500 Pa around 101325, fed through `get_air_density` so ρ gains another ±1.5% frontal swing on top of T/RH; new `WMET_AmbPressure` tag (#106)
 - atmospheric-stability × Bastankhah k* coupling — done: k* = k_neutral·(1 + 0.30·s) clamped to [0.55, 1.45]×; stable ABL yields ~+34% wake deficit at 6 D, convective ~−22%; no new SCADA tag (uses existing `WMET_WakeDef × WMET_AtmStab`) (#109)
 - atmospheric-stability × wind veer coupling — done: `veer_rate_eff = veer_base · clamp(1 − s, 0.3, 2.5)` (Holton/Stull/van der Laan 2017); stable night ~0.20 °/m with +37% TwrSS moment, convective afternoon ~0.03 °/m with −26%; per-turbine veer_rate retained as site/manufacturing variance; effective rate is shared between aero power-loss and fatigue tower/blade load paths; no new SCADA tag (#111)
+- atmospheric-stability × wake meander τ_m coupling — done: integral timescale `τ_m = 25 · clamp(1 − 0.6·s, 0.4, 2.0)` s (Counihan 1975 / Larsen DWM 2008 / Peña 2012); stable ABL → 40 s slow meander, convective ABL → 10 s fast turnover; σ_θ stays 0.3·TI (amplitude path is #99 TI mult); validated lag-25 s autocorr 0.45 vs 0.01 for stable vs convective; no new SCADA tag (`WMET_WakeMndr × WMET_AtmStab` autocorrelation) (#113)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

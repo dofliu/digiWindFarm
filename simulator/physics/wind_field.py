@@ -417,8 +417,9 @@ class PerTurbineWind:
         """
         self._current_direction = wind_direction
 
-        # Advance wake meandering state before computing wake factors
-        self._update_wake_meander(turbulence_intensity, dt)
+        # Advance wake meandering state before computing wake factors.
+        # Atmospheric stability modulates the integral timescale τ_m (#113).
+        self._update_wake_meander(turbulence_intensity, dt, stability=atm_stability)
 
         # Update wake factors based on current wind direction, speed, TI,
         # and atmospheric stability.
@@ -520,14 +521,24 @@ class PerTurbineWind:
         idx = min(turbine_index, self._count - 1)
         return float(self._yaw_tan_theta_c[idx] * self._meander_ref_distance_m)
 
-    def _update_wake_meander(self, turbulence_intensity: float, dt: float):
+    def _update_wake_meander(self, turbulence_intensity: float, dt: float,
+                             stability: float = 0.0):
         """Advance per-turbine wake meander angle as an AR(1) process.
 
         Larsen DWM statistics:
             σ_y(x) ≈ 0.3 · σ_v · (x / U_∞)  =>  σ_θ ≈ 0.3 · TI   (radians)
             τ_m ≈ L_u / U ≈ 25 s   (atmospheric integral timescale)
+
+        Atmospheric-stability correction (#113, Counihan 1975 / Larsen DWM 2008):
+        the integral length scale L_u (and hence τ_m = L_u/U) grows in stable
+        ABL and shrinks in convective ABL. Linearise as
+            τ_m_eff = 25 · clamp(1 − 0.6·s,  0.4, 2.0)
+        so s=−1 → 40 s (slow meander, nocturnal), s=+1 → 10 s (fast turnover,
+        afternoon convection). σ_θ stays tied to TI so amplitude is governed by
+        #99 turbulence-multiplier path; here we only modulate the timescale.
         """
-        tau = 25.0
+        tau_factor = max(0.4, min(2.0, 1.0 - 0.6 * stability))
+        tau = 25.0 * tau_factor
         alpha = math.exp(-max(dt, 0.0) / tau)
         sigma_theta = 0.3 * max(turbulence_intensity, 0.02)
         noise_scale = sigma_theta * math.sqrt(max(0.0, 1.0 - alpha * alpha))
