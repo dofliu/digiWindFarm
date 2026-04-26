@@ -31,6 +31,14 @@ class TurbulenceGenerator:
       τ_turb ≈ L_u / V_mean  (L_u = integral length scale ≈ 340m for hub height 90m)
 
     At 12 m/s: τ ≈ 340/12 ≈ 28 seconds → fluctuations persist for ~30s
+
+    Atmospheric-stability correction (#115, Counihan 1975 / Kaimal & Finnigan 1994 /
+    Peña & Hahmann 2012, parallel to wake-meander #113):
+        L_u_eff = 340 · clamp(1 − 0.6·s,  0.4,  2.0)   [m]
+    where s ∈ [−1, +1] follows the #99 convention (negative = stable / nocturnal,
+    positive = unstable / convective). Stable ABL → larger L_u → longer τ →
+    persistent low-frequency wind fluctuations; convective ABL → shorter L_u →
+    fast turnover.
     """
 
     def __init__(self, seed: Optional[int] = None):
@@ -38,7 +46,7 @@ class TurbulenceGenerator:
         self._state = 0.0  # AR(1) state
 
     def step(self, mean_speed: float, turbulence_intensity: float,
-             dt: float) -> float:
+             dt: float, stability: float = 0.0) -> float:
         """
         Generate turbulence component (m/s) for one timestep.
 
@@ -46,6 +54,9 @@ class TurbulenceGenerator:
             mean_speed: Mean wind speed (m/s)
             turbulence_intensity: TI (typically 0.08-0.20)
             dt: Timestep (seconds)
+            stability: Atmospheric stability score s ∈ [−1, +1] (#99 convention).
+                Negative = stable ABL → longer L_u → slower autocorrelation;
+                positive = convective ABL → shorter L_u → faster turnover.
 
         Returns:
             Turbulence fluctuation (m/s), to be added to mean speed
@@ -54,8 +65,10 @@ class TurbulenceGenerator:
             self._state = 0.0
             return 0.0
 
-        # Integral length scale (IEC 61400-1, hub height 90m)
-        L_u = 340.0  # meters
+        # Integral length scale (IEC 61400-1 neutral baseline at hub height 90m),
+        # modulated by atmospheric stability per #115.
+        L_u_factor = max(0.4, min(2.0, 1.0 - 0.6 * stability))
+        L_u = 340.0 * L_u_factor  # meters
         tau = L_u / max(mean_speed, 1.0)  # correlation time scale
 
         # AR(1) coefficient
@@ -446,7 +459,12 @@ class PerTurbineWind:
             wake_ti = self._wake_added_ti[i]
             eff_mult = math.sqrt(pocket_mult * pocket_mult + (wake_ti / ti_amb) ** 2)
             ti_local = turbulence_intensity * 0.4 * eff_mult
-            turb = self._turb_gens[i].step(farm_wind, ti_local, dt)
+            # Stability-modulated integral length scale L_u (#115): same s ∈
+            # [−1, +1] feeds the per-turbine AR(1) τ as the global generator,
+            # so stable ABL persistence is consistent across the farm.
+            turb = self._turb_gens[i].step(
+                farm_wind, ti_local, dt, stability=atm_stability,
+            )
             self._current_speed_deltas[i] += turb
 
     def get_local_wind(self, farm_wind: float, turbine_index: int) -> float:
