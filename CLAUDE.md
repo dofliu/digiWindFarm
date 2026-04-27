@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 102 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 103 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -41,6 +41,7 @@ Primary focus (next improvements):
 - atmospheric stability × wind veer coupling — fixed: `veer_rate_eff = veer_base · clamp(1 − s, 0.3, 2.5)` (Holton §5.3, Stull §8.5, van der Laan 2017); stable night ABL preserves Ekman spiral (~0.20 °/m, +37% TwrSS moment vs neutral), convective afternoon mixes it out (~0.03 °/m, −26%); no new SCADA tag, observable via `WMET_AtmStab × WLOD_TwrSsMom` correlation — see #111
 - atmospheric stability × wake meander timescale coupling — fixed: `τ_m_eff = 25 · clamp(1 − 0.6·s, 0.4, 2.0)` s (Counihan 1975 / Larsen DWM 2008); stable ABL → 40 s slow meander (lag-25 s autocorr ≈ 0.45), convective ABL → 10 s fast turnover (autocorr ≈ 0.01); σ_θ stays 0.3·TI, only timescale modulated; no new SCADA tag, observable via `WMET_WakeMndr × WMET_AtmStab` autocorrelation — see #113
 - atmospheric stability × turbulence integral length scale L_u coupling — fixed: `L_u_eff = 340 · clamp(1 − 0.6·s, 0.4, 2.0)` m (Counihan 1975 / Kaimal & Finnigan 1994 / Peña & Hahmann 2012); stable nocturnal ABL → 544 m, τ ≈ 54 s @ 10 m/s (lag-30 s autocorr ≈ 0.57), neutral → 340 m, τ ≈ 34 s (≈ 0.40), convective afternoon → 136 m, τ ≈ 14 s (≈ 0.10); σ_v amplitude unchanged (TI path owned by #99), only AR(1) timescale modulated; applied to both farm-wide `_turbulence_gen` and per-turbine `_turb_gens[i]`; no new SCADA tag, observable via `WMET_AtmStab × WROT_RotSpd` low-frequency autocorrelation — see #115
+- nacelle anemometer transfer function (NTF) — fixed: IEC 61400-12-1 Annex D NTF `V_raw = V_∞ · (1 − 0.55·a)` with `a = 0.5·(1 − √(1 − Ct))`; Region 2 (Ct≈0.82) → ≈0.84·V_∞, Region 3 (Ct≈0.30) → ≈0.96·V_∞, stopped → 1.04·V_∞ (bluff-body speed-up); reuses existing `aero_out.ct` so no extra computation; `WMET_WSpeedNac` keeps free-stream semantics (analysis backwards compat), new `WMET_WSpeedRaw` exposes the as-measured anemometer reading — see #117
 - duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
 
 Secondary focus:
@@ -92,6 +93,7 @@ Still pending or incomplete:
 - atmospheric-stability × wind veer coupling — done: `veer_rate_eff = veer_base · clamp(1 − s, 0.3, 2.5)` (Holton/Stull/van der Laan 2017); stable night ~0.20 °/m with +37% TwrSS moment, convective afternoon ~0.03 °/m with −26%; per-turbine veer_rate retained as site/manufacturing variance; effective rate is shared between aero power-loss and fatigue tower/blade load paths; no new SCADA tag (#111)
 - atmospheric-stability × wake meander τ_m coupling — done: integral timescale `τ_m = 25 · clamp(1 − 0.6·s, 0.4, 2.0)` s (Counihan 1975 / Larsen DWM 2008 / Peña 2012); stable ABL → 40 s slow meander, convective ABL → 10 s fast turnover; σ_θ stays 0.3·TI (amplitude path is #99 TI mult); validated lag-25 s autocorr 0.45 vs 0.01 for stable vs convective; no new SCADA tag (`WMET_WakeMndr × WMET_AtmStab` autocorrelation) (#113)
 - atmospheric-stability × turbulence integral length scale L_u coupling — done: `L_u_eff = 340 · clamp(1 − 0.6·s, 0.4, 2.0)` m (Counihan 1975 / Kaimal & Finnigan 1994 / Peña & Hahmann 2012); stable nocturnal ABL → 544 m / τ ≈ 54 s @ 10 m/s, neutral → 340 m / τ ≈ 34 s, convective afternoon → 136 m / τ ≈ 14 s; validated lag-30 s AR(1) autocorr 0.57 vs 0.40 vs 0.10 (stable / neutral / convective); σ_v amplitude unchanged (TI path owned by #99); applied to both farm-wide `_turbulence_gen` and per-turbine `_turb_gens[i]`; no new SCADA tag (#115)
+- nacelle anemometer transfer function (NTF) — done: IEC 61400-12-1 Annex D NTF `V_raw = V_∞ · (1 − 0.55·a)` with `a = 0.5·(1 − √(1 − Ct))` derived from existing `aero_out.ct`; Region 2 → 0.84·V_∞, Region 3 → 0.96·V_∞, stopped → 1.04·V_∞; backwards compat — `WMET_WSpeedNac` keeps free-stream semantics, new `WMET_WSpeedRaw` exposes the as-measured anemometer reading (#117)
 - SQLite vs time-series DB architecture decision — see #24
 - dependency security vulnerabilities (cryptography, pyjwt, etc.) — see #48
 - no automated test suite (pytest) — see #52

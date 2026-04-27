@@ -190,6 +190,11 @@ _TAGS: List[ScadaTag] = [
              "WMET", "REAL32", "hPa", "Ambient Atmospheric Pressure",
              "環境大氣壓力",
              900, 1050),
+    ScadaTag("WMET_WSpeedRaw", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WSpeedRaw",
+             "WMET", "REAL32", "m/s",
+             "Raw Nacelle Anemometer Reading (NTF applied, IEC 61400-12-1 Annex D)",
+             "機艙風速計原始讀值(含轉換函數)",
+             0, 40),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle

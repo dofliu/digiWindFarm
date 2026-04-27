@@ -716,6 +716,21 @@ class TurbinePhysicsModel:
         rotor_locked = 1 if self.tur_state in (1, 2, 3) else 0
         brake_active = 1 if self.tur_state in (1, 7, 9) else 0
 
+        # ── Nacelle Anemometer Transfer Function (#117, IEC 61400-12-1 Annex D) ──
+        # Real cup/sonic anemometer sits ~1.5R behind hub on top of nacelle, so it
+        # reads systematically below free-stream because of axial induction.
+        # a = 0.5(1 − √(1 − Ct)) (1-D momentum theory); k_pos≈0.55 weights the
+        # induction at the anemometer position. Stopped/parked rotor sees a small
+        # bluff-body speed-up (+4%) instead of induction.
+        ct_clip = max(0.0, min(0.95, aero_out.ct))
+        induction_a = 0.5 * (1.0 - math.sqrt(1.0 - ct_clip)) if ct_clip > 0 else 0.0
+        if (is_producing or is_starting) and self.rotor_speed > 1.0:
+            ntf_factor = 1.0 - 0.55 * induction_a
+        else:
+            ntf_factor = 1.04
+        ntf_factor = max(0.78, min(1.10, ntf_factor))
+        nac_anem_raw = effective_wind_speed * ntf_factor
+
         output: Dict[str, float] = {
             "WTUR_TurSt": float(self.tur_state),
             "WTUR_TotPwrAt": round(cnv_gd_pwr, 2),
@@ -758,6 +773,7 @@ class TurbinePhysicsModel:
             "WMET_AtmStab": round(self._atm_stability, 3),
             "WMET_AirDensity": round(self._air_density, 4),
             "WMET_AmbPressure": round(self._ambient_pressure_pa / 100.0, 1),
+            "WMET_WSpeedRaw": round(nac_anem_raw, 2),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
