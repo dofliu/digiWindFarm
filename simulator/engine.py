@@ -121,8 +121,10 @@ class WindFarmSimulator:
             pressure_pa=ambient_pressure,
         )
 
+        # `atm_stability` modulates the AR(1) integral length scale L_u
+        # (#115) so farm-wide wind autocorrelation matches the ABL state.
         turb_component = self._turbulence_gen.step(
-            base_wind, effective_ti, time_step
+            base_wind, effective_ti, time_step, stability=atm_stability,
         )
         farm_wind = max(0, base_wind + turb_component)
 
