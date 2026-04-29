@@ -2,7 +2,7 @@
 
 ## Current Position
 
-A working wind farm simulation platform with 103 SCADA tags, comprehensive physics models, and full API access for external data consumers.
+A working wind farm simulation platform with 104 SCADA tags, comprehensive physics models, and full API access for external data consumers.
 
 Platform includes:
 - backend REST + WebSocket APIs (40+ endpoints)
@@ -42,6 +42,7 @@ Primary focus (next improvements):
 - atmospheric stability × wake meander timescale coupling — fixed: `τ_m_eff = 25 · clamp(1 − 0.6·s, 0.4, 2.0)` s (Counihan 1975 / Larsen DWM 2008); stable ABL → 40 s slow meander (lag-25 s autocorr ≈ 0.45), convective ABL → 10 s fast turnover (autocorr ≈ 0.01); σ_θ stays 0.3·TI, only timescale modulated; no new SCADA tag, observable via `WMET_WakeMndr × WMET_AtmStab` autocorrelation — see #113
 - atmospheric stability × turbulence integral length scale L_u coupling — fixed: `L_u_eff = 340 · clamp(1 − 0.6·s, 0.4, 2.0)` m (Counihan 1975 / Kaimal & Finnigan 1994 / Peña & Hahmann 2012); stable nocturnal ABL → 544 m, τ ≈ 54 s @ 10 m/s (lag-30 s autocorr ≈ 0.57), neutral → 340 m, τ ≈ 34 s (≈ 0.40), convective afternoon → 136 m, τ ≈ 14 s (≈ 0.10); σ_v amplitude unchanged (TI path owned by #99), only AR(1) timescale modulated; applied to both farm-wide `_turbulence_gen` and per-turbine `_turb_gens[i]`; no new SCADA tag, observable via `WMET_AtmStab × WROT_RotSpd` low-frequency autocorrelation — see #115
 - nacelle anemometer transfer function (NTF) — fixed: IEC 61400-12-1 Annex D NTF `V_raw = V_∞ · (1 − 0.55·a)` with `a = 0.5·(1 − √(1 − Ct))`; Region 2 (Ct≈0.82) → ≈0.84·V_∞, Region 3 (Ct≈0.30) → ≈0.96·V_∞, stopped → 1.04·V_∞ (bluff-body speed-up); reuses existing `aero_out.ct` so no extra computation; `WMET_WSpeedNac` keeps free-stream semantics (analysis backwards compat), new `WMET_WSpeedRaw` exposes the as-measured anemometer reading — see #117
+- nacelle wind vane transfer function (WVTF) — fixed: IEC 61400-12-2 Annex E swirl bias `θ_s ≈ Ct/(2·λ)` (Burton et al. 2011 §3.7); right-handed rotor → +bias; Region 2 (Ct≈0.82, λ≈7) ≈ +3.4°, Region 3 (Ct≈0.30, λ≈5) ≈ +1.7°, stopped/cut-out → 0°; clamp ±8°; reuses existing `aero_out.ct` and `aero_out.tsr`; `WMET_WDirAbs` keeps free-stream direction (analysis backwards compat, wake & yaw control unchanged), new `WMET_WDirRaw` exposes the as-measured vane reading — see #119
 - duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
 
 Secondary focus:
