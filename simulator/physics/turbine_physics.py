@@ -731,6 +731,20 @@ class TurbinePhysicsModel:
         ntf_factor = max(0.78, min(1.10, ntf_factor))
         nac_anem_raw = effective_wind_speed * ntf_factor
 
+        # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # Real wind vane sits on top of nacelle, downstream of the rotor, and reads
+        # a systematic swirl bias from rotor wake rotation (Euler turbine eq.).
+        # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7,
+        # derived from a' = Ct / (4·λ)). Right-handed rotor (industry standard:
+        # clockwise from upwind) → +bias on the nacelle vane.
+        if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
+            swirl_rad = ct_clip / (2.0 * aero_out.tsr)
+            vane_bias_deg = math.degrees(swirl_rad)
+        else:
+            vane_bias_deg = 0.0
+        vane_bias_deg = max(-8.0, min(8.0, vane_bias_deg))
+        nac_vane_raw = (wind_direction + vane_bias_deg) % 360.0
+
         output: Dict[str, float] = {
             "WTUR_TurSt": float(self.tur_state),
             "WTUR_TotPwrAt": round(cnv_gd_pwr, 2),
@@ -774,6 +788,7 @@ class TurbinePhysicsModel:
             "WMET_AirDensity": round(self._air_density, 4),
             "WMET_AmbPressure": round(self._ambient_pressure_pa / 100.0, 1),
             "WMET_WSpeedRaw": round(nac_anem_raw, 2),
+            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
