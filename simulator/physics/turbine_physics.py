@@ -731,6 +731,12 @@ class TurbinePhysicsModel:
         ntf_factor = max(0.78, min(1.10, ntf_factor))
         nac_anem_raw = effective_wind_speed * ntf_factor
 
+        # ── Nacelle Wind Vane Transfer Function (IEC 61400-12-2 Annex E) ──
+        # Real wind vane sits ~1.5 R behind the hub and reads a systematic swirl
+        # bias from the rotor wake. Burton et al. (2011) Wind Energy Handbook §3.7
+        # gives θ_swirl ≈ Ct / (2·λ) [rad] for a right-handed rotor (industry
+        # standard); stopped/parked rotor sees no swirl. Reuses ct_clip and
+        # aero_out.tsr already computed above (no extra cost, no new RNG).
         # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
         # Rotor wake swirl biases the downstream vane reading by θ_s ≈ Ct/(2·λ)
         # rad (Burton et al. 2011 Wind Energy Handbook §3.7). Right-handed rotor
