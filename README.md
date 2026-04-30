@@ -2,7 +2,7 @@
 
 Wind farm monitoring and digital twin platform with:
 - physics-based wind turbine simulation
-- 103 SCADA tags aligned to Bachmann Z72 definitions
+- 104 SCADA tags aligned to Bachmann Z72 definitions
 - fault injection and degradation scenarios
 - wind and grid condition control
 - Modbus TCP simulation

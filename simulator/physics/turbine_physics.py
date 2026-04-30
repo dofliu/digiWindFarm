@@ -774,6 +774,7 @@ class TurbinePhysicsModel:
             "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
+            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),

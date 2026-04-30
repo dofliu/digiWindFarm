@@ -9,7 +9,18 @@
 - feat: implement nacelle wind vane transfer function (#119)
 - docs: sync CLAUDE / README / TODO / physics_model_status / daily_report for #119
 
-近 48 小時主幹 `main` 合併摘要：
+## 今日 Commit 摘要
+
+本次日報工作（分支 `claude/keen-hopper-un7sb`）：
+
+- [404f200] feat: add nacelle wind vane transfer function (WVTF) (#119)
+> 最後更新：2026-04-29（分支 `claude/keen-hopper-882Ou`）
+
+## 今日 Commit 摘要
+
+本次日報工作（分支 `claude/keen-hopper-882Ou`）：
+
+- feat: add nacelle wind vane transfer function (WVTF) (#119)
 
 - [5541796] Merge PR #118 — 機艙風速感測器轉換函數 NTF (#117)
 - [76fdc95] feat: add nacelle anemometer transfer function (NTF) (#117)
@@ -30,7 +41,7 @@
 | 保持 | #51 | 警報處理透過 RAG 機制 | 用戶功能需求 |
 | 保持 | #50 | 外部擷取資料 API | 用戶功能需求 |
 | 保持 | #48 | pip-audit 17 個安全漏洞 | 未升級 |
-| 保持 | #44 | Ruff lint 115 個錯誤 | 核心模組現為 **0 錯誤** |
+| 保持 | #44 | Ruff lint 179 個錯誤 | 核心模組現為 **0 錯誤** |
 | 保持 | #26 | 部署強化 | Docker 已完成，JWT/RBAC 待做 |
 | 保持 | #24 | 歷史資料儲存架構 | 架構決策待定 |
 
@@ -48,7 +59,7 @@
 | #51 | 警報處理透過 RAG 機制 | — | 2026-04-14 | 用戶功能需求 |
 | #50 | 外部擷取資料 API | — | 2026-04-14 | 用戶功能需求 |
 | #48 | pip-audit 17 個安全漏洞 | security, auto-detected | 2026-04-13 | 未升級 |
-| #44 | Ruff lint 115 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組 0 錯誤 |
+| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組 0 錯誤 |
 | #26 | 部署強化 | enhancement, platform, deployment | 2026-04-05 | Docker 已完成 |
 | #24 | 歷史資料儲存架構 | enhancement, platform | 2026-04-05 | 架構決策待定 |
 
@@ -68,7 +79,7 @@
 
 ## API Endpoints
 
-共 61 個 HTTP 路由 + 1 WebSocket。本日無新增路由。詳見 README.md「Core APIs」章節。
+共 60 個 HTTP 路由 + 1 WebSocket。本日無新增路由。詳見 README.md「Core APIs」章節。
 
 待同步：`/api/farms`（10 個路由）仍未完整同步至 README 的 Core APIs 章節（追蹤項，不阻塞物理模型優先工作）。
 
