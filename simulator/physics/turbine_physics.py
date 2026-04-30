@@ -737,6 +737,23 @@ class TurbinePhysicsModel:
         # (clockwise from upwind, industry standard) gives a positive bias.
         if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
             vane_bias_deg = math.degrees(ct_clip / (2.0 * aero_out.tsr))
+        # ── Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # Real wind vane on top of nacelle reads systematic swirl bias from
+        # rotor wake. θ_swirl ≈ C_t / (2·λ) [rad] (Burton et al. 2011, Wind
+        # Energy Handbook §3.7). Right-handed rotor (clockwise viewed from
+        # upwind, industry standard) → +bias. Reuses ct_clip + aero_out.tsr
+        # already computed above; no extra cost, no new RNG mutation.
+        if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
+            swirl_rad = ct_clip / (2.0 * max(aero_out.tsr, 1.0))
+        # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # Real wind vane sits on top of nacelle, downstream of the rotor, and reads
+        # a systematic swirl bias from rotor wake rotation (Euler turbine eq.).
+        # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7,
+        # derived from a' = Ct / (4·λ)). Right-handed rotor (industry standard:
+        # clockwise from upwind) → +bias on the nacelle vane.
+        if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
+            swirl_rad = ct_clip / (2.0 * aero_out.tsr)
+            vane_bias_deg = math.degrees(swirl_rad)
         else:
             vane_bias_deg = 0.0
         vane_bias_deg = max(-8.0, min(8.0, vane_bias_deg))
@@ -773,6 +790,7 @@ class TurbinePhysicsModel:
             "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
+            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),
