@@ -731,32 +731,10 @@ class TurbinePhysicsModel:
         ntf_factor = max(0.78, min(1.10, ntf_factor))
         nac_anem_raw = effective_wind_speed * ntf_factor
 
-        # ── Nacelle Wind Vane Transfer Function (IEC 61400-12-2 Annex E) ──
-        # Real wind vane sits ~1.5 R behind the hub and reads a systematic swirl
-        # bias from the rotor wake. Burton et al. (2011) Wind Energy Handbook §3.7
-        # gives θ_swirl ≈ Ct / (2·λ) [rad] for a right-handed rotor (industry
-        # standard); stopped/parked rotor sees no swirl. Reuses ct_clip and
-        # aero_out.tsr already computed above (no extra cost, no new RNG).
         # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
-        # Rotor wake swirl biases the downstream vane reading by θ_s ≈ Ct/(2·λ)
-        # rad (Burton et al. 2011 Wind Energy Handbook §3.7). Right-handed rotor
-        # (clockwise from upwind, industry standard) gives a positive bias.
-        if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
-            vane_bias_deg = math.degrees(ct_clip / (2.0 * aero_out.tsr))
-        # ── Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
-        # Real wind vane on top of nacelle reads systematic swirl bias from
-        # rotor wake. θ_swirl ≈ C_t / (2·λ) [rad] (Burton et al. 2011, Wind
-        # Energy Handbook §3.7). Right-handed rotor (clockwise viewed from
-        # upwind, industry standard) → +bias. Reuses ct_clip + aero_out.tsr
-        # already computed above; no extra cost, no new RNG mutation.
-        if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
-            swirl_rad = ct_clip / (2.0 * max(aero_out.tsr, 1.0))
-        # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
-        # Real wind vane sits on top of nacelle, downstream of the rotor, and reads
-        # a systematic swirl bias from rotor wake rotation (Euler turbine eq.).
-        # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7,
-        # derived from a' = Ct / (4·λ)). Right-handed rotor (industry standard:
-        # clockwise from upwind) → +bias on the nacelle vane.
+        # Real wind vane on top of nacelle reads systematic swirl bias from rotor wake.
+        # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7).
+        # Right-handed rotor (industry standard, clockwise from upwind) → +bias.
         if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
             swirl_rad = ct_clip / (2.0 * aero_out.tsr)
             vane_bias_deg = math.degrees(swirl_rad)
