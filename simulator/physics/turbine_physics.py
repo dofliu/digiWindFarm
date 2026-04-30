@@ -722,10 +722,19 @@ class TurbinePhysicsModel:
         # a = 0.5(1 − √(1 − Ct)) (1-D momentum theory); k_pos≈0.55 weights the
         # induction at the anemometer position. Stopped/parked rotor sees a small
         # bluff-body speed-up (+4%) instead of induction.
+        #
+        # Yaw-skew Glauert correction (#125, IEC 61400-12-1/2 / Glauert 1935 /
+        # Burton et al. 2011 §3.10 / Castillo-Negro et al. 2008): under yaw error γ
+        # the rotor sees only V·cos(γ) axially, so the axial induction at the
+        # anemometer position reduces as a·cos²(γ) (Glauert combined-momentum /
+        # Coleman skewed-wake). The same cos(γ) factor is reused below for WVTF.
         ct_clip = max(0.0, min(0.95, aero_out.ct))
         induction_a = 0.5 * (1.0 - math.sqrt(1.0 - ct_clip)) if ct_clip > 0 else 0.0
+        yaw_skew_rad = math.radians(max(-45.0, min(45.0, yaw_out["yaw_error"])))
+        yaw_skew_cos = math.cos(yaw_skew_rad)
+        induction_a_yawed = induction_a * yaw_skew_cos * yaw_skew_cos
         if (is_producing or is_starting) and self.rotor_speed > 1.0:
-            ntf_factor = 1.0 - 0.55 * induction_a
+            ntf_factor = 1.0 - 0.55 * induction_a_yawed
         else:
             ntf_factor = 1.04
         ntf_factor = max(0.78, min(1.10, ntf_factor))
@@ -735,9 +744,11 @@ class TurbinePhysicsModel:
         # Real wind vane on top of nacelle reads systematic swirl bias from rotor wake.
         # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7).
         # Right-handed rotor (industry standard, clockwise from upwind) → +bias.
+        # Yaw-skew correction (#125): under γ the rotor swirl plane tilts relative
+        # to the nacelle plane and only the cos(γ) projection is read by the vane.
         if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
             swirl_rad = ct_clip / (2.0 * aero_out.tsr)
-            vane_bias_deg = math.degrees(swirl_rad)
+            vane_bias_deg = math.degrees(swirl_rad * yaw_skew_cos)
         else:
             vane_bias_deg = 0.0
         vane_bias_deg = max(-8.0, min(8.0, vane_bias_deg))
@@ -774,7 +785,6 @@ class TurbinePhysicsModel:
             "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
-            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),
