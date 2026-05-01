@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-04-29 (nacelle wind vane transfer function, #119)
+Last updated: 2026-05-01 (Glauert yaw-skew correction on NTF + WVTF, #125)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -594,4 +594,5 @@ Implemented:
 23. ~~atmospheric-stability × turbulence integral length scale L_u coupling~~ → done (#115, `L_u_eff = 340 · clamp(1 − 0.6·s, 0.4, 2.0)` m, stable 544 m / neutral 340 m / convective 136 m, lag-30 s autocorr 0.57 vs 0.10 @ 10 m/s, σ_v amplitude unchanged, no new tag)
 24. ~~nacelle anemometer transfer function (NTF, IEC 61400-12-1 Annex D)~~ → done (#117, `V_raw = V_∞·(1 − 0.55·a)`, Region 2 → 0.84·V_∞ / Region 3 → 0.96·V_∞ / stopped → 1.04·V_∞, `WMET_WSpeedRaw`)
 25. ~~nacelle wind vane transfer function (WVTF, IEC 61400-12-2 Annex E)~~ → done (#119, `θ_s ≈ Ct/(2·λ)`, Region 2 → +3.36° / Region 3 → +1.72° / stopped → 0°, clamp ±8°, `WMET_WDirRaw`)
-26. deployment hardening (JWT auth, RBAC, Docker Compose)
+26. ~~Glauert yaw-skew correction on NTF + WVTF (IEC 61400-12-1/2 closure under γ ≠ 0)~~ → done (#125, `a_skew = a · cos²(γ)` Glauert 1935 / Coleman skewed-wake / Burton et al. 2011 §3.10 + `θ_swirl_eff = (Ct/(2λ)) · cos(γ)` Burton §3.7 + planar projection; γ clamped ±45°; γ=0° fully reproduces #117/#119 baseline (NTF=0.842, bias=3.36°), γ=15° → NTF=0.852/bias=3.24°, γ=30° → 0.881/2.91°, γ=45° → 0.921/2.37°; shared cos(γ) factor reused by NTF + WVTF, zero extra cost; concurrently cleaned residual duplicate `WMET_WDirRaw` dict key F601 + duplicate ScadaTag definition; no new SCADA tag, observable via `WMET_WSpeedRaw / WMET_WSpeedNac × WYAW_YwVn1AlgnAvg5s`)
+27. deployment hardening (JWT auth, RBAC, Docker Compose)
