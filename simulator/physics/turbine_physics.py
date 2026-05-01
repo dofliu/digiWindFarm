@@ -717,26 +717,33 @@ class TurbinePhysicsModel:
         brake_active = 1 if self.tur_state in (1, 7, 9) else 0
 
         # ── Nacelle Anemometer Transfer Function (#117, IEC 61400-12-1 Annex D) ──
+        # ── + Glauert yaw skewed-flow correction (#125, Burton et al. 2011 §3.10) ──
         # Real cup/sonic anemometer sits ~1.5R behind hub on top of nacelle, so it
         # reads systematically below free-stream because of axial induction.
         # a = 0.5(1 − √(1 − Ct)) (1-D momentum theory); k_pos≈0.55 weights the
-        # induction at the anemometer position. Stopped/parked rotor sees a small
-        # bluff-body speed-up (+4%) instead of induction.
+        # induction at the anemometer position. Under yaw misalignment γ the rotor
+        # blocks less axial flow, so induction follows Glauert/Coleman skewed-wake:
+        # a_skew = a · cos²(γ).  γ clamped to ±45° (validity of skewed-momentum).
+        # Stopped/parked rotor sees a small bluff-body speed-up (+4%) instead.
         ct_clip = max(0.0, min(0.95, aero_out.ct))
         induction_a = 0.5 * (1.0 - math.sqrt(1.0 - ct_clip)) if ct_clip > 0 else 0.0
+        gamma_deg = max(-45.0, min(45.0, yaw_out["yaw_error"]))
+        cos_gamma = math.cos(math.radians(gamma_deg))
         if (is_producing or is_starting) and self.rotor_speed > 1.0:
-            ntf_factor = 1.0 - 0.55 * induction_a
+            ntf_factor = 1.0 - 0.55 * induction_a * cos_gamma * cos_gamma
         else:
             ntf_factor = 1.04
         ntf_factor = max(0.78, min(1.10, ntf_factor))
         nac_anem_raw = effective_wind_speed * ntf_factor
 
         # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # ── + yaw projection (#125, Burton et al. 2011 §3.7 + projection geometry) ──
         # Real wind vane on top of nacelle reads systematic swirl bias from rotor wake.
         # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7).
         # Right-handed rotor (industry standard, clockwise from upwind) → +bias.
+        # Under yaw γ, the swirl vector projects onto the nacelle plane → ×cos(γ).
         if (is_producing or is_starting) and self.rotor_speed > 1.0 and aero_out.tsr > 1.0:
-            swirl_rad = ct_clip / (2.0 * aero_out.tsr)
+            swirl_rad = (ct_clip / (2.0 * aero_out.tsr)) * cos_gamma
             vane_bias_deg = math.degrees(swirl_rad)
         else:
             vane_bias_deg = 0.0
@@ -774,7 +781,6 @@ class TurbinePhysicsModel:
             "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
-            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),
