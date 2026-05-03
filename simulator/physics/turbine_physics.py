@@ -339,7 +339,8 @@ class TurbinePhysicsModel:
              wind_shear_exp_base: float = 0.2,
              atm_stability: float = 0.0,
              air_density: float = 1.225,
-             ambient_pressure_pa: float = 101325.0) -> Dict[str, float]:
+             ambient_pressure_pa: float = 101325.0,
+             effective_ti: float = 0.10) -> Dict[str, float]:
         """Advance the turbine physics simulation by one timestep and return all SCADA tag values."""
         s = self.spec
         self._local_ti_multiplier = max(0.0, float(local_ti_multiplier))
@@ -726,6 +727,7 @@ class TurbinePhysicsModel:
         cos2_gamma = cos_gamma * cos_gamma
 
         # ── Nacelle Anemometer Transfer Function (#117, IEC 61400-12-1 Annex D) ──
+        # ── + Glauert yaw skewed-flow correction (#125, Burton et al. 2011 §3.10) ──
         # Real cup/sonic anemometer sits ~1.5R behind hub on top of nacelle, so it
         # reads systematically below free-stream because of axial induction.
         # a = 0.5(1 − √(1 − Ct)) (1-D momentum theory); k_pos≈0.55 weights the
@@ -734,6 +736,9 @@ class TurbinePhysicsModel:
         # (#125): induction reduction scales by cos²(γ).
         ct_clip = max(0.0, min(0.95, aero_out.ct))
         induction_a = 0.5 * (1.0 - math.sqrt(1.0 - ct_clip)) if ct_clip > 0 else 0.0
+        yaw_skew_rad = math.radians(max(-45.0, min(45.0, yaw_out["yaw_error"])))
+        yaw_skew_cos = math.cos(yaw_skew_rad)
+        induction_a_yawed = induction_a * yaw_skew_cos * yaw_skew_cos
         if (is_producing or is_starting) and self.rotor_speed > 1.0:
             ntf_factor = 1.0 - 0.55 * induction_a * cos2_gamma
         else:
@@ -741,7 +746,25 @@ class TurbinePhysicsModel:
         ntf_factor = max(0.78, min(1.10, ntf_factor))
         nac_anem_raw = effective_wind_speed * ntf_factor
 
+        # ── Cup-Anemometer Overspeeding Bias (#127, IEC 61400-12-1 Annex H) ──
+        # Cup-type anemometers respond faster to gusts than to lulls (asymmetric
+        # drag torque, D ∝ V²), producing a long-term mean reading biased high
+        # by k_overspeed · TI² (Kristensen 1998 Risø-R-1024; Pedersen 2006
+        # Risø-R-1473).  k=1.5 for heated Risø Class 1 cup; sonic anemometers
+        # k≈0.  Combine atmospheric (#99 effective_ti × #91 pocket multiplier)
+        # with wake-added TI (#103) in quadrature: independent stochastic sources.
+        # Stopped/parked rotor: cup not turning → bias = 1.0 (unchanged baseline).
+        if (is_producing or is_starting) and self.rotor_speed > 1.0:
+            ti_pocket = max(0.0, float(effective_ti)) * self._local_ti_multiplier
+            ti_local_total = math.sqrt(ti_pocket * ti_pocket + self._wake_added_ti * self._wake_added_ti)
+            overspeed_bias = 1.0 + 1.5 * ti_local_total * ti_local_total
+            overspeed_bias = min(overspeed_bias, 1.10)
+        else:
+            overspeed_bias = 1.0
+        nac_anem_raw *= overspeed_bias
+
         # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # ── + yaw projection (#125, Burton et al. 2011 §3.7 + projection geometry) ──
         # Real wind vane on top of nacelle reads systematic swirl bias from rotor wake.
         # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7).
         # Right-handed rotor (industry standard, clockwise from upwind) → +bias.
@@ -785,7 +808,6 @@ class TurbinePhysicsModel:
             "WGDC_TrfCoreTmp": temps["transformer"],
             "WMET_WSpeedNac": round(effective_wind_speed, 2),
             "WMET_WDirAbs": round(wind_direction % 360, 2),
-            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WMET_TmpOutside": round(ambient_temp, 2),
             "WMET_HumOutside": round(self.cooling.last_ambient_humidity, 2),
             "WMET_LocalTi": round(self._local_ti_multiplier * 100.0, 1),

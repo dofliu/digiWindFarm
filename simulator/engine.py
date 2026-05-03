@@ -189,6 +189,7 @@ class WindFarmSimulator:
                 atm_stability=atm_stability,
                 air_density=air_density,
                 ambient_pressure_pa=ambient_pressure,
+                effective_ti=effective_ti,
             )
 
             # Capture yaw_error (deg) for this step; fed back next step to drive

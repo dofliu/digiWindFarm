@@ -45,6 +45,7 @@ Primary focus (next improvements):
 - nacelle wind vane transfer function (WVTF) — fixed: IEC 61400-12-2 Annex E swirl bias `θ_s ≈ Ct/(2·λ)` (Burton et al. 2011 §3.7); right-handed rotor → +bias; Region 2 (Ct≈0.82, λ≈7) ≈ +3.4°, Region 3 (Ct≈0.30, λ≈5) ≈ +1.7°, stopped/cut-out → 0°; clamp ±8°; reuses existing `aero_out.ct` and `aero_out.tsr`; `WMET_WDirAbs` keeps free-stream direction (analysis backwards compat, wake & yaw control unchanged), new `WMET_WDirRaw` exposes the as-measured vane reading — see #119
 - Glauert yaw-skew correction on NTF + WVTF — fixed: `a_skew = a · cos²(γ)` (Glauert 1935 / Coleman skewed-wake / Burton et al. 2011 §3.10) and `θ_swirl_eff = (Ct/(2λ)) · cos(γ)` (Burton §3.7 + planar projection); γ clamped ±45°; γ=0° fully reproduces #117/#119 baseline (NTF=0.842, bias=3.36°), γ=15° → NTF=0.852/bias=3.24° (cos²=0.933, cos=0.966), γ=30° → 0.881/2.91°, γ=45° → 0.921/2.37°; shared `cos(γ)` factor reused by NTF and WVTF (zero extra cost); no new SCADA tags (observable via `WMET_WSpeedRaw / WMET_WSpeedNac × WYAW_YwVn1AlgnAvg5s`); duplicate `WMET_WDirRaw` dict key (F601) and ScadaTag definition cleaned up at the same time — see #125
 - duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
+- duplicate `WMET_WDirRaw` key in turbine_physics.py output dict and scada_registry.py tag list (F601 / merge leftover from #119) — fixed in #125
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally
