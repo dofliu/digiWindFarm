@@ -32,7 +32,7 @@
 | 保持 | #67 | 完整保護繼電器協調 LVRT/OVRT | 電壓-時間保護曲線待做 |
 | 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 頻帶警報曲線仍待做（BPFO/BPFI、邊帶、峰值因子/峭度警報已完成） |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，前端 RUL 視覺化待做 |
-| 保持 | #52 | 缺少自動化測試套件 | 仍無 pytest |
+| 保持 | #52 | 缺少自動化測試套件 | 仍無 pytest，本次新增 `/tmp/test_glauert_yaw.py` 可作為 #117/#119/#125 物理鏈共用 pytest 起點 |
 | 保持 | #51 | 警報處理透過 RAG 機制 | 用戶功能需求 |
 | 保持 | #50 | 外部擷取資料 API | 用戶功能需求 |
 | 保持 | #48 | pip-audit 17 個安全漏洞 | 未升級 |
@@ -54,7 +54,7 @@
 | #51 | 警報處理透過 RAG 機制 | — | 2026-04-14 | 用戶功能需求 |
 | #50 | 外部擷取資料 API | — | 2026-04-14 | 用戶功能需求 |
 | #48 | pip-audit 17 個安全漏洞 | security, auto-detected | 2026-04-13 | 未升級 |
-| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組 0 錯誤 |
+| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組 0 錯誤（F601 已修） |
 | #26 | 部署強化 | enhancement, platform, deployment | 2026-04-05 | Docker 已完成 |
 | #24 | 歷史資料儲存架構 | enhancement, platform | 2026-04-05 | 架構決策待定 |
 
@@ -79,7 +79,7 @@
 
 ## 程式碼品質
 
-- Lint 錯誤：核心模組 `server/` + `simulator/` + `wind_model.py` = **0**
+- Lint 錯誤：核心模組 `server/` + `simulator/` + `wind_model.py` = **0**（修復前為 1 × F601）
 - `ruff check simulator/ server/ wind_model.py` — `All checks passed!`
 - `python -m py_compile simulator/physics/turbine_physics.py simulator/physics/scada_registry.py` — 通過
 - 修復前 `ruff` 偵測到的 `F601 Dictionary key literal "WMET_WDirRaw" repeated`（#119 合併殘留），本次一併清除

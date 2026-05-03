@@ -46,6 +46,7 @@ Primary focus (next improvements):
 - yaw-skew Glauert correction for NTF + WVTF — fixed: Glauert combined-momentum / Coleman skewed-wake under yaw error γ gives `a_eff = a·cos²(γ)` (Glauert 1935 / Burton et al. 2011 §3.10 / Castillo-Negro 2008); swirl plane projects onto nacelle plane as `θ_s_eff = θ_s·cos(γ)`; reuses `yaw_out["yaw_error"]` already in `step()`; γ=0 reproduces #117/#119 exactly, γ=15° NTF correction shrinks 6.7% / WVTF bias shrinks 3.4%, γ=30° NTF correction shrinks 25% / WVTF bias shrinks 13.4%, γ=45° NTF correction halved; γ clamped ±45°; closes the IEC 61400-12-1/2 chain under non-zero yaw error; pairs with `yaw_misalignment` fault for the "vane miscalibration → systematic yaw error" diagnostic; no new SCADA tag, observable via `(WMET_WSpeedRaw / WMET_WSpeedNac − 1) × WYAW_YwVn1AlgnAvg5s` and `(WMET_WDirRaw − WMET_WDirAbs) × WYAW_YwVn1AlgnAvg5s` correlations — see #125
 - duplicate `WMET_WDirRaw` registration (leftover from #119 merge) — fixed: removed duplicate dict-key in `turbine_physics.py::step()` output and duplicate `ScadaTag` definition in `scada_registry.py`; SCADA tag count unchanged (104 physics tags) — see #125
 - duplicate `get_wake_added_ti` in `PerTurbineWind` (F811 leftover from #103/#106 merge) — fixed — see #108
+- duplicate `WMET_WDirRaw` key in turbine_physics.py output dict and scada_registry.py tag list (F601 / merge leftover from #119) — fixed in #125
 
 Secondary focus:
 - deployment hardening (JWT, Docker) — only when ready to share externally

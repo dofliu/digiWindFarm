@@ -717,6 +717,7 @@ class TurbinePhysicsModel:
         brake_active = 1 if self.tur_state in (1, 7, 9) else 0
 
         # ── Nacelle Anemometer Transfer Function (#117, IEC 61400-12-1 Annex D) ──
+        # ── + Glauert yaw skewed-flow correction (#125, Burton et al. 2011 §3.10) ──
         # Real cup/sonic anemometer sits ~1.5R behind hub on top of nacelle, so it
         # reads systematically below free-stream because of axial induction.
         # a = 0.5(1 − √(1 − Ct)) (1-D momentum theory); k_pos≈0.55 weights the
@@ -741,6 +742,7 @@ class TurbinePhysicsModel:
         nac_anem_raw = effective_wind_speed * ntf_factor
 
         # ── Nacelle Wind Vane Transfer Function (#119, IEC 61400-12-2 Annex E) ──
+        # ── + yaw projection (#125, Burton et al. 2011 §3.7 + projection geometry) ──
         # Real wind vane on top of nacelle reads systematic swirl bias from rotor wake.
         # θ_swirl ≈ Ct / (2·λ) [rad] (Burton et al. 2011, Wind Energy Handbook §3.7).
         # Right-handed rotor (industry standard, clockwise from upwind) → +bias.
