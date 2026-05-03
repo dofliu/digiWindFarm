@@ -1,47 +1,45 @@
 # digiWindFarm Daily Report
 
-> 最後更新：2026-05-01（分支 `claude/keen-hopper-dAj1l`）
+> 最後更新：2026-05-03（分支 `claude/keen-hopper-uDa3c`）
 
 ## 今日 Commit 摘要
 
-本次日報工作（分支 `claude/keen-hopper-dAj1l`）：
+本日工作（分支 `claude/keen-hopper-uDa3c`）：
 
-- [c5f4347] feat: Glauert yaw-skew correction on NTF + WVTF (#125)
-  - 將 Glauert (1935) / Coleman 偏航斜流修正套用至 #117 NTF 與 #119 WVTF
-  - 軸向誘導 `a_skew = a · cos²(γ)`、旋轉尾流投影 `θ_swirl_eff = (Ct/(2λ)) · cos(γ)`
-  - γ clamp 至 ±45°，單一共用 cos(γ) 因子（零額外計算成本）
-  - 同步清除 #119 合併殘留的 `WMET_WDirRaw` 重複 key（F601）
+- [7adbb4b] fix: restore WMET_WDirRaw (#119 WVTF regression from #125 cleanup)
+  - 還原 #125「重複清理」合併導致的 `WMET_WDirRaw` 標籤遺失（#119 WVTF）
+  - 同時清除 #127 合併殘留的 `yaw_skew_rad` / `yaw_skew_cos` / `induction_a_yawed` 三行死碼
+  - 差異 +6 / −3 行；2 個檔案：`scada_registry.py` 與 `turbine_physics.py`
 
 歷史延續（前 48 小時）：
 
-- [62115d9] Merge PR #124 — 機艙風向計 WVTF (#119)
-- [c6df8b0] feat: add nacelle wind vane transfer function (WVTF, IEC 61400-12-2 Annex E)
-- [3da3eb6] docs: sync project docs and daily report for WVTF (#119)
-- [73343cf] feat: add nacelle wind vane transfer function (WVTF) (#119)
+- [14292f8] Merge PR #130（#127 杯式風速計 overspeeding bias 文件同步）
+- [d49795c] feat: cup-anemometer overspeeding bias (#127, IEC 61400-12-1 Annex H)
+- [070de49] Merge PR #126（#125 Glauert γ 修正）
+- [b97e98f] feat: Glauert yaw skewed-flow correction on NTF + WVTF (#125)
 
 ## Issue 狀態
 
 | 動作 | Issue # | 標題 | 說明 |
 |------|---------|------|------|
-| 實作完成 | #125 | NTF/WVTF 在偏航誤差下的 Glauert 偏航斜流修正 | 已於 `turbine_physics.py::step()` 內加入共用 `cos(γ)` 因子，套用至 NTF + WVTF；同步清除 #119 殘留的 `WMET_WDirRaw` 重複 key；9/9 物理自測 PASS；待 PR 合併後關閉 |
+| 後續修補 | #119 / #125 / #127 | 機艙感測器轉換鏈 | 偵測到 #125 cleanup 的進位回歸 + #127 殘留死碼，合併修復；本日無新增 issue |
 | 保持 | #67 | 完整保護繼電器協調 LVRT/OVRT | 電壓-時間保護曲線待做 |
 | 保持 | #58 | 頻譜振動警報閾值與邊帶分析 | 頻帶警報曲線仍待做（BPFO/BPFI、邊帶、峰值因子/峭度警報已完成） |
 | 保持 | #57 | 疲勞警報閾值與 RUL 估算 | 後端完成，前端 RUL 視覺化待做 |
-| 保持 | #52 | 缺少自動化測試套件 | 仍無 pytest，本次新增 `/tmp/test_overspeeding.py` 可作為 #127 物理鏈共用 pytest 起點 |
+| 保持 | #52 | 缺少自動化測試套件 | 仍無 pytest，本次新增 `/tmp/test_wdir_raw_restore.py`（16/16 PASS）可作為 IEC 61400-12-1/2 物理鏈共用 pytest 起點 |
 | 保持 | #51 | 警報處理透過 RAG 機制 | 用戶功能需求 |
 | 保持 | #50 | 外部擷取資料 API | 用戶功能需求 |
 | 保持 | #48 | pip-audit 17 個安全漏洞 | 未升級 |
-| 保持 | #44 | Ruff lint 179 個錯誤 | 核心模組仍為 **0 錯誤** |
+| 保持 | #44 | Ruff lint 179 個錯誤 | **核心模組 ruff 從 2 個 F841 → 0 個錯誤**（本日修復） |
 | 保持 | #26 | 部署強化 | Docker 已完成，JWT/RBAC 待做 |
 | 保持 | #24 | 歷史資料儲存架構 | 架構決策待定 |
 
-本日**未建立新 issue**（#125 由前一輪日報工作流建立），符合「每次最多 3 個新 issue / 1 個 PR」規則。本次工作主要驅動方向為**處理已建立的 #125 並清除其指出的 lint 缺陷**，未新增 PR（用戶未要求）。
+本日**未建立新 issue**（修復內容不需新 issue 追蹤），符合「每次最多 3 個新 issue / 1 個 PR」規則。本日工作主要驅動方向為**回歸修復**（restore the dropped WVTF tag）+ **lint cleanup**，未新增 PR（用戶未要求；fix commit 已 push 至工作分支）。
 
 ## Open Issues 總覽
 
 | # | 標題 | Labels | 建立日期 | 備註 |
 |---|------|--------|----------|------|
-| #125 | NTF/WVTF Glauert 偏航斜流修正 | enhancement, physics, auto-detected | 2026-04-30 | **已實作於本分支**，待 PR 合併 |
 | #67 | 完整保護繼電器協調 LVRT/OVRT | enhancement, physics, auto-detected | 2026-04-16 | 電壓-時間曲線 |
 | #58 | 頻譜振動警報閾值與邊帶分析 | enhancement, physics, auto-detected | 2026-04-15 | 頻帶警報曲線待做 |
 | #57 | 疲勞警報閾值與 RUL 估算 | enhancement, physics, auto-detected | 2026-04-15 | 前端 RUL 待做 |
@@ -49,7 +47,7 @@
 | #51 | 警報處理透過 RAG 機制 | — | 2026-04-14 | 用戶功能需求 |
 | #50 | 外部擷取資料 API | — | 2026-04-14 | 用戶功能需求 |
 | #48 | pip-audit 17 個安全漏洞 | security, auto-detected | 2026-04-13 | 未升級 |
-| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組 0 錯誤 |
+| #44 | Ruff lint 179 個錯誤 | code-quality, auto-detected | 2026-04-13 | 核心模組重回 0 錯誤 |
 | #26 | 部署強化 | enhancement, platform, deployment | 2026-04-05 | Docker 已完成 |
 | #24 | 歷史資料儲存架構 | enhancement, platform | 2026-04-05 | 架構決策待定 |
 
@@ -57,12 +55,12 @@
 
 | 模組 | 最後修改 | TODO 數 | 測試 | 備註 |
 |------|----------|---------|------|------|
-| `simulator/physics/turbine_physics.py` | 2026-05-01 | 0 | 無測試套件 | `step()` 內 #117/#119 區塊前新增 5 行共用 Glauert cos(γ) 計算；NTF 公式加入 `cos²(γ)`、WVTF 公式加入 `cos(γ)`；移除輸出 dict 內重複的 `WMET_WDirRaw` |
-| `simulator/physics/scada_registry.py` | 2026-05-01 | 0 | 無測試套件 | 移除重複的 `WMET_WDirRaw` ScadaTag 定義（保留行 151 的原始定義） |
+| `simulator/physics/turbine_physics.py` | 2026-05-03 | 0 | 無測試套件 | 移除 #127 殘留 3 行死碼（`yaw_skew_rad` / `yaw_skew_cos` / `induction_a_yawed`）；新增 `WMET_WDirRaw` 輸出 dict 項目 |
+| `simulator/physics/scada_registry.py` | 2026-05-03 | 0 | 無測試套件 | 還原 `WMET_WDirRaw` ScadaTag 定義（#125 cleanup 誤刪） |
 | `simulator/physics/wind_field.py` | 2026-04-27 | 0 | 無測試套件 | 無變更 |
-| `simulator/engine.py` | 2026-04-27 | 0 | 無測試套件 | 無變更 |
-| `simulator/physics/power_curve.py` | 2026-04-25 | 0 | 無測試套件 | 無變更（提供 `aero_out.tsr` / `aero_out.ct` 供 #125 共用） |
-| `simulator/physics/yaw_model.py` | 2026-04-17 | 0 | 無測試套件 | 無變更（提供 `yaw_out["yaw_error"]` 供 #125 讀取） |
+| `simulator/engine.py` | 2026-05-02 | 0 | 無測試套件 | 無變更（#127 過後保持） |
+| `simulator/physics/power_curve.py` | 2026-04-25 | 0 | 無測試套件 | 無變更（提供 `aero_out.tsr` / `aero_out.ct` 供 NTF/WVTF 共用） |
+| `simulator/physics/yaw_model.py` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
 | `simulator/physics/fatigue_model.py` | 2026-04-22 | 0 | 無測試套件 | 無變更 |
 | `wind_model.py`（根目錄） | 2026-04-24 | 0 | 無測試套件 | 無變更 |
 | `server/` | 2026-04-17 | 0 | 無測試套件 | 無變更 |
@@ -74,148 +72,135 @@
 
 ## 程式碼品質
 
-- Lint 錯誤：核心模組 `server/` + `simulator/` + `wind_model.py` = **0**
-- `ruff check simulator/ server/ wind_model.py` — `All checks passed!`（修正前有 1 個 F601 重複 key 錯誤，本次連同 #125 實作一起清除）
+- Lint 錯誤：核心模組 `server/` + `simulator/` + `wind_model.py` = **0**（修復前 2 個 F841 unused-variable）
+- `ruff check simulator/ server/ wind_model.py` — `All checks passed!`（修復前 2 個錯誤已清除）
 - `python -m py_compile simulator/physics/turbine_physics.py simulator/physics/scada_registry.py` — 通過
-- 物理單元自測（`/tmp/test_glauert_yaw_skew.py`）— **9 / 9 PASS**：
-  - 基準（γ=0°, Region 2, Ct=0.82, λ=7）：NTF=0.8417, bias=3.36°（完整重現 #117/#119）✓
-  - γ=15°（cos²=0.933, cos=0.966）：NTF=0.8523, bias=3.24°（誘導減量縮 6.7%、bias 縮 3.4%）✓
-  - γ=30°（cos²=0.75, cos=0.866）：NTF=0.8813, bias=2.91° ✓
-  - γ=45°（cos²=0.5, cos=0.707）：NTF=0.9208, bias=2.37° ✓
-  - γ=60° clamp 至 ±45°：NTF 與 γ=45° 完全相同 ✓
-  - 對稱性 γ=±15°：NTF 與 bias 量值一致（cos² 與 cos 對 ± 對稱）✓
-  - Region 3 γ=0° vs γ=15°：NTF 0.9551→0.9581（向 1.0 收斂），bias 1.72°→1.66° ✓
-  - 停機（rpm=0）γ=30°：NTF=1.04（鈍體加速）, bias=0°（無偏航效應）✓
-  - 單調性：NTF(γ) 隨 |γ|↑ 單調趨近 1.0（[0.8417, 0.8429, ..., 0.9208]）✓
-- 引擎端到端 smoke test：**未執行**（本環境未安裝 numpy；獨立物理單元測試已驗證 #125 邏輯）
+- 物理單元自測（`/tmp/test_wdir_raw_restore.py`）— **16 / 16 PASS**：
+  - `#119` baseline 完整重現：Region 2 (Ct=0.82, λ=7) → +3.36°；Region 2.5 → +3.10°；Region 3 (Ct=0.30, λ=5) → +1.72°；starting (Ct=0.55, λ=6) → +2.63°；停機 / 不運轉 → 0°
+  - `#125` Glauert γ 投影：γ=15° → +3.24°（cos=0.966）；γ=30° → +2.91°（cos=0.866）；γ=45° → +2.37°（cos=0.707）；γ=60° clamps to γ=45°
+  - 對稱性 ±15° 一致（cos 偶函數）
+  - ±8° clamp（Ct=0.95 / λ=2 → +8°）
+  - 360° wrap-around（358° + 3.36° → 1.36°）
+  - Ct↑ → bias↑ 單調
+  - λ↑ → bias↓ 單調
+  - |γ|↑ → bias↓ 單調
+- 引擎端到端 smoke test：未執行（本環境未安裝 numpy；獨立物理單元測試已驗證 #119 / #125 / 本次修復邏輯）
 - Broken imports：0
 - 語法錯誤：0
-- 測試套件：未建立（無 pytest）— 追蹤 issue #52；本次自測腳本可移入 `tests/physics/test_glauert_yaw.py` 作為 pytest 起點
+- 測試套件：未建立（無 pytest）— 追蹤 issue #52；本次自測腳本累積至 4 個（`/tmp/test_ntf.py` / `test_wvtf.py` / `test_glauert_yaw_skew.py` / `test_wdir_raw_restore.py`），可一併移入 `tests/physics/test_iec_61400_12.py` 作為 pytest 起點
 - 安全漏洞：17 個（5 個套件），詳見 #48
 - TODO/FIXME/HACK：0 個（核心模組）
-- SCADA 物理標籤：**104 個**（#125 不新增標籤）
+- SCADA 物理標籤：**104 個**（registry 110 entries = 104 physics + 6 system，恢復至 #119 / #125 後基線）
 
-## 今日新增功能
+## 今日修補：WMET_WDirRaw 回歸修復 + #127 殘留死碼清除
 
-### NTF + WVTF 在偏航誤差下的 Glauert 偏航斜流修正 — #125
+### 問題與根因
 
-**問題與物理原理**
+`#125` 的 commit message 與 daily report 都聲稱「移除 `#119` 合併殘留的 `WMET_WDirRaw` 重複 key」，並標記為 F601 lint 修復。但實際情況：
 
-`#117`（NTF, IEC 61400-12-1 Annex D）與 `#119`（WVTF, IEC 61400-12-2 Annex E）已建立機艙風速計與風向計的轉換函數鏈，但兩者皆以**偏航誤差 γ=0**為前提實作。實際運轉中：
+1. **`scada_registry.py`**：原本就只有**一個** `WMET_WDirRaw` ScadaTag 定義（位於 line 148–152，緊接 `WMET_WDirAbs` 之後），**並無重複**。F601 警告完全來自 `turbine_physics.py::step()` 輸出 dict 內的重複 dict key（`{"WMET_WDirRaw": ..., ..., "WMET_WDirRaw": ...}`，兩處 round/value 不同）。
+2. **`#125` cleanup 誤判**：把 `scada_registry.py` 唯一的 `WMET_WDirRaw` 連同 `turbine_physics.py` 的重複 dict key 一起刪掉，於是 SCADA registry 從 110 → 109，且 `WMET_WDirRaw` 從 `step()` 輸出 dict 完全消失。
+3. **殘留遺孤**：`step()` 內仍計算 `nac_vane_raw = (wind_direction + vane_bias_deg) % 360.0`（line 778），但因 dict 已無對應 key，這個變數變成「ruff F841 unused variable」；`#119` WVTF 物理仍在跑，但 SCADA 端讀不到，下游消費者拿到 missing-key fallback。
 
-- `yaw_misalignment` 故障會把 γ 拉到 5–25°
-- 偏航控制 dead-band（±5°）下，平時也常見 ±5°
-- 強陣風 / 風向急轉時瞬時 γ 可達 15°
-
-此時 IEC 61400-12-1/2 校驗實務需要套用 **Glauert 偏航斜流修正**（Glauert 1935 / Coleman skewed-wake）：
-
-| 操作狀態 | γ | cos²(γ) | NTF 縮減量比例 | NTF 因子 | bias 比例 | bias |
-|---------|---|---------|--------------|---------|----------|------|
-| Region 2 (Ct=0.82, λ=7) | 0° | 1.000 | 100% | 0.842 | 100% | 3.36° |
-| Region 2 | ±5° | 0.992 | 99.2% | 0.843 | 99.6% | 3.34° |
-| Region 2 | ±15° | 0.933 | 93.3% | 0.852 | 96.6% | 3.24° |
-| Region 2 | ±25° | 0.821 | 82.1% | 0.870 | 90.6% | 3.04° |
-| Region 2 | ±30° | 0.750 | 75.0% | 0.881 | 86.6% | 2.91° |
-| Region 2 | ±45° | 0.500 | 50.0% | 0.921 | 70.7% | 2.37° |
-
-**物理依據**：
-
-1. **NTF 偏航修正**（Glauert 1935 / Burton et al. 2011 §3.10 / Castillo-Negro et al. 2008 Coleman skewed-wake）：
-
-   ```
-   a_skew = a · cos²(γ)              ← Glauert combined-momentum 修正
-   V_raw  = V_∞ · (1 − k_pos · a_skew) = V_∞ · (1 − 0.55·a·cos²(γ))
-   ```
-
-   意義：偏航越大，轉子「擋住」的風越少，NTF 縮減量隨 cos²(γ) 收斂。
-
-2. **WVTF 偏航修正**（Burton 2011 §3.7 + 平面投影幾何）：
-
-   ```
-   θ_swirl_eff = (Ct / (2·λ)) · cos(γ)    ← 旋轉尾流向量投影到機艙平面
-   ```
-
-   意義：旋轉向量原本垂直於轉子軸，當轉子偏航 γ 後，旋轉平面相對機艙平面傾斜，風向計只讀到投影量。
-
-**實作公式**
+額外地，`#127` 杯式風速計 overspeeding bias 合併時，又留下三行孤立程式碼：
 
 ```python
-# ── Glauert yaw-skew factor (#125) shared by NTF + WVTF ──
-yaw_err_deg = max(-45.0, min(45.0, yaw_out["yaw_error"]))
-cos_gamma   = math.cos(math.radians(yaw_err_deg))
-cos2_gamma  = cos_gamma * cos_gamma
-
-# NTF (#117) — 軸向誘導折減
-ntf_factor = 1.0 - 0.55 * induction_a * cos2_gamma   # γ=0° 時退化為 #117 baseline
-
-# WVTF (#119) — 尾流旋轉投影
-swirl_rad = (ct_clip / (2.0 * aero_out.tsr)) * cos_gamma   # γ=0° 時退化為 #119 baseline
+# turbine_physics.py:739-741 (合併殘留)
+yaw_skew_rad = math.radians(max(-45.0, min(45.0, yaw_out["yaw_error"])))
+yaw_skew_cos = math.cos(yaw_skew_rad)
+induction_a_yawed = induction_a * yaw_skew_cos * yaw_skew_cos
 ```
 
-**修改範圍**
+這三行在 `#125` `cos_gamma` / `cos2_gamma` 區塊（line 725–727）的下方，內容完全等價但變數名不同，且**從未被使用**——active NTF 路徑使用 `cos2_gamma`。ruff F841 抓到 `induction_a_yawed` 與下方的 `nac_vane_raw` 兩個 unused variable。
 
-1. `simulator/physics/turbine_physics.py`：
-   - `step()` 內於 #117/#119 區塊前新增 5 行共用 `cos(γ)` 計算（讀 `yaw_out["yaw_error"]`，clamp ±45°）
-   - NTF 公式：`1 - 0.55 * a * cos²(γ)`
-   - WVTF 公式：`(Ct/(2λ)) * cos(γ)`
-   - 移除輸出 dict 內重複的 `WMET_WDirRaw`（F601 lint 修復，#119 殘留）
-2. `simulator/physics/scada_registry.py`：
-   - 移除重複的 `WMET_WDirRaw` ScadaTag 定義（保留行 151 原始定義，刪除行 202 重複）
-3. SCADA 標籤總數**保持 104 個**
+### 為何這是 IEC 61400-12-2 規範下的物理回歸
 
-**驗證結果**
+`#119` 引入 `WMET_WDirRaw` 是為了完整 IEC 61400-12-1/2 機艙感測器轉換函數鏈：
 
-`/tmp/test_glauert_yaw_skew.py`（9 / 9 PASS）：
+- `WMET_WSpeedRaw`（`#117` NTF）：杯式 / sonic 風速計受軸向誘導折扣的原始讀值
+- `WMET_WDirRaw`（`#119` WVTF）：風向計受轉子尾流旋轉偏置的原始讀值
 
-| 案例 | γ | NTF | bias | 驗證 |
-|------|---|-----|------|------|
-| Region 2 baseline | 0° | 0.8417 | 3.36° | 完整重現 #117/#119 ✓ |
-| Region 2 偏航小 | 15° | 0.8523 | 3.24° | NTF↑、bias↓ ✓ |
-| Region 2 偏航中 | 30° | 0.8813 | 2.91° | cos²=0.75 對應 ✓ |
-| Region 2 偏航大 | 45° | 0.9208 | 2.37° | cos²=0.5 對應 ✓ |
-| 過界 clamp | 60°→45° | 0.9208 | 2.37° | 與 45° 完全相同 ✓ |
-| 對稱性 | ±15° | 0.8523 | ±3.24° | cos / cos² 都偶函數 ✓ |
-| Region 3 γ=15° | — | 0.9581 | 1.66° | 比 γ=0° 更接近 1.0 ✓ |
-| 停機 γ=30° | — | 1.0400 | 0.00° | 偏航無效 ✓ |
-| 單調性 | 0..45° | ↗ | — | NTF 單調趨近 1.0 ✓ |
+兩者**配對**才能讓「以機艙風速計與風向計校驗 nacelle power performance」（IEC 61400-12-2 ed.1 §6.4 + Annex E）的下游分析正確進行。`#125` cleanup 把其中一半（風向計）刪掉，等於把 `#119` 的物理工作從 SCADA 端隱藏，但物理計算還在跑（`nac_vane_raw` 還在計算），這是典型的「靜默回歸」（silent regression）。
 
-**為何是物理「因」而非輸出端修正**
+### 物理依據（重申以記錄完整脈絡）
 
-- Glauert (1935) 的 `a_skew = a·cos²(γ)` 來自動量定理在偏航條件下的封閉解
-- 平面投影 `θ_swirl_eff = θ_swirl·cos(γ)` 來自旋轉向量在傾斜平面上的幾何投影
-- 重用既有 `aero_out.ct` / `aero_out.tsr` / `yaw_out["yaw_error"]`，無新計算成本、無新 RNG mutation
-- 不改動 `WMET_WSpeedNac` 或 `WMET_WDirAbs`，保持向後相容（前端風玫瑰、上游 wake 索引、`yaw_model` 控制器邏輯皆不受影響）
-- γ=0° 時公式自動退化為 #117/#119 baseline，無破壞性變更
+`#119` 引用的 swirl bias：
 
-**為何 cos(γ) 一次計算就好**
+```
+θ_swirl ≈ Ct / (2·λ) [rad]    (Burton et al. 2011 Wind Energy Handbook §3.7)
+                              (源自 BEM tangential induction a' = Ct/(4·λ))
+```
 
-- NTF 與 WVTF 區塊相鄰（`turbine_physics.py:719–755`）
-- 兩個區塊都需要從 `yaw_out["yaw_error"]` 取 γ
-- 兩者都在同一個 `step()` 內計算
-- → 共用一個 `cos_gamma`/`cos2_gamma` 變數，零額外計算成本
+`#125` 的 Glauert γ 投影：
 
-**與其他模型的關係**
+```
+θ_swirl_eff = (Ct / (2·λ)) · cos(γ)    (planar projection / Burton §3.10)
+γ clamped ±45°
+```
 
-- `power_curve.py`：提供 `aero_out.ct` / `aero_out.tsr` 給 NTF/WVTF/Glauert 共用，無重複計算
-- `yaw_model.py`：**不變動**，仍用自由流 `wind_direction` 計算控制誤差（Glauert 修正僅作用於 SCADA 感測器讀值）
-- `fault_engine.py`：`yaw_misalignment` 故障在 γ=15–25° 區間時，#125 修正使 `WMET_WSpeedRaw` 偏離 `WMET_WSpeedNac` 的程度減小（與真實儀器物理一致）
-- 與 ABL 五項耦合鏈（#99 / #109 / #111 / #113 / #115）：ABL 鏈處理「物理上有什麼風」，#117 / #119 / #125 處理「感測器看到什麼風 + 在不同操作條件下感測器如何看」
+| 操作狀態 | Ct | λ | γ | bias |
+|---------|-----|-----|----|------|
+| Region 2 peak Cp | 0.82 | 7 | 0° | +3.36° |
+| Region 2 偏航小 | 0.82 | 7 | 15° | +3.24° |
+| Region 2 偏航中 | 0.82 | 7 | 30° | +2.91° |
+| Region 2 偏航大 | 0.82 | 7 | 45° | +2.37° |
+| Region 3 變槳 | 0.30 | 5 | 0° | +1.72° |
+| 停機 | — | — | — | 0° |
 
-**預期下游應用**
+### 修補範圍
 
-- `WMET_WSpeedRaw / WMET_WSpeedNac` 與 `WYAW_YwVn1AlgnAvg5s` 的相關性可作為「偏航品質」的觀察通道
-- IEC 61400-12-2 機艙功率曲線驗證在 ±5° dead-band 下更逼真
-- 故障診斷：未來「vane 校正異常 → 系統性偏航誤差 → 功率損失」故障場景（#51 RAG 警報處理）建立完整物理基線
-- 教學示範：學生可從 SCADA 資料反推「轉子確實處於偏航」的隱性訊號
+1. `simulator/physics/scada_registry.py`：在 `WMET_WSpeedRaw`（line 193–197）正下方新增 `WMET_WDirRaw` ScadaTag（與 `WMET_WSpeedRaw` 配對，作為 IEC 61400-12-1/2 機艙感測器原始讀值雙生對）。
+2. `simulator/physics/turbine_physics.py`：
+   - 移除 `#127` 合併殘留的 3 行死碼（`yaw_skew_rad` / `yaw_skew_cos` / `induction_a_yawed`）—— `#125` `cos2_gamma` 已涵蓋
+   - 在輸出 dict 新增 `"WMET_WDirRaw": round(nac_vane_raw, 2)`
+3. SCADA 物理標籤總數：**104**（不變）；registry total entries：109 → **110**（恢復至 `#119` / `#125` 後基線 = 104 physics + 6 system）
+
+### 驗證結果
+
+`/tmp/test_wdir_raw_restore.py`（16 / 16 PASS）：
+
+| 案例 | 預期 | 實際 |
+|------|------|------|
+| R2 baseline γ=0° | 3.36° | 3.356° ✓ |
+| R2.5 baseline γ=0° | 3.10° | 3.104° ✓ |
+| R3 baseline γ=0° | 1.72° | 1.719° ✓ |
+| starting γ=0° | 2.63° | 2.626° ✓ |
+| stopped (rpm=0) | 0° | 0° ✓ |
+| not running | 0° | 0° ✓ |
+| 極端 Ct=0.95/λ=2 clamp +8° | 8.00° | 8.000° ✓ |
+| R2 γ=15° | 3.24° | 3.242° ✓ |
+| R2 γ=30° | 2.91° | 2.906° ✓ |
+| R2 γ=45° | 2.37° | 2.373° ✓ |
+| γ=60° clamp 至 45° | 2.37° | 2.373° ✓ |
+| ±15° 對稱性 | 3.24° | 3.242° ✓ |
+| 360° wrap (358°+3.36°→1.36°) | 1.36° | 1.356° ✓ |
+| Ct↑ → bias↑ 單調 | ✓ | ✓ |
+| λ↑ → bias↓ 單調 | ✓ | ✓ |
+| \|γ\|↑ → bias↓ 單調 | ✓ | ✓ |
+
+### 為何不是新功能而是修補（符合工作原則）
+
+- 「prefer changing physical causes over directly offsetting output tags」：本次只是還原 `#119` 引入的物理「因」（轉子尾流旋轉 → 風向計偏移）讓 SCADA 端讀得到，並未引入新公式
+- 「keep new work observable in history charts whenever possible」：恢復 `WMET_WDirRaw` 後，前端 history、API export、OPC adapter 才能再次觀察 `(WMET_WDirRaw − WMET_WDirAbs)` 通道，這是工程現場診斷「vane miscalibration → 系統性偏航誤差」的關鍵訊號
+- 不引入新 RNG mutation、新狀態變數、新計算成本——`nac_vane_raw` 早已計算，只是把它接回輸出
+- 與既有 `#125` Glauert γ 修正 **零衝突**——`vane_bias_deg` 計算（line 772–777）已包含 `cos_gamma`
+
+### 與其他模型的關係
+
+- `power_curve.py`：提供 `aero_out.ct` / `aero_out.tsr`（不變）
+- `yaw_model.py`：提供 `yaw_out["yaw_error"]`（不變）
+- `wind_field.py`：`WMET_WDirAbs`（自由流方向）保持不變，繼續被上游 wake 索引與 yaw 控制器使用
+- `frontend/`：可在 settings tags 列表新增 `WMET_WDirRaw`（不必要，因為 OPC adapter 與 API export 都會自動反映 registry）
 
 ## 建議行動
 
-1. **物理鏈路下一步**：`#125` 完成 IEC 61400-12-1/2 機艙感測器在偏航條件下的閉合，可繼續：
-   - 低空噴流 (Low-Level Jet, LLJ)：Taiwan 離岸風場常見現象，與 #99 穩定度耦合，影響 hub-height 風速 + 風切剖面 + 疲勞 DEL
-   - 大氣穩定度 × Coriolis 旋轉（地球自轉效應，影響超長時間尺度風向漂移）
-   - 大氣穩定度 × Reynolds 應力剖面（垂直 momentum flux，影響近地層）
+1. **物理鏈路下一步**（保留 `#125` 日報所述 6 項候選）：`#119` / `#125` / `#127` 的 IEC 61400-12-1/2 機艙感測器鏈現已完整閉合，可繼續：
+   - 低空噴流 (Low-Level Jet, LLJ)：Taiwan 離岸風場常見現象，與 `#99` 穩定度耦合
+   - 大氣穩定度 × Coriolis 旋轉（地球自轉效應）
    - 海面波浪 × 風速耦合（離岸場景：風浪互動、海面粗糙度動態變化 z₀(U)）
-   - 氣動彈性簡化 BEM 葉素動量法（取代目前 Cp(λ,β) 解析面）
-   - 風速計 1P/3P 高頻擾動（葉片通過機艙頂部的機械擾動）— 補完 #117 的時間域訊號真實性
-2. **測試基礎建設（#52）**：本次 `/tmp/test_glauert_yaw_skew.py` 配合上一輪的 `/tmp/test_ntf.py` / `/tmp/test_wvtf.py` 已具備三個 IEC 61400-12-1/2 物理單元測試，可一併移入 `tests/physics/` 作為 pytest 起點，再涵蓋 #99 / #109 / #111 / #113 / #115 / #117 / #119 / #125 共八個物理路徑。
+   - 風速計 1P / 3P 高頻擾動（葉片通過機艙頂部的機械擾動）—— 補完 `#117` 的時間域訊號真實性
+   - 動態尾流捲曲 (curled-wake)：偏航 + Ct 大角度下的 counter-rotating vortex pair，補完 `#97` Bastankhah 線性偏轉
+   - 氣動彈性簡化 BEM（葉素動量法），取代目前 Cp(λ,β) 解析面
+2. **測試基礎建設（#52）**：累積到 4 個 `/tmp/` IEC 61400-12-1/2 物理單元測試（NTF / WVTF / Glauert / WDirRaw 回歸），可移入 `tests/physics/test_iec_61400_12.py` 作為 pytest 起點，再涵蓋 `#99` / `#109` / `#111` / `#113` / `#115` / `#117` / `#119` / `#125` / `#127` 共九個物理路徑。
 3. **前端 RUL 視覺化（#57）**：後端 alarm/RUL 已完成，前端可開始實作（與物理優先序低，但用戶可見）。
+4. **PR review 流程改善**：`#125` 與 `#127` 兩次合併都留下「靜默」殘留（一次刪光必要 tag、一次留死碼），建議未來在 PR 階段加上「`ruff check simulator/` 必須 pass」的 CI gate，可在 5 分鐘內捕獲今日修復的兩種 F841 問題。
