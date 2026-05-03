@@ -195,11 +195,6 @@ _TAGS: List[ScadaTag] = [
              "Raw Nacelle Anemometer Reading (NTF applied, IEC 61400-12-1 Annex D)",
              "機艙風速計原始讀值(含轉換函數)",
              0, 40),
-    ScadaTag("WMET_WDirRaw", "WMET.Z72PLC__UI_Loc_WMET_Analogue_WDirRaw",
-             "WMET", "REAL32", "deg",
-             "Raw Nacelle Wind Vane Reading (WVTF applied, IEC 61400-12-2 Annex E)",
-             "機艙風向計原始讀值(含尾流旋轉偏差)",
-             0, 360),
 
     # ══════════════════════════════════════════════════════════════════════
     # WNAC — Nacelle
