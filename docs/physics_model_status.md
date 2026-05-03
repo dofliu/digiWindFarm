@@ -1,6 +1,6 @@
 # Physics Model Status
 
-Last updated: 2026-05-02 (cup-anemometer overspeeding bias on NTF, IEC 61400-12-1 Annex H, #127)
+Last updated: 2026-04-30 (yaw-skew Glauert correction for NTF + WVTF, #125)
 
 This document tracks the current completion status of the wind turbine physics models.
 It is intended to be the single reference for:
@@ -547,6 +547,5 @@ Implemented:
 23. ~~atmospheric-stability × turbulence integral length scale L_u coupling~~ → done (#115, `L_u_eff = 340 · clamp(1 − 0.6·s, 0.4, 2.0)` m, stable 544 m / neutral 340 m / convective 136 m, lag-30 s autocorr 0.57 vs 0.10 @ 10 m/s, σ_v amplitude unchanged, no new tag)
 24. ~~nacelle anemometer transfer function (NTF, IEC 61400-12-1 Annex D)~~ → done (#117, `V_raw = V_∞·(1 − 0.55·a)`, Region 2 → 0.84·V_∞ / Region 3 → 0.96·V_∞ / stopped → 1.04·V_∞, `WMET_WSpeedRaw`)
 25. ~~nacelle wind vane transfer function (WVTF, IEC 61400-12-2 Annex E)~~ → done (#119, `θ_s ≈ Ct/(2·λ)`, Region 2 → +3.36° / Region 3 → +1.72° / stopped → 0°, clamp ±8°, `WMET_WDirRaw`)
-26. ~~Glauert yaw skewed-flow correction on NTF + WVTF~~ → done (#125, `a_skew = a·cos²(γ)` for NTF, `θ_s_eff = θ_s·cos(γ)` for WVTF, γ clamped ±45°; closes IEC 61400-12-1/2 chain under yaw misalignment; γ=0 baseline preserved exactly; γ=15° → NTF ratio 0.933×, WVTF ratio 0.966×; γ=30° → 0.75× / 0.866×; γ=45° → 0.50× / 0.707×; reuses `yaw_out["yaw_error"]` already in step()`, no extra cost, no new SCADA tag)
-27. ~~cup-anemometer overspeeding bias (IEC 61400-12-1 Annex H)~~ → done (#127, `bias = 1 + 1.5·TI_local²` with `TI_local = sqrt((effective_ti·local_mult)² + wake_added_ti²)`, clamp ≤+10%; TI=0.10 → +1.5% / TI=0.15 → +3.4% / TI=0.20 → +6.0% / TI≥0.27 → clamped +10%; closes IEC 61400-12-1 mean (Annex D) + Glauert (#125) + statistical (Annex H) chain; first TI-coupling into sensor reading; no new SCADA tag)
-28. deployment hardening (JWT auth, RBAC, Docker Compose)
+26. ~~yaw-skew Glauert correction for NTF + WVTF~~ → done (#125, `a_eff = a·cos²(γ)` for NTF and `θ_s_eff = θ_s·cos(γ)` for WVTF, γ clamped ±45°; γ=0 reproduces #117/#119 exactly; γ=15° NTF correction shrinks 6.7% / WVTF bias shrinks 3.4%; γ=45° NTF correction halved; closes IEC 61400-12-1/2 chain under non-zero yaw error; cleanup of duplicate `WMET_WDirRaw` registration; no new SCADA tag, observable via `(WMET_WSpeedRaw / WMET_WSpeedNac − 1) × WYAW_YwVn1AlgnAvg5s` correlation)
+27. deployment hardening (JWT auth, RBAC, Docker Compose)
