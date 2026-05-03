@@ -736,9 +736,6 @@ class TurbinePhysicsModel:
         # (#125): induction reduction scales by cos²(γ).
         ct_clip = max(0.0, min(0.95, aero_out.ct))
         induction_a = 0.5 * (1.0 - math.sqrt(1.0 - ct_clip)) if ct_clip > 0 else 0.0
-        yaw_skew_rad = math.radians(max(-45.0, min(45.0, yaw_out["yaw_error"])))
-        yaw_skew_cos = math.cos(yaw_skew_rad)
-        induction_a_yawed = induction_a * yaw_skew_cos * yaw_skew_cos
         if (is_producing or is_starting) and self.rotor_speed > 1.0:
             ntf_factor = 1.0 - 0.55 * induction_a * cos2_gamma
         else:
@@ -820,6 +817,7 @@ class TurbinePhysicsModel:
             "WMET_AirDensity": round(self._air_density, 4),
             "WMET_AmbPressure": round(self._ambient_pressure_pa / 100.0, 1),
             "WMET_WSpeedRaw": round(nac_anem_raw, 2),
+            "WMET_WDirRaw": round(nac_vane_raw, 2),
             "WNAC_NacTmp": temps["nacelle"],
             "WNAC_NacCabTmp": temps["nac_cabinet"],
             "WNAC_VibMsNacXDir": round(vib_x, 3),
